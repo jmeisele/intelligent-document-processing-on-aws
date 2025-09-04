@@ -9,15 +9,20 @@ Build artifacts
 Upload artifacts to S3 bucket for deployment with CloudFormation
 """
 
+import base64
 import concurrent.futures
 import hashlib
 import json
 import os
+import py_compile
 import shutil
 import subprocess
 import sys
 import time
+import traceback
 import zipfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
@@ -648,8 +653,6 @@ STDERR:
             )
 
         except Exception as e:
-            import traceback
-
             # Delete checksum on any failure to force rebuild next time
             self._delete_checksum_file(directory)
             self.log_verbose(f"Exception in build_and_package_template: {str(e)}")
@@ -770,7 +773,6 @@ STDERR:
 
                     except Exception as e:
                         # Log detailed error information
-                        import traceback
 
                         error_output = f"Exception: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
                         self.log_error_details(
@@ -904,8 +906,6 @@ STDERR:
             self.console.print("[red]❌ Error running lambda build validation:[/red]")
             self.console.print(str(e), style="red", markup=False)
             if self.verbose:
-                import traceback
-
                 self.console.print(f"[red]{traceback.format_exc()}[/red]")
             self.console.print(
                 "[bold red]🚫 Publish process aborted due to validation error![/bold red]"
@@ -1222,8 +1222,6 @@ except Exception as e:
         if not changed:
             return None, None
 
-        import concurrent.futures
-
         ui_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         ui_validation_future = ui_executor.submit(self.validate_ui_build)
         self.console.print(
@@ -1324,6 +1322,119 @@ except Exception as e:
 
         return zipfile_name
 
+    def package_pattern2_source(self):
+        """Package Pattern-2 source code for CodeBuild to build Docker images"""
+        self.console.print(
+            "[bold cyan]📦 Packaging Pattern-2 source for Docker builds[/bold cyan]"
+        )
+
+        # Calculate content hash for versioning
+        paths_to_hash = [
+            "Dockerfile.optimized",
+            "patterns/pattern-2/buildspec.yml",
+            "lib/idp_common_pkg",
+            "patterns/pattern-2/src",
+        ]
+
+        combined_hash = hashlib.sha256()
+        for path in paths_to_hash:
+            if os.path.isfile(path):
+                file_hash = self.get_file_checksum(path)
+                if file_hash:
+                    combined_hash.update(file_hash.encode())
+            elif os.path.isdir(path):
+                dir_hash = self.get_component_checksum(path)
+                if dir_hash:
+                    combined_hash.update(dir_hash.encode())
+
+        content_hash = combined_hash.hexdigest()[:8]
+        zipfile_name = f"pattern-2-source-{content_hash}.zip"
+        zipfile_path = os.path.join(".aws-sam", zipfile_name)
+
+        # Create zip if it doesn't exist
+        if not os.path.exists(zipfile_path):
+            os.makedirs(".aws-sam", exist_ok=True)
+            self.console.print(
+                f"[cyan]Creating Pattern-2 source zip: {zipfile_name}[/cyan]"
+            )
+
+            with zipfile.ZipFile(zipfile_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+                # Add Dockerfile
+                zipf.write("Dockerfile.optimized", "Dockerfile.optimized")
+
+                # Add buildspec.yml
+                zipf.write("patterns/pattern-2/buildspec.yml", "patterns/pattern-2/buildspec.yml")
+
+                # Add lib/idp_common_pkg
+                for root, dirs, files in os.walk("lib/idp_common_pkg"):
+                    # Exclude build artifacts and cache
+                    dirs[:] = [
+                        d
+                        for d in dirs
+                        if d
+                        not in {
+                            "__pycache__",
+                            ".pytest_cache",
+                            "dist",
+                            "build",
+                            "*.egg-info",
+                        }
+                    ]
+                    for file in files:
+                        if file.endswith((".pyc", ".pyo")):
+                            continue
+                        file_path = os.path.join(root, file)
+                        arcname = os.path.relpath(file_path, ".")
+                        zipf.write(file_path, arcname)
+
+                # Add patterns/pattern-2/src
+                for root, dirs, files in os.walk("patterns/pattern-2/src"):
+                    dirs[:] = [
+                        d
+                        for d in dirs
+                        if d not in {"__pycache__", ".pytest_cache", ".aws-sam"}
+                    ]
+                    for file in files:
+                        if file.endswith((".pyc", ".pyo")):
+                            continue
+                        file_path = os.path.join(root, file)
+                        arcname = os.path.relpath(file_path, ".")
+                        zipf.write(file_path, arcname)
+
+            self.console.print(
+                f"[green]✅ Created Pattern-2 source zip ({os.path.getsize(zipfile_path) / 1024 / 1024:.2f} MB)[/green]"
+            )
+
+        # Upload to S3 if needed
+        s3_key = f"{self.prefix_and_version}/{zipfile_name}"
+        try:
+            self.s3_client.head_object(Bucket=self.bucket, Key=s3_key)
+            self.console.print(
+                f"[green]Pattern-2 source already exists in S3: {zipfile_name}[/green]"
+            )
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "404":
+                self.console.print(
+                    f"[cyan]Uploading Pattern-2 source to S3: {s3_key}[/cyan]"
+                )
+                try:
+                    self.s3_client.upload_file(zipfile_path, self.bucket, s3_key)
+                    self.console.print(
+                        "[green]✅ Uploaded Pattern-2 source to S3[/green]"
+                    )
+                except ClientError as upload_error:
+                    self.console.print(
+                        f"[red]❌ Error uploading Pattern-2 source: {upload_error}[/red]"
+                    )
+                    sys.exit(1)
+            else:
+                self.console.print(
+                    f"[red]❌ Error checking S3 for Pattern-2 source: {e}[/red]"
+                )
+                sys.exit(1)
+
+        return zipfile_name
+
     def _upload_template_to_s3(self, template_path, s3_key, description):
         """Helper method to upload template to S3 with error handling"""
         self.console.print(f"[cyan]Uploading {description} to S3: {s3_key}[/cyan]")
@@ -1418,7 +1529,6 @@ except Exception as e:
                 )
 
                 # Replace tokens in template
-                from datetime import datetime, timezone
 
                 build_date_time = datetime.now(timezone.utc).strftime(
                     "%Y-%m-%d %H:%M:%S"
@@ -1772,7 +1882,6 @@ except Exception as e:
 
     def _validate_python_syntax(self, directory):
         """Validate Python syntax in all .py files in the directory"""
-        import py_compile
 
         for root, dirs, files in os.walk(directory):
             for file in files:
