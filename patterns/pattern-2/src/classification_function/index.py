@@ -28,6 +28,11 @@ def handler(event, context):
     Lambda handler for document classification.
     """
     logger.info(f"Event: {json.dumps(event)}")
+    
+    # Check for selective processing flags
+    skip_classification = event.get("skip_classification", False)
+    processing_mode = event.get("processing_mode", "normal")
+    
     # Load configuration
     config = get_config()
     # Use default=str to handle Decimal and other non-serializable types
@@ -37,6 +42,30 @@ def handler(event, context):
     working_bucket = os.environ.get('WORKING_BUCKET')
     document = Document.load_document(event["OCRResult"]["document"], working_bucket, logger)
     
+    # If selective processing is enabled and classification should be skipped, apply manual changes
+    if skip_classification and processing_mode == "selective":
+        logger.info(f"Skipping classification for document {document.id} - applying manual changes")
+        
+        # Ensure document has the expected execution ARN
+        document.workflow_execution_arn = event.get("execution_arn")
+        
+        # Manual changes have already been applied to the document by the process_changes_resolver
+        # The sections and pages already have the correct classifications
+        # We just need to ensure the document status is updated appropriately
+        document_service = create_document_service()
+        
+        # Don't change status to CLASSIFYING since we're skipping this step
+        logger.info(f"Applied manual classification changes for selective processing")
+        
+        # Prepare output with the manually modified document
+        response = {
+            "document": document.serialize_document(working_bucket, "classification_skip", logger)
+        }
+        
+        logger.info(f"Classification skipped - Response: {json.dumps(response, default=str)}")
+        return response
+    
+    # Normal classification processing
     # Update document status to CLASSIFYING
     document.status = Status.CLASSIFYING
     document.workflow_execution_arn = event.get("execution_arn")

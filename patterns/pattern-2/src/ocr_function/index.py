@@ -32,9 +32,36 @@ def handler(event, context):
     """       
     logger.info(f"Event: {json.dumps(event)}")
     
+    # Check for selective processing flags
+    skip_ocr = event.get("skip_ocr", False)
+    processing_mode = event.get("processing_mode", "normal")
+    
     # Get document from event
     document = Document.from_dict(event["document"])
     
+    # If selective processing is enabled and OCR should be skipped, return existing data
+    if skip_ocr and processing_mode == "selective":
+        logger.info(f"Skipping OCR processing for document {document.id} - selective processing mode")
+        
+        # Ensure document has the expected status and execution ARN
+        document.workflow_execution_arn = event.get("execution_arn")
+        
+        # Update document status if needed (but don't change to OCR since we're skipping)
+        if document.status == Status.QUEUED:
+            document_service = create_document_service()
+            logger.info(f"Updating document execution ARN for selective processing")
+            document_service.update_document(document)
+        
+        # Prepare output with existing document data
+        working_bucket = os.environ.get('WORKING_BUCKET')
+        response = {
+            "document": document.serialize_document(working_bucket, "ocr_skip", logger)
+        }
+        
+        logger.info(f"OCR skipped - Response: {json.dumps(response, default=str)}")
+        return response
+    
+    # Normal OCR processing
     # Update document status to OCR and update in AppSync
     document.status = Status.OCR
     document.workflow_execution_arn = event.get("execution_arn")
