@@ -17,6 +17,7 @@ image: public.ecr.aws/docker/library/python:3.13-bookworm
 stages:
   - developer_tests
   - integration_tests
+  - deployment_validation
 
 developer_tests:
   stage: developer_tests
@@ -93,4 +94,105 @@ integration_tests:
     - poetry install
     - make put
     - make wait
+
+deployment_validation:
+  stage: deployment_validation
+  rules:
+    - when: always
+
+  before_script:
+    - apt-get update -y
+    - apt-get install curl unzip python3-pip -y
+    # Install AWS CLI
+    - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    - unzip awscliv2.zip
+    - ./aws/install
+    # Install PyYAML for template analysis
+    - pip install PyYAML
+
+  script:
+    # Validate CloudFormation service role template syntax
+    - aws cloudformation validate-template --template-body file://iam-roles/cloudformation-management/IDP-Cloudformation-Service-Role.yaml --no-cli-pager
+    # Check if service role has sufficient permissions for main stack deployment
+    - python3 -c "
+import yaml
+import sys
+import os
+import glob
+
+def extract_aws_services_from_template(template_path):
+    '''Extract AWS services used in a CloudFormation template'''
+    try:
+        with open(template_path, 'r') as f:
+            template = yaml.safe_load(f)
+        
+        services = set()
+        if 'Resources' in template:
+            for resource in template['Resources'].values():
+                if 'Type' in resource:
+                    resource_type = resource['Type']
+                    if resource_type.startswith('AWS::'):
+                        service = resource_type.split('::')[1].lower()
+                        services.add(service)
+        return services
+    except Exception as e:
+        print(f'Error processing {template_path}: {e}')
+        return set()
+
+def extract_permissions_from_role(role_template_path):
+    '''Extract permissions from IAM role template'''
+    with open(role_template_path, 'r') as f:
+        role_template = yaml.safe_load(f)
+    
+    permissions = set()
+    for resource in role_template['Resources'].values():
+        if resource['Type'] == 'AWS::IAM::Role':
+            for policy in resource['Properties']['Policies']:
+                for statement in policy['PolicyDocument']['Statement']:
+                    if statement['Effect'] == 'Allow':
+                        actions = statement['Action']
+                        if isinstance(actions, str):
+                            permissions.add(actions)
+                        else:
+                            permissions.update(actions)
+    return permissions
+
+# Extract permissions from service role
+role_permissions = extract_permissions_from_role('iam-roles/cloudformation-management/IDP-Cloudformation-Service-Role.yaml')
+
+# Find all CloudFormation templates
+template_files = []
+template_files.append('template.yaml')  # Main template
+template_files.extend(glob.glob('patterns/*/template.yaml'))
+template_files.extend(glob.glob('options/*/template.yaml'))
+
+# Extract required services from all templates
+required_services = set()
+for template_file in template_files:
+    if os.path.exists(template_file):
+        services = extract_aws_services_from_template(template_file)
+        required_services.update(services)
+        print(f'Services in {template_file}: {sorted(services)}')
+
+print(f'\\nAll required services: {sorted(required_services)}')
+
+# Check if role has permissions for each service
+missing_services = []
+for service in required_services:
+    # Check if role has wildcard or specific permissions for this service
+    has_permission = any(
+        perm == f'{service}:*' or 
+        perm.startswith(f'{service}:') or
+        perm == '*'
+        for perm in role_permissions
+    )
+    if not has_permission:
+        missing_services.append(service)
+
+if missing_services:
+    print(f'\\nWARNING: Service role may be missing permissions for: {sorted(missing_services)}')
+    sys.exit(1)
+else:
+    print(f'\\nSUCCESS: Service role appears to have sufficient permissions for all required services')
+"
   
