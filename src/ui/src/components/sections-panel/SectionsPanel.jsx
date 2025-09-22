@@ -104,14 +104,23 @@ const EditablePageIdsCell = ({ item, validationErrors, updateSection }) => {
     }
 
     // Parse comma-separated page IDs
-    const pageIds = trimmedValue
+    const rawPageIds = trimmedValue
       .split(/[,\s]+/) // Split on commas and/or whitespace
-      .map((id) => {
-        const trimmed = id.trim();
-        const parsed = parseInt(trimmed, 10);
-        return Number.isNaN(parsed) ? null : parsed;
-      })
-      .filter((id) => id !== null && id > 0);
+      .map((id) => id.trim())
+      .filter((id) => id !== '');
+
+    const seenIds = new Set();
+
+    const pageIds = rawPageIds
+      .map((rawId) => parseInt(rawId, 10))
+      .filter((parsed) => !Number.isNaN(parsed) && parsed > 0)
+      .filter((parsed) => {
+        if (seenIds.has(parsed)) {
+          return false;
+        }
+        seenIds.add(parsed);
+        return true;
+      });
 
     updateSection(item.Id, 'PageIds', pageIds);
   };
@@ -121,9 +130,9 @@ const EditablePageIdsCell = ({ item, validationErrors, updateSection }) => {
     setInputValue(detail.value);
   };
 
-  const handleBlur = ({ detail }) => {
+  const handleBlur = () => {
     // Parse and update PageIds when user finishes editing
-    parseAndUpdatePageIds(detail.value);
+    parseAndUpdatePageIds(inputValue);
   };
 
   return (
@@ -197,7 +206,7 @@ const createColumnDefinitions = (pages, documentItem, mergedConfig) => [
   },
 ];
 
-// Edit mode column definitions
+// Edit mode column definitions - expanded to use full available width
 const createEditColumnDefinitions = (
   validationErrors,
   updateSection,
@@ -211,8 +220,8 @@ const createEditColumnDefinitions = (
     cell: (item) => (
       <EditableIdCell item={item} validationErrors={validationErrors} updateSectionId={updateSectionId} />
     ),
-    minWidth: 200,
-    width: 320,
+    minWidth: 160,
+    width: 240,
     isResizable: true,
   },
   {
@@ -226,8 +235,8 @@ const createEditColumnDefinitions = (
         getAvailableClasses={getAvailableClasses}
       />
     ),
-    minWidth: 300,
-    width: 500,
+    minWidth: 200,
+    width: 300,
     isResizable: true,
   },
   {
@@ -236,16 +245,16 @@ const createEditColumnDefinitions = (
     cell: (item) => (
       <EditablePageIdsCell item={item} validationErrors={validationErrors} updateSection={updateSection} />
     ),
-    minWidth: 250,
-    width: 400,
+    minWidth: 200,
+    width: 350,
     isResizable: true,
   },
   {
     id: 'actions',
     header: 'Actions',
     cell: (item) => <EditableActionsCell item={item} deleteSection={deleteSection} />,
-    minWidth: 120,
-    width: 200,
+    minWidth: 100,
+    width: 130,
     isResizable: true,
   },
 ];
@@ -324,6 +333,10 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
     const pageIdMap = new Map();
     const sectionIdMap = new Map();
 
+    // Get available page IDs from the document
+    const availablePageIds = pages ? pages.map((page) => page.Id) : [];
+    const maxPageId = availablePageIds.length > 0 ? Math.max(...availablePageIds) : 0;
+
     sectionsToValidate.forEach((section) => {
       const sectionErrors = [];
 
@@ -338,18 +351,39 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
 
       // Check for empty page IDs
       if (!section.PageIds || section.PageIds.length === 0) {
-        sectionErrors.push('Section must have at least one page ID');
-      }
+        sectionErrors.push('Section must have at least one valid page ID');
+      } else {
+        // Check each page ID for validity
+        const invalidPageIds = [];
+        const nonExistentPageIds = [];
 
-      // Check for overlaps
-      section.PageIds.forEach((pageId) => {
-        if (pageIdMap.has(pageId)) {
-          const conflictSection = pageIdMap.get(pageId);
-          sectionErrors.push(`Page ${pageId} is already assigned to section ${conflictSection}`);
-        } else {
-          pageIdMap.set(pageId, section.Id);
+        section.PageIds.forEach((pageId) => {
+          // Check if page ID is valid (should be handled by parsing, but double-check)
+          if (!Number.isInteger(pageId) || pageId <= 0) {
+            invalidPageIds.push(pageId);
+          } else if (!availablePageIds.includes(pageId)) {
+            // Check if page exists in document
+            nonExistentPageIds.push(pageId);
+          } else if (pageIdMap.has(pageId)) {
+            // Check for overlaps with other sections
+            const conflictSection = pageIdMap.get(pageId);
+            sectionErrors.push(`Page ${pageId} is already assigned to section ${conflictSection}`);
+          } else {
+            pageIdMap.set(pageId, section.Id);
+          }
+        });
+
+        // Add specific error messages for invalid page IDs
+        if (invalidPageIds.length > 0) {
+          sectionErrors.push(`Invalid page IDs: ${invalidPageIds.join(', ')} (must be positive integers)`);
         }
-      });
+
+        if (nonExistentPageIds.length > 0) {
+          sectionErrors.push(
+            `Page IDs ${nonExistentPageIds.join(', ')} do not exist in this document (available: 1-${maxPageId})`,
+          );
+        }
+      }
 
       if (sectionErrors.length > 0) {
         errors[section.Id] = sectionErrors;
