@@ -65,8 +65,8 @@ def handler(event, context):
             response['groundTruthObjectKey'] = gt_object_key
             response['groundTruthPresignedUrl'] = json.dumps(gt_presigned_post)
 
-        job_id = arguments.get('jobId')
-
+        #generate unique job id
+        job_id = str(uuid.uuid4())
 
         create_discovery_job(job_id, object_key, gt_object_key)
 

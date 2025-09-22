@@ -10,6 +10,7 @@ from datetime import datetime
 
 from idp_common.bda.bda_blueprint_service import BdaBlueprintService
 
+
 logger = logging.getLogger()
 logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
 logging.getLogger('idp_common.bedrock.client').setLevel(os.environ.get("BEDROCK_LOG_LEVEL", "INFO"))

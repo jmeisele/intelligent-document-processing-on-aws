@@ -181,6 +181,22 @@ When deciding between Text-Based Holistic Classification and MultiModal Page-Lev
 
 ## Customizing Classification in Pattern 2
 
+### Configuration Settings
+
+#### Page Limit Configuration
+
+Control how many pages are used for classification:
+
+```yaml
+classification:
+  maxPagesForClassification: "ALL"  # Default: use all pages
+  # Or: "1", "2", "3", etc. - use only first N pages
+```
+
+**Important**: When set to a number (e.g., `"3"`), only the first N pages are classified, but the result is applied to ALL pages in the document. This forces the entire document to be assigned a single class with one section.
+
+### Prompt Components
+
 In Pattern 2, you can customize classification behavior through various prompt components:
 
 ### System Prompts

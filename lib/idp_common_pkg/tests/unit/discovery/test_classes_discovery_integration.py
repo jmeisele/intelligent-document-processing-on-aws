@@ -149,6 +149,9 @@ class TestClassesDiscoveryIntegration:
         with (
             patch("boto3.resource") as mock_dynamodb,
             patch("idp_common.bedrock.BedrockClient") as mock_bedrock_client,
+            patch(
+                "idp_common.discovery.classes_discovery.ConfigurationReader"
+            ) as mock_config_reader,
             patch.dict("os.environ", {"CONFIGURATION_TABLE_NAME": "test-config-table"}),
         ):
             # Mock DynamoDB table
@@ -158,6 +161,25 @@ class TestClassesDiscoveryIntegration:
             # Mock BedrockClient
             mock_client = MagicMock()
             mock_bedrock_client.return_value = mock_client
+
+            # Mock ConfigurationReader to return a default config
+            mock_reader_instance = mock_config_reader.return_value
+            mock_reader_instance.get_merged_configuration.return_value = {
+                "discovery": {
+                    "without_ground_truth": {
+                        "model_id": "anthropic.claude-3-sonnet-20240229-v1:0",
+                        "temperature": 1.0,
+                        "top_p": 0.1,
+                        "max_tokens": 10000,
+                    },
+                    "with_ground_truth": {
+                        "model_id": "anthropic.claude-3-sonnet-20240229-v1:0",
+                        "temperature": 1.0,
+                        "top_p": 0.1,
+                        "max_tokens": 10000,
+                    },
+                }
+            }
 
             service = ClassesDiscovery(
                 input_bucket="test-discovery-bucket",

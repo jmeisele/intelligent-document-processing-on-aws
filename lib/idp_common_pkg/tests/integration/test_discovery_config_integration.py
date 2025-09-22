@@ -65,7 +65,8 @@ discovery:
             ],
         }
 
-    @patch("idp_common.discovery.classes_discovery.boto3.resource")
+    @patch.dict("os.environ", {"CONFIGURATION_TABLE_NAME": "test-config-table"})
+    @patch("idp_common.discovery.classes_discovery.ConfigurationManager")
     @patch("idp_common.discovery.classes_discovery.bedrock.BedrockClient")
     @patch("idp_common.discovery.classes_discovery.bedrock.extract_text_from_response")
     @patch("idp_common.discovery.classes_discovery.S3Util.get_bytes")
@@ -74,15 +75,15 @@ discovery:
         mock_s3_get_bytes,
         mock_extract_text,
         mock_bedrock_client,
-        mock_boto3_resource,
+        mock_config_manager,
     ):
         """Test complete configuration flow for discovery without ground truth."""
         # Setup mocks
-        mock_table = Mock()
-        mock_boto3_resource.return_value.Table.return_value = mock_table
+        mock_config_manager_instance = Mock()
+        mock_config_manager.return_value = mock_config_manager_instance
 
-        # Mock the configuration table get_item method to return empty result
-        mock_table.get_item.return_value = {}
+        # Mock the configuration manager to return empty config
+        mock_config_manager_instance.get_configuration.return_value = None
 
         mock_bedrock_instance = Mock()
         mock_bedrock_client.return_value = mock_bedrock_instance
@@ -113,13 +114,22 @@ discovery:
         mock_extract_text.return_value = json.dumps(expected_result)
         mock_s3_get_bytes.return_value = b"mock document content"
 
-        # Initialize ClassesDiscovery with YAML config
-        discovery = ClassesDiscovery(
-            input_bucket=self.test_bucket,
-            input_prefix=self.test_prefix,
-            config=self.config_dict,
-            region=self.test_region,
-        )
+        # Mock ConfigurationReader to return config_dict
+        with patch(
+            "idp_common.discovery.classes_discovery.ConfigurationReader"
+        ) as mock_config_reader:
+            mock_reader_instance = mock_config_reader.return_value
+            mock_reader_instance.get_merged_configuration.return_value = (
+                self.config_dict
+            )
+
+            with patch.dict("os.environ", {"CONFIGURATION_TABLE_NAME": "test-table"}):
+                # Initialize ClassesDiscovery with YAML config
+                discovery = ClassesDiscovery(
+                    input_bucket=self.test_bucket,
+                    input_prefix=self.test_prefix,
+                    region=self.test_region,
+                )
 
         # Execute discovery without ground truth
         result = discovery.discovery_classes_with_document(
@@ -157,7 +167,8 @@ discovery:
         # Verify result
         self.assertEqual(result["status"], "SUCCESS")
 
-    @patch("idp_common.discovery.classes_discovery.boto3.resource")
+    @patch.dict("os.environ", {"CONFIGURATION_TABLE_NAME": "test-config-table"})
+    @patch("idp_common.discovery.classes_discovery.ConfigurationManager")
     @patch("idp_common.discovery.classes_discovery.bedrock.BedrockClient")
     @patch("idp_common.discovery.classes_discovery.bedrock.extract_text_from_response")
     @patch("idp_common.discovery.classes_discovery.S3Util.get_bytes")
@@ -166,15 +177,15 @@ discovery:
         mock_s3_get_bytes,
         mock_extract_text,
         mock_bedrock_client,
-        mock_boto3_resource,
+        mock_config_manager,
     ):
         """Test complete configuration flow for discovery with ground truth."""
         # Setup mocks
-        mock_table = Mock()
-        mock_boto3_resource.return_value.Table.return_value = mock_table
+        mock_config_manager_instance = Mock()
+        mock_config_manager.return_value = mock_config_manager_instance
 
-        # Mock the configuration table get_item method to return empty result
-        mock_table.get_item.return_value = {}
+        # Mock the configuration manager to return empty config
+        mock_config_manager_instance.get_configuration.return_value = None
 
         mock_bedrock_instance = Mock()
         mock_bedrock_client.return_value = mock_bedrock_instance
@@ -218,13 +229,22 @@ discovery:
 
         mock_s3_get_bytes.side_effect = mock_s3_side_effect
 
-        # Initialize ClassesDiscovery with YAML config
-        discovery = ClassesDiscovery(
-            input_bucket=self.test_bucket,
-            input_prefix=self.test_prefix,
-            config=self.config_dict,
-            region=self.test_region,
-        )
+        # Mock ConfigurationReader to return config_dict
+        with patch(
+            "idp_common.discovery.classes_discovery.ConfigurationReader"
+        ) as mock_config_reader:
+            mock_reader_instance = mock_config_reader.return_value
+            mock_reader_instance.get_merged_configuration.return_value = (
+                self.config_dict
+            )
+
+            with patch.dict("os.environ", {"CONFIGURATION_TABLE_NAME": "test-table"}):
+                # Initialize ClassesDiscovery with YAML config
+                discovery = ClassesDiscovery(
+                    input_bucket=self.test_bucket,
+                    input_prefix=self.test_prefix,
+                    region=self.test_region,
+                )
 
         # Execute discovery with ground truth
         result = discovery.discovery_classes_with_document_and_ground_truth(
@@ -270,15 +290,16 @@ discovery:
         # Verify result
         self.assertEqual(result["status"], "SUCCESS")
 
-    @patch("idp_common.discovery.classes_discovery.boto3.resource")
+    @patch.dict("os.environ", {"CONFIGURATION_TABLE_NAME": "test-config-table"})
+    @patch("idp_common.discovery.classes_discovery.ConfigurationManager")
     @patch("idp_common.discovery.classes_discovery.bedrock.BedrockClient")
     def test_config_validation_and_defaults(
-        self, mock_bedrock_client, mock_boto3_resource
+        self, mock_bedrock_client, mock_config_manager
     ):
         """Test configuration validation and default fallbacks."""
         # Setup mocks
-        mock_table = Mock()
-        mock_boto3_resource.return_value.Table.return_value = mock_table
+        mock_config_manager_instance = Mock()
+        mock_config_manager.return_value = mock_config_manager_instance
 
         # Test with incomplete configuration
         incomplete_config = {
@@ -290,13 +311,22 @@ discovery:
             }
         }
 
-        # Initialize with incomplete config
-        discovery = ClassesDiscovery(
-            input_bucket=self.test_bucket,
-            input_prefix=self.test_prefix,
-            config=incomplete_config,
-            region=self.test_region,
-        )
+        # Mock ConfigurationReader to return incomplete config
+        with patch(
+            "idp_common.discovery.classes_discovery.ConfigurationReader"
+        ) as mock_config_reader:
+            mock_reader_instance = mock_config_reader.return_value
+            mock_reader_instance.get_merged_configuration.return_value = (
+                incomplete_config
+            )
+
+            with patch.dict("os.environ", {"CONFIGURATION_TABLE_NAME": "test-table"}):
+                # Initialize with incomplete config
+                discovery = ClassesDiscovery(
+                    input_bucket=self.test_bucket,
+                    input_prefix=self.test_prefix,
+                    region=self.test_region,
+                )
 
         # Verify that missing fields get default values
         without_gt_config = discovery.without_gt_config

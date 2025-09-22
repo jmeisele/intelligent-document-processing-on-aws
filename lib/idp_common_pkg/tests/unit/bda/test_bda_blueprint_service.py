@@ -125,6 +125,9 @@ class TestBdaBlueprintService:
         with (
             patch("boto3.resource") as mock_dynamodb,
             patch("boto3.client") as mock_boto_client,
+            patch(
+                "idp_common.bda.bda_blueprint_service.ConfigurationManager"
+            ) as mock_config_manager,
             patch.dict("os.environ", {"CONFIGURATION_TABLE_NAME": "test-config-table"}),
         ):
             # Mock DynamoDB table
@@ -135,12 +138,18 @@ class TestBdaBlueprintService:
             mock_bedrock_client = MagicMock()
             mock_boto_client.return_value = mock_bedrock_client
 
+            # Mock configuration manager
+            mock_manager_instance = mock_config_manager.return_value
+            mock_manager_instance.get_configuration.return_value = None
+            mock_manager_instance.handle_update_custom_configuration.return_value = True
+
             service = BdaBlueprintService(
                 dataAutomationProjectArn="arn:aws:bedrock:us-west-2:123456789012:project/test-project"
             )
 
             # Store mocks for access in tests
             service._mock_table = mock_table
+            service.config_manager = mock_manager_instance
 
             # Replace the blueprint_creator with a mock
             mock_blueprint_creator = MagicMock()
@@ -170,7 +179,6 @@ class TestBdaBlueprintService:
                 service.dataAutomationProjectArn
                 == "arn:aws:bedrock:us-west-2:123456789012:project/test-project"
             )
-            assert service.configuration_table_name == "test-config-table"
 
             # Verify boto3 client was called for BDABlueprintCreator
             mock_boto_client.assert_called_with(service_name="bedrock-data-automation")
@@ -178,93 +186,12 @@ class TestBdaBlueprintService:
             # Verify DynamoDB table was set up
             mock_dynamodb.assert_called_once_with("dynamodb")
 
-    def test_stringify_values(self, service):
-        """Test the _stringify_values method."""
-        # Test with mixed data types
-        input_data = {
-            "string": "test",
-            "number": 123,
-            "float": 45.67,
-            "boolean": True,
-            "none": None,
-            "list": [1, 2, "three", None],
-            "nested_dict": {"inner_string": "inner", "inner_number": 456},
-        }
-
-        result = service._stringify_values(input_data)
-
-        assert result["string"] == "test"
-        assert result["number"] == "123"
-        assert result["float"] == "45.67"
-        assert result["boolean"] == "True"
-        assert result["none"] is None
-        assert result["list"] == ["1", "2", "three", None]
-        assert result["nested_dict"]["inner_string"] == "inner"
-        assert result["nested_dict"]["inner_number"] == "456"
-
-    def test_get_configuration_item_success(self, service, mock_custom_configuration):
-        """Test successful retrieval of configuration item."""
-        service._mock_table.get_item.return_value = {"Item": mock_custom_configuration}
-
-        result = service._get_configuration_item("Custom")
-
-        assert result == mock_custom_configuration
-        service._mock_table.get_item.assert_called_once_with(
-            Key={"Configuration": "Custom"}
-        )
-
-    def test_get_configuration_item_not_found(self, service):
-        """Test retrieval of non-existent configuration item."""
-        service._mock_table.get_item.return_value = {}
-
-        result = service._get_configuration_item("NonExistent")
-
-        assert result is None
-
-    def test_get_configuration_item_client_error(self, service):
-        """Test handling of ClientError during configuration retrieval."""
-        error_response = {
-            "Error": {"Code": "ResourceNotFoundException", "Message": "Table not found"}
-        }
-        service._mock_table.get_item.side_effect = ClientError(
-            error_response, "GetItem"
-        )
-
-        with pytest.raises(Exception, match="Failed to retrieve Custom configuration"):
-            service._get_configuration_item("Custom")
-
-    def test_handle_update_configuration_success(self, service):
-        """Test successful configuration update."""
-        custom_config = [
-            {
-                "name": "W-4",
-                "description": "Employee's Withholding Certificate",
-                "attributes": [],
-            }
-        ]
-
-        result = service._handle_update_configuration(custom_config)
-
-        assert result is True
-        service._mock_table.put_item.assert_called_once()
-
-        # Verify the put_item call
-        call_args = service._mock_table.put_item.call_args[1]
-        assert call_args["Item"]["Configuration"] == "Custom"
-        assert call_args["Item"]["classes"] == custom_config
-
-    def test_handle_update_configuration_exception(self, service):
-        """Test handling of exception during configuration update."""
-        service._mock_table.put_item.side_effect = Exception("DynamoDB error")
-
-        with pytest.raises(Exception, match="DynamoDB error"):
-            service._handle_update_configuration([])
-
     def test_create_blueprints_from_custom_configuration_no_config(self, service):
         """Test handling when no custom configuration exists."""
         # Mock empty configuration retrieval
-        service._mock_table.get_item.return_value = {
-            "Item": {"Configuration": "Custom", "classes": []}
+        service.config_manager.get_configuration.return_value = {
+            "Configuration": "Custom",
+            "classes": [],
         }
 
         # This should not raise an exception but should handle empty classes gracefully
@@ -281,8 +208,8 @@ class TestBdaBlueprintService:
     def test_create_blueprints_from_custom_configuration_no_classes_key(self, service):
         """Test handling when configuration has no 'classes' key."""
         # Mock configuration without classes key
-        service._mock_table.get_item.return_value = {
-            "Item": {"Configuration": "Custom"}
+        service.config_manager.get_configuration.return_value = {
+            "Configuration": "Custom"
         }
 
         # Should handle missing classes key gracefully
@@ -297,7 +224,7 @@ class TestBdaBlueprintService:
         error_response = {
             "Error": {"Code": "ResourceNotFoundException", "Message": "Table not found"}
         }
-        service._mock_table.get_item.side_effect = ClientError(
+        service.config_manager.get_configuration.side_effect = ClientError(
             error_response, "GetItem"
         )
 
@@ -310,7 +237,9 @@ class TestBdaBlueprintService:
     ):
         """Test handling when one blueprint succeeds and another fails."""
         # Mock configuration retrieval
-        service._mock_table.get_item.return_value = {"Item": mock_custom_configuration}
+        service.config_manager.get_configuration.return_value = (
+            mock_custom_configuration
+        )
 
         # Mock first blueprint creation success, second failure
         success_response = {
@@ -334,58 +263,7 @@ class TestBdaBlueprintService:
         service.create_blueprints_from_custom_configuration()
 
         # Should still update configuration despite partial failure
-        service._mock_table.put_item.assert_called_once()
-
-    def test_stringify_values_edge_cases(self, service):
-        """Test _stringify_values with edge cases."""
-        # Test empty structures
-        assert service._stringify_values({}) == {}
-        assert service._stringify_values([]) == []
-
-        # Test deeply nested structures
-        deep_nested = {"level1": {"level2": {"level3": [1, 2, {"level4": True}]}}}
-        result = service._stringify_values(deep_nested)
-        assert result["level1"]["level2"]["level3"][2]["level4"] == "True"
-
-        # Test with special values
-        special_values = {"zero": 0, "empty_string": "", "false": False, "none": None}
-        result = service._stringify_values(special_values)
-        assert result["zero"] == "0"
-        assert result["empty_string"] == ""
-        assert result["false"] == "False"
-        assert result["none"] is None
-
-    def test_handle_update_configuration_with_complex_data(self, service):
-        """Test configuration update with complex nested data."""
-        complex_config = [
-            {
-                "name": "ComplexForm",
-                "description": "A complex form with nested structures",
-                "attributes": [
-                    {
-                        "name": "Section1",
-                        "groupAttributes": [
-                            {
-                                "name": "Field1",
-                                "dataType": "string",
-                                "validations": ["required", "min_length:5"],
-                            }
-                        ],
-                    }
-                ],
-            }
-        ]
-
-        result = service._handle_update_configuration(complex_config)
-
-        assert result is True
-        call_args = service._mock_table.put_item.call_args[1]
-
-        # Verify complex data was stringified properly
-        stored_config = call_args["Item"]["classes"]
-        assert stored_config[0]["attributes"][0]["groupAttributes"][0][
-            "validations"
-        ] == ["required", "min_length:5"]
+        service.config_manager.handle_update_custom_configuration.assert_called_once()
 
     def test_check_for_updates_no_changes(self, service):
         """Test _check_for_updates when no changes are detected."""

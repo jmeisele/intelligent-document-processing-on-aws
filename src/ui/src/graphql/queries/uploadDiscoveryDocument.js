@@ -7,7 +7,6 @@ const uploadDiscoveryDocument = /* GraphQL */ `
     $prefix: String
     $bucket: String
     $groundTruthFileName: String
-    $jobId: String!
   ) {
     uploadDiscoveryDocument(
       fileName: $fileName
@@ -15,7 +14,6 @@ const uploadDiscoveryDocument = /* GraphQL */ `
       prefix: $prefix
       bucket: $bucket
       groundTruthFileName: $groundTruthFileName
-      jobId: $jobId
     ) {
       presignedUrl
       objectKey

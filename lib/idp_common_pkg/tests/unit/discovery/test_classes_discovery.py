@@ -12,11 +12,9 @@ import pytest
 
 # Import standard library modules first
 import json
-import base64
 from unittest.mock import MagicMock, patch, call
 
 # Import third-party modules
-from botocore.exceptions import ClientError
 
 # Import application modules
 from idp_common.discovery.classes_discovery import ClassesDiscovery
@@ -25,6 +23,26 @@ from idp_common.discovery.classes_discovery import ClassesDiscovery
 @pytest.mark.unit
 class TestClassesDiscovery:
     """Tests for the ClassesDiscovery class."""
+
+    @pytest.fixture
+    def mock_config(self):
+        """Fixture providing a mock configuration."""
+        return {
+            "discovery": {
+                "without_ground_truth": {
+                    "model_id": "anthropic.claude-3-sonnet-20240229-v1:0",
+                    "temperature": 1.0,
+                    "top_p": 0.1,
+                    "max_tokens": 10000,
+                },
+                "with_ground_truth": {
+                    "model_id": "anthropic.claude-3-sonnet-20240229-v1:0",
+                    "temperature": 1.0,
+                    "top_p": 0.1,
+                    "max_tokens": 10000,
+                },
+            }
+        }
 
     @pytest.fixture
     def mock_bedrock_response(self):
@@ -105,11 +123,17 @@ class TestClassesDiscovery:
         }
 
     @pytest.fixture
-    def service(self):
+    def service(self, mock_config):
         """Fixture providing a ClassesDiscovery instance."""
         with (
             patch("boto3.resource") as mock_dynamodb,
             patch("idp_common.bedrock.BedrockClient") as mock_bedrock_client,
+            patch(
+                "idp_common.discovery.classes_discovery.ConfigurationReader"
+            ) as mock_config_reader,
+            patch(
+                "idp_common.discovery.classes_discovery.ConfigurationManager"
+            ) as mock_config_manager,
             patch.dict("os.environ", {"CONFIGURATION_TABLE_NAME": "test-config-table"}),
         ):
             # Mock DynamoDB table
@@ -120,6 +144,15 @@ class TestClassesDiscovery:
             mock_client = MagicMock()
             mock_bedrock_client.return_value = mock_client
 
+            # Mock the ConfigurationReader to return the mock config
+            mock_reader_instance = mock_config_reader.return_value
+            mock_reader_instance.get_merged_configuration.return_value = mock_config
+
+            # Mock the ConfigurationManager
+            mock_manager_instance = mock_config_manager.return_value
+            mock_manager_instance.get_configuration.return_value = None
+            mock_manager_instance.update_configuration.return_value = None
+
             service = ClassesDiscovery(
                 input_bucket="test-bucket",
                 input_prefix="test-document.pdf",
@@ -129,16 +162,25 @@ class TestClassesDiscovery:
             # Store mocks for access in tests
             service._mock_table = mock_table
             service._mock_bedrock_client = mock_client
+            service.config_manager = mock_manager_instance
 
             return service
 
-    def test_init(self):
+    def test_init(self, mock_config):
         """Test initialization of ClassesDiscovery."""
         with (
-            patch("boto3.resource") as mock_dynamodb,
+            patch("boto3.resource"),
             patch("idp_common.bedrock.BedrockClient") as mock_bedrock_client,
+            patch(
+                "idp_common.discovery.classes_discovery.ConfigurationReader"
+            ) as mock_config_reader,
+            patch("idp_common.discovery.classes_discovery.ConfigurationManager"),
             patch.dict("os.environ", {"CONFIGURATION_TABLE_NAME": "test-config-table"}),
         ):
+            # Mock the ConfigurationReader to return the mock config
+            mock_reader_instance = mock_config_reader.return_value
+            mock_reader_instance.get_merged_configuration.return_value = mock_config
+
             service = ClassesDiscovery(
                 input_bucket="test-bucket",
                 input_prefix="test-document.pdf",
@@ -147,7 +189,7 @@ class TestClassesDiscovery:
 
             assert service.input_bucket == "test-bucket"
             assert service.input_prefix == "test-document.pdf"
-            # Verify backward compatibility - bedrock_model_id should override config
+            # Verify config is loaded correctly
             assert (
                 service.without_gt_config["model_id"]
                 == "anthropic.claude-3-sonnet-20240229-v1:0"
@@ -157,24 +199,27 @@ class TestClassesDiscovery:
                 == "anthropic.claude-3-sonnet-20240229-v1:0"
             )
             assert service.region == "us-west-2"
-            assert service.configuration_table_name == "test-config-table"
 
             # Verify BedrockClient was initialized with correct region
             mock_bedrock_client.assert_called_once_with(region="us-west-2")
 
-            # Verify DynamoDB table was set up
-            mock_dynamodb.assert_called_once_with("dynamodb")
-
-    def test_init_with_default_region(self):
+    def test_init_with_default_region(self, mock_config):
         """Test initialization with default region from environment."""
         with (
             patch("boto3.resource"),
             patch("idp_common.bedrock.BedrockClient"),
+            patch(
+                "idp_common.discovery.classes_discovery.ConfigurationReader"
+            ) as mock_config_reader,
             patch.dict(
                 "os.environ",
                 {"AWS_REGION": "us-east-1", "CONFIGURATION_TABLE_NAME": "test-table"},
             ),
         ):
+            # Mock the ConfigurationReader to return the mock config
+            mock_reader_instance = mock_config_reader.return_value
+            mock_reader_instance.get_merged_configuration.return_value = mock_config
+
             service = ClassesDiscovery(
                 input_bucket="test-bucket",
                 input_prefix="test-document.pdf",
@@ -182,88 +227,6 @@ class TestClassesDiscovery:
             )
 
             assert service.region == "us-east-1"
-
-    def test_stringify_values(self, service):
-        """Test the _stringify_values method."""
-        # Test with mixed data types
-        input_data = {
-            "string": "test",
-            "number": 123,
-            "float": 45.67,
-            "boolean": True,
-            "none": None,
-            "list": [1, 2, "three", None],
-            "nested_dict": {"inner_string": "inner", "inner_number": 456},
-        }
-
-        result = service._stringify_values(input_data)
-
-        assert result["string"] == "test"
-        assert result["number"] == "123"
-        assert result["float"] == "45.67"
-        assert result["boolean"] == "True"
-        assert result["none"] is None
-        assert result["list"] == ["1", "2", "three", None]
-        assert result["nested_dict"]["inner_string"] == "inner"
-        assert result["nested_dict"]["inner_number"] == "456"
-
-    def test_get_configuration_item_success(self, service, mock_configuration_item):
-        """Test successful retrieval of configuration item."""
-        service._mock_table.get_item.return_value = {"Item": mock_configuration_item}
-
-        result = service._get_configuration_item("Custom")
-
-        assert result == mock_configuration_item
-        service._mock_table.get_item.assert_called_once_with(
-            Key={"Configuration": "Custom"}
-        )
-
-    def test_get_configuration_item_not_found(self, service):
-        """Test retrieval of non-existent configuration item."""
-        service._mock_table.get_item.return_value = {}
-
-        result = service._get_configuration_item("NonExistent")
-
-        assert result is None
-
-    def test_get_configuration_item_client_error(self, service):
-        """Test handling of ClientError during configuration retrieval."""
-        error_response = {
-            "Error": {"Code": "ResourceNotFoundException", "Message": "Table not found"}
-        }
-        service._mock_table.get_item.side_effect = ClientError(
-            error_response, "GetItem"
-        )
-
-        with pytest.raises(Exception, match="Failed to retrieve Custom configuration"):
-            service._get_configuration_item("Custom")
-
-    def test_handle_update_configuration_success(self, service):
-        """Test successful configuration update."""
-        custom_config = [
-            {
-                "name": "W-4",
-                "description": "Employee's Withholding Certificate",
-                "attributes": [],
-            }
-        ]
-
-        result = service._handle_update_configuration(custom_config)
-
-        assert result is True
-        service._mock_table.put_item.assert_called_once()
-
-        # Verify the put_item call
-        call_args = service._mock_table.put_item.call_args[1]
-        assert call_args["Item"]["Configuration"] == "Custom"
-        assert call_args["Item"]["classes"] == custom_config
-
-    def test_handle_update_configuration_exception(self, service):
-        """Test handling of exception during configuration update."""
-        service._mock_table.put_item.side_effect = Exception("DynamoDB error")
-
-        with pytest.raises(Exception, match="DynamoDB error"):
-            service._handle_update_configuration([])
 
     @patch("idp_common.utils.s3util.S3Util.get_bytes")
     @patch("idp_common.bedrock.extract_text_from_response")
@@ -309,7 +272,7 @@ class TestClassesDiscovery:
         )
 
         # Mock configuration retrieval
-        service._mock_table.get_item.return_value = {"Item": mock_configuration_item}
+        service.config_manager.get_configuration.return_value = mock_configuration_item
 
         # Call the method
         result = service.discovery_classes_with_document(
@@ -327,8 +290,8 @@ class TestClassesDiscovery:
         # Verify Bedrock was called
         service._mock_bedrock_client.invoke_model.assert_called_once()
 
-        # Verify configuration was updated
-        service._mock_table.put_item.assert_called_once()
+        # Verify configuration was updated via configuration manager
+        service.config_manager.update_configuration.assert_called_once()
 
     @patch("idp_common.utils.s3util.S3Util.get_bytes")
     def test_discovery_classes_with_document_s3_error(self, mock_get_bytes, service):
@@ -399,7 +362,7 @@ class TestClassesDiscovery:
         )
 
         # Mock configuration retrieval
-        service._mock_table.get_item.return_value = {"Item": mock_configuration_item}
+        service.config_manager.get_configuration.return_value = mock_configuration_item
 
         # Call the method
         result = service.discovery_classes_with_document_and_ground_truth(
@@ -417,22 +380,6 @@ class TestClassesDiscovery:
                 call(bucket="test-bucket", key="test-document.pdf"),
             ]
         )
-
-    def test_parse_s3_uri_valid(self, service):
-        """Test parsing valid S3 URI."""
-        bucket, key = service._parse_s3_uri("s3://my-bucket/path/to/file.pdf")
-        assert bucket == "my-bucket"
-        assert key == "path/to/file.pdf"
-
-        # Test with no key
-        bucket, key = service._parse_s3_uri("s3://my-bucket")
-        assert bucket == "my-bucket"
-        assert key == ""
-
-    def test_parse_s3_uri_invalid(self, service):
-        """Test parsing invalid S3 URI."""
-        with pytest.raises(ValueError, match="Invalid S3 URI format"):
-            service._parse_s3_uri("http://example.com/file.pdf")
 
     @patch("idp_common.utils.s3util.S3Util.get_bytes")
     def test_load_ground_truth_success(
@@ -622,15 +569,6 @@ class TestClassesDiscovery:
 
         assert result is None
 
-    def test_get_base64_image(self, service):
-        """Test base64 encoding of image data."""
-        mock_image_data = b"fake_image_content"
-        expected_base64 = base64.b64encode(mock_image_data).decode("utf-8")
-
-        result = service._get_base64_image(mock_image_data)
-
-        assert result == expected_base64
-
     def test_prompt_classes_discovery_with_ground_truth(
         self, service, mock_ground_truth_data
     ):
@@ -695,7 +633,7 @@ class TestClassesDiscovery:
                 "response": {"output": {"message": {"content": [{"text": "{}"}]}}},
                 "metering": {"tokens": 500},
             }
-            service._mock_table.get_item.return_value = {"Item": existing_config}
+            service.config_manager.get_configuration.return_value = existing_config
 
             result = service.discovery_classes_with_document(
                 "test-bucket", "test-document.pdf"
@@ -703,10 +641,10 @@ class TestClassesDiscovery:
 
             assert result["status"] == "SUCCESS"
 
-            # Verify that put_item was called to update configuration
-            service._mock_table.put_item.assert_called_once()
-            call_args = service._mock_table.put_item.call_args[1]
-            updated_classes = call_args["Item"]["classes"]
+            # Verify that configuration manager was called to update configuration
+            service.config_manager.update_configuration.assert_called_once()
+            call_args = service.config_manager.update_configuration.call_args[0]
+            updated_classes = call_args[1]["classes"]
 
             # Should have 2 classes (Other-Form + updated W-4)
             assert len(updated_classes) == 2
@@ -736,7 +674,9 @@ class TestClassesDiscovery:
                 "response": {"output": {"message": {"content": [{"text": "{}"}]}}},
                 "metering": {"tokens": 500},
             }
-            service._mock_table.get_item.return_value = {}  # No existing config
+            service.config_manager.get_configuration.return_value = (
+                None  # No existing config
+            )
 
             result = service.discovery_classes_with_document(
                 "test-bucket", "test-document.pdf"
@@ -744,10 +684,10 @@ class TestClassesDiscovery:
 
             assert result["status"] == "SUCCESS"
 
-            # Verify configuration was created
-            service._mock_table.put_item.assert_called_once()
-            call_args = service._mock_table.put_item.call_args[1]
-            updated_classes = call_args["Item"]["classes"]
+            # Verify configuration was created via configuration manager
+            service.config_manager.update_configuration.assert_called_once()
+            call_args = service.config_manager.update_configuration.call_args[0]
+            updated_classes = call_args[1]["classes"]
 
             # Should have 1 class
             assert len(updated_classes) == 1

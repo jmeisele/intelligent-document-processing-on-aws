@@ -1143,8 +1143,14 @@ except Exception as e:
 
             with zipfile.ZipFile(zipfile_path, "w", zipfile.ZIP_DEFLATED) as zipf:
                 ui_dir = "src/ui"
+                exclude_dirs = {"node_modules", "build", ".aws-sam"}
                 for root, dirs, files in os.walk(ui_dir):
+                    # Exclude specified directories from zipping
+                    dirs[:] = [d for d in dirs if d not in exclude_dirs]
                     for file in files:
+                        # Skip .env files
+                        if file == ".env" or file.startswith(".env."):
+                            continue
                         file_path = os.path.join(root, file)
                         arcname = os.path.relpath(file_path, ui_dir)
                         zipf.write(file_path, arcname)

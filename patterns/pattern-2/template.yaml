@@ -513,33 +513,38 @@ Resources:
                 description: "Classification methodology to use"
                 enum: ["multimodalPageLevelClassification", "textbasedHolisticClassification"]
                 order: 2
+              maxPagesForClassification:
+                type: string
+                description: "Number of pages to use for classification [When set to a number, forces the entire document to be assigned a single class]"
+                enum: ["ALL", "1", "2", "3", "5", "10"]
+                order: 3
               temperature:
                 type: number
                 minimum: 0
                 maximum: 1
                 description: Sampling temperature
-                order: 3
+                order: 4
               top_k:
                 type: integer
                 minimum: 1
                 description: Sampling Top K
-                order: 4
+                order: 5
               top_p:
                 type: number
                 description: Sampling Top P
-                order: 5
+                order: 6
               max_tokens:
                 type: number
                 description: Max tokens
-                order: 6
+                order: 7
               system_prompt:
                 type: string
                 description: System prompt
-                order: 7
+                order: 8
               task_prompt:
                 type: string
                 description: Task prompt - include placeholders {CLASS_NAMES_AND_DESCRIPTIONS} (replaced with the class names and descriptions for all specified classes), {FEW_SHOT_EXAMPLES} (replaced by classPrompt and image data from examples in class definitions), {DOCUMENT_TEXT} (replaced by the OCR output), and for multi-modal classification {DOCUMENT_IMAGE} (replaced by the page image attachment). Optionally use <<CACHEPOINT>> to separate static and dynamic elements of prompt for Bedrock prompt caching.
-                order: 8
+                order: 9
           extraction:
             order: 4
             type: object
@@ -635,7 +640,7 @@ Resources:
               validation_enabled:
                 type: boolean
                 description: Enable or disable assessment validation checks
-                default: true
+                default: false
                 order: 1
                 dependsOn: {
                   field: "enabled",
