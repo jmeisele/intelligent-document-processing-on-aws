@@ -14,6 +14,7 @@ import {
   FormField,
   Select,
   Input,
+  Textarea,
   Modal,
   Alert,
 } from '@awsui/components-react';
@@ -94,12 +95,8 @@ const EditablePageIdsCell = ({ item, validationErrors, updateSection }) => {
     setInputValue(item.PageIds && item.PageIds.length > 0 ? item.PageIds.join(', ') : '');
   }, [item.PageIds]);
 
-  const handlePageIdsChange = ({ detail }) => {
-    const newValue = detail.value;
-    setInputValue(newValue);
-
-    // Parse and update PageIds in real-time
-    const trimmedValue = newValue.trim();
+  const parseAndUpdatePageIds = (value) => {
+    const trimmedValue = value.trim();
 
     if (!trimmedValue) {
       updateSection(item.Id, 'PageIds', []);
@@ -119,17 +116,29 @@ const EditablePageIdsCell = ({ item, validationErrors, updateSection }) => {
     updateSection(item.Id, 'PageIds', pageIds);
   };
 
+  const handleInputChange = ({ detail }) => {
+    // Only update the input value, don't parse yet
+    setInputValue(detail.value);
+  };
+
+  const handleBlur = ({ detail }) => {
+    // Parse and update PageIds when user finishes editing
+    parseAndUpdatePageIds(detail.value);
+  };
+
   return (
     <FormField
       errorText={validationErrors[item.Id]?.find((err) => err.includes('Page') || err.includes('page'))}
       description="Enter page numbers separated by commas (e.g., 1, 2, 3)"
     >
-      <Input
+      <Textarea
         value={inputValue}
-        onChange={handlePageIdsChange}
+        onChange={handleInputChange}
+        onBlur={handleBlur}
         placeholder="1, 2, 3"
-        type="text"
-        inputMode="text"
+        autoComplete="off"
+        spellCheck={false}
+        rows={1}
         invalid={validationErrors[item.Id]?.some((err) => err.includes('Page') || err.includes('page'))}
       />
     </FormField>
