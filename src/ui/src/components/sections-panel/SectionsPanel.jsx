@@ -108,7 +108,7 @@ const EditablePageIdsCell = ({ item, validationErrors, updateSection }) => {
 
     // Parse comma-separated page IDs
     const pageIds = trimmedValue
-      .split(',')
+      .split(/[,\s]+/) // Split on commas and/or whitespace
       .map((id) => {
         const trimmed = id.trim();
         const parsed = parseInt(trimmed, 10);
@@ -128,6 +128,8 @@ const EditablePageIdsCell = ({ item, validationErrors, updateSection }) => {
         value={inputValue}
         onChange={handlePageIdsChange}
         placeholder="1, 2, 3"
+        type="text"
+        inputMode="text"
         invalid={validationErrors[item.Id]?.some((err) => err.includes('Page') || err.includes('page'))}
       />
     </FormField>
