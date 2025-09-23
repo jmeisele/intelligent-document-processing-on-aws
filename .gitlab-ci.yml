@@ -16,8 +16,8 @@ image: public.ecr.aws/docker/library/python:3.13-bookworm
 
 stages:
   - developer_tests
-  - integration_tests
   - deployment_validation
+  - integration_tests
 
 developer_tests:
   stage: developer_tests
@@ -111,6 +111,8 @@ deployment_validation:
     - pip install PyYAML
 
   script:
+    # Validate CloudFormation service role template syntax
+    - aws cloudformation validate-template --template-body file://iam-roles/cloudformation-management/IDP-Cloudformation-Service-Role.yaml --no-cli-pager
     # Check if service role has sufficient permissions for main stack deployment
     - |
       python3 -c "
