@@ -85,7 +85,7 @@ class TestLoadDbDescription:
         result = load_db_description()
         assert isinstance(result, str)
         assert len(result) > 0
-        assert "Athena Table Information" in result
+        assert "Comprehensive Athena Database Schema" in result
 
     def test_load_db_description_contains_expected_content(self):
         """Test that database description contains expected table information."""

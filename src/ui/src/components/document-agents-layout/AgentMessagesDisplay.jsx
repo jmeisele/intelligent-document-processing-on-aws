@@ -12,6 +12,8 @@ const AgentMessagesDisplay = ({ agentMessages, isProcessing }) => {
   const [currentSqlQuery, setCurrentSqlQuery] = useState('');
   const [codeModalVisible, setCodeModalVisible] = useState(false);
   const [currentPythonCode, setCurrentPythonCode] = useState('');
+  const [databaseInfoModalVisible, setDatabaseInfoModalVisible] = useState(false);
+  const [currentDatabaseInfo, setCurrentDatabaseInfo] = useState('');
 
   // Suppress ResizeObserver errors in development
   useEffect(() => {
@@ -59,6 +61,22 @@ const AgentMessagesDisplay = ({ agentMessages, isProcessing }) => {
     return null;
   };
 
+  // Extract database info from tool use content (for get_database_info tool)
+  const extractDatabaseInfo = (originalMessage) => {
+    if (!originalMessage || !originalMessage.content) return null;
+
+    // Handle array content format
+    if (Array.isArray(originalMessage.content)) {
+      const dbInfoItem = originalMessage.content.find(
+        (item) => item && item.toolUse && item.toolUse.name === 'get_database_info',
+      );
+      // For get_database_info, there typically isn't input data, but we can check for tool result
+      return dbInfoItem ? 'Database schema information was retrieved by the agent' : null;
+    }
+
+    return null;
+  };
+
   // Show SQL query modal with error handling
   const showSqlQuery = useCallback((originalMessage) => {
     try {
@@ -88,6 +106,287 @@ const AgentMessagesDisplay = ({ agentMessages, isProcessing }) => {
       }
     } catch (error) {
       console.warn('Error showing Python code:', error);
+    }
+  }, []);
+
+  // Show database info modal with error handling
+  const showDatabaseInfo = useCallback(async () => {
+    try {
+      // Show the comprehensive database schema information that matches what the agent receives
+      // This mirrors the output of generate_comprehensive_database_description() from the schema provider
+      const databaseSchemaInfo = `# Comprehensive Athena Database Schema
+
+## Overview
+
+This database contains three main categories of tables for document processing analytics:
+
+1. **Metering Table**: Usage metrics, costs, and consumption data
+2. **Evaluation Tables**: Accuracy assessment data (typically empty unless evaluation jobs are run)  
+3. **Document Sections Tables**: Extracted content from processed documents (dynamically created)
+
+## Important Notes
+
+- **Column Names**: Always enclose column names in double quotes in Athena queries
+- **Partitioning**: All tables are partitioned by date (YYYY-MM-DD format) for efficient querying
+- **Timestamps**: All date/timestamp columns refer to processing time, not document content dates
+- **Case Sensitivity**: Use LOWER() functions when comparing string values as case may vary
+
+---
+
+## Metering Table (metering)
+
+**Purpose**: Captures detailed usage metrics and cost information for document processing operations
+
+**Key Usage**: Always use this table for questions about:
+- Volume of documents processed
+- Models used and their consumption patterns  
+- Units of consumption (tokens, pages) for each processing step
+- Costs and spending analysis
+- Processing patterns and trends
+
+**Important**: Each document has multiple rows in this table - one for each context/service/unit combination.
+
+### Schema:
+- \`document_id\` (string): Unique identifier for the document
+- \`context\` (string): Processing context (OCR, Classification, Extraction, Assessment, Summarization, Evaluation)
+- \`service_api\` (string): Specific API or model used (e.g., textract/analyze_document, bedrock/claude-3-sonnet)
+- \`unit\` (string): Unit of measurement (pages, inputTokens, outputTokens, totalTokens)
+- \`value\` (double): Quantity of the unit consumed
+- \`number_of_pages\` (int): Number of pages in the document (replicated across all rows for same document)
+- \`unit_cost\` (double): Cost per unit in USD
+- \`estimated_cost\` (double): Calculated total cost (value × unit_cost)
+- \`timestamp\` (timestamp): When the operation was performed
+
+**Partitioned by**: date (YYYY-MM-DD format)
+
+### Critical Aggregation Patterns:
+- **For document page counts**: Use \`MAX("number_of_pages")\` per document (NOT SUM, as this value is replicated)
+- **For total pages across documents**: Use \`SUM\` of per-document MAX values:
+  \`\`\`sql
+  SELECT SUM(max_pages) FROM (
+    SELECT "document_id", MAX("number_of_pages") as max_pages 
+    FROM metering 
+    GROUP BY "document_id"
+  )
+  \`\`\`
+- **For costs**: Use \`SUM("estimated_cost")\` for totals, \`GROUP BY "context"\` for breakdowns
+- **For token usage**: Use \`SUM("value")\` when \`"unit"\` IN ('inputTokens', 'outputTokens', 'totalTokens')
+
+### Sample Queries:
+\`\`\`sql
+-- Total documents processed
+SELECT COUNT(DISTINCT "document_id") FROM metering
+
+-- Total pages processed (correct aggregation)
+SELECT SUM(max_pages) FROM (
+  SELECT "document_id", MAX("number_of_pages") as max_pages 
+  FROM metering 
+  GROUP BY "document_id"
+)
+
+-- Cost breakdown by processing context
+SELECT "context", SUM("estimated_cost") as total_cost
+FROM metering 
+GROUP BY "context"
+ORDER BY total_cost DESC
+
+-- Token usage by model
+SELECT "service_api", 
+       SUM(CASE WHEN "unit" = 'inputTokens' THEN "value" ELSE 0 END) as input_tokens,
+       SUM(CASE WHEN "unit" = 'outputTokens' THEN "value" ELSE 0 END) as output_tokens
+FROM metering 
+WHERE "unit" IN ('inputTokens', 'outputTokens')
+GROUP BY "service_api"
+\`\`\`
+
+---
+
+## Evaluation Tables
+
+**Purpose**: Store accuracy metrics from comparing extracted document data against ground truth baselines
+
+**Key Usage**: Always use these tables for questions about accuracy for documents that have ground truth data
+
+**Important**: These tables are typically empty unless users have run separate evaluation jobs (not run by default)
+
+### Document Evaluations Table (document_evaluations)
+
+**Purpose**: Document-level evaluation metrics and overall accuracy scores
+
+#### Schema:
+- \`document_id\` (string): Unique identifier for the document
+- \`input_key\` (string): S3 key of the input document  
+- \`evaluation_date\` (timestamp): When the evaluation was performed
+- \`accuracy\` (double): Overall accuracy score (0-1)
+- \`precision\` (double): Precision score (0-1)
+- \`recall\` (double): Recall score (0-1)
+- \`f1_score\` (double): F1 score (0-1)
+- \`false_alarm_rate\` (double): False alarm rate (0-1)
+- \`false_discovery_rate\` (double): False discovery rate (0-1)
+- \`execution_time\` (double): Time taken to evaluate (seconds)
+
+**Partitioned by**: date (YYYY-MM-DD format)
+
+### Section Evaluations Table (section_evaluations)
+
+**Purpose**: Section-level evaluation metrics grouped by document type/classification
+
+#### Schema:
+- \`document_id\` (string): Unique identifier for the document
+- \`section_id\` (string): Identifier for the section
+- \`section_type\` (string): Type/class of the section (e.g., 'invoice', 'receipt', 'w2')
+- \`accuracy\` (double): Section accuracy score (0-1)
+- \`precision\` (double): Section precision score (0-1)
+- \`recall\` (double): Recall score (0-1)
+- \`f1_score\` (double): Section F1 score (0-1)
+- \`false_alarm_rate\` (double): Section false alarm rate (0-1)
+- \`false_discovery_rate\` (double): Section false discovery rate (0-1)
+- \`evaluation_date\` (timestamp): When the evaluation was performed
+
+**Partitioned by**: date (YYYY-MM-DD format)
+
+### Attribute Evaluations Table (attribute_evaluations)
+
+**Purpose**: Detailed attribute-level comparison results showing expected vs actual extracted values
+
+#### Schema:
+- \`document_id\` (string): Unique identifier for the document
+- \`section_id\` (string): Identifier for the section
+- \`section_type\` (string): Type/class of the section
+- \`attribute_name\` (string): Name of the extracted attribute
+- \`expected\` (string): Expected (ground truth) value
+- \`actual\` (string): Actual extracted value
+- \`matched\` (boolean): Whether the values matched according to evaluation method
+- \`score\` (double): Match score (0-1)
+- \`reason\` (string): Explanation for the match result
+- \`evaluation_method\` (string): Method used for comparison (EXACT, FUZZY, SEMANTIC, etc.)
+- \`confidence\` (string): Confidence score from extraction process
+- \`confidence_threshold\` (string): Confidence threshold used for evaluation
+- \`evaluation_date\` (timestamp): When the evaluation was performed
+
+**Partitioned by**: date (YYYY-MM-DD format)
+
+---
+
+## Document Sections Tables (Dynamic)
+
+**Purpose**: Store actual extracted data from document sections in structured format for analytics
+
+**Key Usage**: Use these tables to query the actual extracted content and attributes from processed documents
+
+**Dynamic Nature**: Tables are automatically created based on document classifications encountered during processing
+
+### Common Characteristics:
+
+All document sections tables share these **common metadata columns**:
+- \`section_id\` (string): Unique identifier for the section
+- \`document_id\` (string): Unique identifier for the document  
+- \`section_classification\` (string): Type/class of the section
+- \`section_confidence\` (double): Confidence score for the section classification
+- \`timestamp\` (timestamp): When the document was processed
+
+**Standard Inference Columns** (all tables):
+- \`explainability_info\` (string): JSON containing explanation of extraction decisions
+- \`inference_results\` (string): JSON containing raw extraction results
+
+**Partitioned by**: date (YYYY-MM-DD format)
+
+### Known Document Sections Tables:
+
+**IMPORTANT**: The following tables typically exist based on common configurations. Do NOT use discovery queries (SHOW TABLES, DESCRIBE) if you know the table name - use them directly:
+
+- \`document_sections_w2\` - W2 tax form processing
+- \`document_sections_invoice\` - Invoice processing  
+- \`document_sections_receipt\` - Receipt processing
+- \`document_sections_bank_statement\` - Bank statement processing
+
+### Table Naming Pattern:
+Tables follow the pattern: \`document_sections_{section_type_lowercase}\`
+
+### Dynamic Data Columns:
+Beyond the common columns, each table has **dynamically inferred columns** from JSON extraction results:
+
+**Column Naming Patterns**:
+- **Nested objects**: Flattened using dot notation (e.g., \`"customer.name"\`, \`"customer.address.street"\`)
+- **Arrays**: Converted to JSON strings  
+- **Primitive values**: Preserved as native types (strings, numbers, booleans)
+
+**Important**: When querying columns with periods in their names, **always use double quotes**:
+\`\`\`sql
+SELECT "customer.name", "customer.address.city" 
+FROM document_sections_invoice
+\`\`\`
+
+### Common Column Examples by Document Type:
+
+**W2 Tables** (\`document_sections_w2\`):
+- \`"employee.name"\` (string): Employee full name
+- \`"employee.ssn"\` (string): Employee Social Security Number
+- \`"employer.name"\` (string): Employer company name
+- \`"employer.ein"\` (string): Employer Identification Number
+- \`"wages"\` (double): Total wages, tips, and compensation
+- \`"federal_tax_withheld"\` (double): Federal income tax withheld
+- \`"tax_year"\` (int): Tax year for this W2
+
+**Invoice Tables** (\`document_sections_invoice\`):
+- \`"invoice_number"\` (string): Invoice identifier
+- \`"vendor.name"\` (string): Vendor/supplier name
+- \`"customer.name"\` (string): Customer/buyer name
+- \`"total_amount"\` (double): Total amount due
+- \`"invoice_date"\` (string): Date of invoice
+
+**Bank Statement Tables** (\`document_sections_bank_statement\`):
+- \`"account_number"\` (string): Bank account number
+- \`"account_holder"\` (string): Account holder name
+- \`"opening_balance"\` (double): Opening balance
+- \`"closing_balance"\` (double): Closing balance
+- \`"transactions"\` (string): JSON array of transactions
+
+### Sample Queries:
+\`\`\`sql
+-- Query W2 data specifically
+SELECT "document_id", "employee.name", "employer.name", "wages", "tax_year"
+FROM document_sections_w2
+WHERE "tax_year" = 2023
+
+-- Count documents by section type
+SELECT "section_classification", COUNT(*) as document_count
+FROM document_sections_invoice
+GROUP BY "section_classification"
+
+-- Query specific extracted attributes (example for invoice)
+SELECT "document_id", 
+       "customer.name" as customer_name,
+       "total_amount" as invoice_total,
+       "date" as processing_date
+FROM document_sections_invoice
+WHERE date >= '2024-01-01'
+
+-- Join with metering for cost analysis
+SELECT ds."section_classification",
+       COUNT(DISTINCT ds."document_id") as document_count,
+       AVG(m."estimated_cost") as avg_processing_cost
+FROM document_sections_w2 ds
+JOIN metering m ON ds."document_id" = m."document_id"
+GROUP BY ds."section_classification"
+\`\`\`
+
+### Notes:
+- Table schemas evolve as new extraction patterns are discovered
+- All timestamp/date columns refer to processing time, not document content dates
+- For JSON array fields, use JSON parsing functions to extract elements
+
+---
+
+**This comprehensive schema information matches exactly what the analytics agent receives when calling the get_database_info tool. The agent uses this information to query specific tables like document_sections_w2 directly without needing expensive SHOW TABLES or DESCRIBE queries.**`;
+
+      setCurrentDatabaseInfo(databaseSchemaInfo);
+      // Use setTimeout to avoid ResizeObserver issues
+      setTimeout(() => {
+        setDatabaseInfoModalVisible(true);
+      }, 0);
+    } catch (error) {
+      console.warn('Error showing database info:', error);
     }
   }, []);
 
@@ -150,6 +449,36 @@ const AgentMessagesDisplay = ({ agentMessages, isProcessing }) => {
       console.warn('Error copying to clipboard:', error);
     }
   }, [currentSqlQuery]);
+
+  // Handle database info modal dismiss with error handling
+  const handleDatabaseInfoModalDismiss = useCallback(() => {
+    try {
+      setDatabaseInfoModalVisible(false);
+      setCurrentDatabaseInfo('');
+    } catch (error) {
+      console.warn('Error dismissing database info modal:', error);
+    }
+  }, []);
+
+  // Handle copy database info to clipboard with error handling
+  const handleCopyDatabaseInfoToClipboard = useCallback(() => {
+    try {
+      if (currentDatabaseInfo && navigator.clipboard) {
+        navigator.clipboard.writeText(currentDatabaseInfo).catch((error) => {
+          console.warn('Failed to copy database info to clipboard:', error);
+          // Fallback for older browsers
+          const textArea = document.createElement('textarea');
+          textArea.value = currentDatabaseInfo;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+        });
+      }
+    } catch (error) {
+      console.warn('Error copying database info to clipboard:', error);
+    }
+  }, [currentDatabaseInfo]);
 
   // Parse and process messages using useMemo to avoid re-render loops
   const messages = useMemo(() => {
@@ -408,6 +737,11 @@ const AgentMessagesDisplay = ({ agentMessages, isProcessing }) => {
     const isPythonExecution = message.role === 'tool' && message.tool_name === 'execute_python';
     const hasPythonCode = isPythonExecution && message.originalMessage && extractPythonCode(message.originalMessage);
 
+    // Check if this is a get_database_info tool
+    const isDatabaseInfoTool = message.role === 'tool' && message.tool_name === 'get_database_info';
+    const hasDatabaseInfo =
+      isDatabaseInfoTool && message.originalMessage && extractDatabaseInfo(message.originalMessage);
+
     // Create a unique key for this message
     const messageKey = `${message.role}-${message.sequence_number}-${index}-${message.timestamp}`;
 
@@ -542,6 +876,35 @@ const AgentMessagesDisplay = ({ agentMessages, isProcessing }) => {
                 }}
               >
                 View Code
+              </button>
+            )}
+            {hasDatabaseInfo && (
+              <button
+                type="button"
+                onClick={() => showDatabaseInfo()}
+                style={{
+                  marginLeft: '8px',
+                  fontSize: '11px',
+                  padding: '3px 8px',
+                  backgroundColor: '#0073bb',
+                  color: 'white',
+                  border: '1px solid #0073bb',
+                  borderRadius: '4px',
+                  textDecoration: 'none',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#005a9e';
+                  e.target.style.borderColor = '#005a9e';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#0073bb';
+                  e.target.style.borderColor = '#0073bb';
+                }}
+              >
+                View Info
               </button>
             )}
           </div>
@@ -700,6 +1063,48 @@ const AgentMessagesDisplay = ({ agentMessages, isProcessing }) => {
               }}
             >
               {currentPythonCode || 'No Python code available'}
+            </div>
+          </Box>
+        </Modal>
+      )}
+
+      {/* Database Info Modal */}
+      {databaseInfoModalVisible && (
+        <Modal
+          onDismiss={handleDatabaseInfoModalDismiss}
+          visible={databaseInfoModalVisible}
+          header="Database Schema Information"
+          size="large"
+          footer={
+            <Box float="right">
+              <SpaceBetween direction="horizontal" size="xs">
+                <Button variant="normal" onClick={handleCopyDatabaseInfoToClipboard}>
+                  Copy to Clipboard
+                </Button>
+                <Button variant="primary" onClick={handleDatabaseInfoModalDismiss}>
+                  Close
+                </Button>
+              </SpaceBetween>
+            </Box>
+          }
+        >
+          <Box padding="s">
+            <div
+              style={{
+                backgroundColor: '#f8f9fa',
+                border: '1px solid #e1e4e8',
+                borderRadius: '6px',
+                padding: '16px',
+                fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, "Courier New", monospace',
+                fontSize: '14px',
+                lineHeight: '1.45',
+                overflow: 'auto',
+                maxHeight: '400px',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              {currentDatabaseInfo || 'No database information available'}
             </div>
           </Box>
         </Modal>

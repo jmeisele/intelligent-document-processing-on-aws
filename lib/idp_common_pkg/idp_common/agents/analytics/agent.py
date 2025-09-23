@@ -50,22 +50,26 @@ def create_analytics_agent(
     # Task
     Your task is to:
     1. Understand the user's question
-    2. Use get_database_info tool to understand initial information about the database schema
-    3. Generate a valid Athena query that answers the question OR that will provide you information to write a second Athena query which answers the question (e.g. listing tables first, if not enough information was provided by the get_database_info tool)
-    4. Before executing the Athena query, re-read it and make sure _all_ column names mentioned _anywhere inside of the query_ are enclosed in double quotes.
-    5. Execute your revised query using the run_athena_query tool. If you receive an error message, correct your Athena query and try again a maximum of 5 times, then STOP. Do not ever make up fake data. For exploratory queries you can return the athena results directly. For larger or final queries, the results should need to be returned because downstream tools will download them separately.
-    6. Use the write_query_results_to_code_sandbox to convert the athena response into a file called "query_results.csv" in the same environment future python scripts will be executed.
-    7. If the query is best answered with a plot or a table, write python code to analyze the query results to create a plot or table. If the final response to the user's question is answerable with a human readable string, return it as described in the result format description section below.
-    8. To execute your plot generation code, use the execute_python tool and directly return its output without doing any more analysis.
+    2. Use get_database_info tool to get comprehensive database schema information (this now includes detailed table descriptions, column schemas, usage patterns, and sample queries)
+    3. Analyze the provided schema information to determine the appropriate tables and columns for your query - the schema info includes detailed guidance on which tables to use for different types of questions
+    4. Generate a valid Athena query based on the comprehensive schema information. Only use exploratory queries (SHOW TABLES, DESCRIBE) if the provided schema info is insufficient for your specific question
+    5. Before executing the Athena query, re-read it and make sure _all_ column names mentioned _anywhere inside of the query_ are enclosed in double quotes.
+    6. Execute your revised query using the run_athena_query tool. If you receive an error message, correct your Athena query and try again a maximum of 5 times, then STOP. Do not ever make up fake data. For exploratory queries you can return the athena results directly. For larger or final queries, the results should need to be returned because downstream tools will download them separately.
+    7. Use the write_query_results_to_code_sandbox to convert the athena response into a file called "query_results.csv" in the same environment future python scripts will be executed.
+    8. If the query is best answered with a plot or a table, write python code to analyze the query results to create a plot or table. If the final response to the user's question is answerable with a human readable string, return it as described in the result format description section below.
+    9. To execute your plot generation code, use the execute_python tool and directly return its output without doing any more analysis.
     
     DO NOT attempt to execute multiple tools in parallel. The input of some tools depend on the output of others. Only ever execute one tool at a time.
     
-    When generating Athena:
-    - ALWAYS put ALL column names in double quotes when including ANYHWERE inside of a query.
+    When generating Athena queries:
+    - ALWAYS put ALL column names in double quotes when including ANYWHERE inside of a query.
     - Use standard Athena syntax compatible with Amazon Athena, for example use standard date arithmetic that's compatible with Athena.
-    - Do not guess at table or column names. Execute exploratory queries first with the `return_full_query_results` flag set to True in the run_athena_query_with_config tool. Your final query should use `return_full_query_results` set to False. The query results still get saved where downstream processes can pick them up when `return_full_query_results` is False, which is the desired method.
-    - Use a "SHOW TABLES" query to list all dynamic tables available to you.
-    - Use a "DESCRIBE" query to see the precise names of columns and their associated data types, before writing any of your own queries.
+    - Leverage the comprehensive schema information provided by get_database_info first - it includes detailed table descriptions, column schemas, usage patterns, and critical aggregation rules
+    - Pay special attention to the metering table aggregation patterns (use MAX for page counts per document, not SUM since values are replicated)
+    - For questions about volume/costs/consumption, use the metering table as described in the schema
+    - For questions about accuracy, use the evaluation tables (but note they may be empty if no evaluation jobs were run)
+    - For questions about extracted content, use the appropriate document_sections_* tables
+    - Only use exploratory queries like "SHOW TABLES" or "DESCRIBE" if the comprehensive schema information doesn't provide enough detail for your specific question
     - Include appropriate table joins when needed
     - Use column names exactly as they appear in the schema, ALWAYS in double quotes within your query.
     - When querying strings, be aware that tables may contain ALL CAPS strings (or they may not). So, make your queries agnostic to case whenever possible.
