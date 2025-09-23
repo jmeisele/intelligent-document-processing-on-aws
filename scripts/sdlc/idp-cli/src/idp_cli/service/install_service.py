@@ -132,26 +132,209 @@ class InstallService():
             return False
         
 
+    def cleanup_failed_stack(self, stack_name):
+        """
+        Clean up failed stack if it exists in ROLLBACK_COMPLETE state.
+        
+        Args:
+            stack_name: Name of the stack to clean up
+            
+        Returns:
+            bool: True if cleanup successful or not needed, False if cleanup failed
+        """
+        try:
+            # Check stack status
+            cmd = [
+                'aws', 'cloudformation', 'describe-stacks',
+                '--region', self.region,
+                '--stack-name', stack_name,
+                '--query', 'Stacks[0].StackStatus',
+                '--output', 'text'
+            ]
+            
+            process = subprocess.run(
+                cmd,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            stack_status = process.stdout.strip()
+            
+            if stack_status in ['ROLLBACK_COMPLETE', 'CREATE_FAILED', 'DELETE_FAILED']:
+                logger.info(f"Cleaning up failed stack {stack_name} (status: {stack_status})")
+                
+                delete_cmd = [
+                    'aws', 'cloudformation', 'delete-stack',
+                    '--region', self.region,
+                    '--stack-name', stack_name
+                ]
+                
+                subprocess.run(delete_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                
+                # Wait for deletion to complete
+                wait_cmd = [
+                    'aws', 'cloudformation', 'wait', 'stack-delete-complete',
+                    '--region', self.region,
+                    '--stack-name', stack_name
+                ]
+                
+                subprocess.run(wait_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                logger.info(f"Successfully cleaned up failed stack {stack_name}")
+                
+            return True
+            
+        except subprocess.CalledProcessError:
+            # Stack doesn't exist - no cleanup needed
+            return True
+        except Exception as e:
+            logger.error(f"Failed to cleanup stack {stack_name}: {e}")
+            return False
+
+    def get_existing_service_role_arn(self):
+        """
+        Check if CloudFormation service role stack exists and return its ARN.
+        
+        Returns:
+            str: The ARN of the existing service role, or None if not found
+        """
+        service_role_stack_name = f"{self.cfn_prefix}-cloudformation-service-role"
+        
+        try:
+            describe_cmd = [
+                'aws', 'cloudformation', 'describe-stacks',
+                '--region', self.region,
+                '--stack-name', service_role_stack_name,
+                '--query', 'Stacks[0].Outputs[?OutputKey==`ServiceRoleArn`].OutputValue',
+                '--output', 'text'
+            ]
+
+            process = subprocess.run(
+                describe_cmd,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+
+            service_role_arn = process.stdout.strip()
+            if service_role_arn and service_role_arn != "None":
+                logger.info(f"Found existing service role: {service_role_arn}")
+                return service_role_arn
+            else:
+                return None
+
+        except subprocess.CalledProcessError:
+            logger.debug(f"Service role stack {service_role_stack_name} not found")
+            return None
+        except Exception as e:
+            logger.error(f"Error checking for existing service role: {e}")
+            return None
+
+    def deploy_service_role(self):
+        """
+        Deploy the CloudFormation service role stack only if it doesn't exist.
+        
+        Returns:
+            str: The ARN of the service role, or None if deployment failed
+        """
+        # First check if service role already exists
+        existing_arn = self.get_existing_service_role_arn()
+        if existing_arn:
+            logger.info("CloudFormation service role already exists, skipping deployment")
+            return existing_arn
+
+        service_role_stack_name = f"{self.cfn_prefix}-cloudformation-service-role"
+        service_role_template = 'iam-roles/cloudformation-management/IDP-Cloudformation-Service-Role.yaml'
+        
+        try:
+            # Verify template file exists
+            template_path = os.path.join(self.abs_cwd, service_role_template)
+            if not os.path.exists(template_path):
+                raise FileNotFoundError(f"Service role template not found: {template_path}")
+
+            logger.info(f"Deploying CloudFormation service role stack: {service_role_stack_name}")
+
+            # Deploy the service role stack
+            cmd = [
+                'aws', 'cloudformation', 'deploy',
+                '--region', self.region,
+                '--template-file', service_role_template,
+                '--capabilities', 'CAPABILITY_NAMED_IAM',
+                '--stack-name', service_role_stack_name
+            ]
+
+            logger.debug(f"Running service role deploy command: {' '.join(cmd)}")
+
+            process = subprocess.run(
+                cmd,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=self.cwd
+            )
+
+            logger.debug(f"Service role deploy stdout: {process.stdout}")
+            if process.stderr:
+                logger.debug(f"Service role deploy stderr: {process.stderr}")
+
+            # Get the service role ARN from stack outputs
+            service_role_arn = self.get_existing_service_role_arn()
+            if service_role_arn:
+                logger.info(f"Successfully deployed service role: {service_role_arn}")
+                return service_role_arn
+            else:
+                logger.error("Failed to retrieve service role ARN after deployment")
+                return None
+
+        except FileNotFoundError as e:
+            logger.error(f"Service role template error: {e}")
+            return None
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to deploy service role: {e}")
+            if e.stdout:
+                logger.debug(f"Command stdout: {e.stdout}")
+            if e.stderr:
+                logger.debug(f"Command stderr: {e.stderr}")
+            
+            # Cleanup failed service role deployment
+            logger.info("Cleaning up failed service role deployment...")
+            self.cleanup_failed_stack(service_role_stack_name)
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error during service role deployment: {e}")
+            return None
+
     def install(self, admin_email: str, idp_pattern: str):
         """
-        Install the IDP stack using CloudFormation.
+        Install the IDP stack using CloudFormation with service role.
         
         Args:
             admin_email: Email address for the admin user
             idp_pattern: IDP pattern to deploy
-            stack_name: Optional stack name (defaults to idp-Stack)
         """
         template_file = '.aws-sam/idp-main.yaml'
-        
         s3_prefix = f"{self.cfn_prefix}/0.2.2"  # TODO: Make version configurable
 
         try:
+            # Step 1: Ensure CloudFormation service role exists
+            logger.info("Step 1: Ensuring CloudFormation service role exists...")
+            service_role_arn = self.deploy_service_role()
+            if not service_role_arn:
+                logger.error("Failed to deploy or find service role. Aborting IDP deployment.")
+                return False
+
+            # Step 2: Deploy IDP stack using the service role
+            logger.info("Step 2: Deploying IDP stack using service role...")
+            
             # Verify template file exists
             template_path = os.path.join(self.abs_cwd, template_file)
             if not os.path.exists(template_path):
                 raise FileNotFoundError(f"Template file not found: {template_path}")
 
-            # Construct the CloudFormation deploy command
+            # Construct the CloudFormation deploy command with service role
             cmd = [
                 'aws', 'cloudformation', 'deploy',
                 '--region', self.region,
@@ -159,6 +342,7 @@ class InstallService():
                 '--s3-bucket', self.s3_bucket,
                 '--s3-prefix', s3_prefix,
                 '--capabilities', 'CAPABILITY_NAMED_IAM', 'CAPABILITY_AUTO_EXPAND',
+                '--role-arn', service_role_arn,  # Use the service role
                 '--parameter-overrides',
                 "DocumentKnowledgeBase=DISABLED",
                 f"IDPPattern={idp_pattern}",
@@ -187,7 +371,7 @@ class InstallService():
             if process.stderr:
                 logger.debug(f"CloudFormation deploy stderr: {process.stderr}")
 
-            logger.info(f"Successfully deployed stack {stack_name} in {self.region}")
+            logger.info(f"Successfully deployed stack {self.stack_name} in {self.region} using service role")
             return True
 
         except FileNotFoundError as e:
@@ -199,6 +383,10 @@ class InstallService():
                 logger.debug(f"Command stdout: {e.stdout}")
             if e.stderr:
                 logger.debug(f"Command stderr: {e.stderr}")
+            
+            # Cleanup failed deployment for next attempt
+            logger.info("Cleaning up failed deployment for next attempt...")
+            self.cleanup_failed_stack(self.stack_name)
             return False
         except Exception as e:
             logger.error(f"Unexpected error during stack deployment: {e}")
