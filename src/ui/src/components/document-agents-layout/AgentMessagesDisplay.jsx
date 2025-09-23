@@ -317,14 +317,66 @@ Each table has the following structure:
   - \`"inference_result.federal_wage_info.wages_tips_other_compensation"\` (string): Total wages, tips, and other compensation paid to the employee.
   - \`"inference_result.state_taxes_table"\` (string): JSON array containing state and local tax information for specific jurisdictions.
 
+**\`document_sections_us_drivers_licenses\`** (Class: "US-drivers-licenses"):
+- **Description**: An official government-issued identification document that authorizes an individual to operate motor vehicles, containing personal information, physical characteristics, address details, and driving privileges with restrictions and endorsements.
+- **Standard Columns**: (Same as above)
+- **Configuration-Specific Columns**:
+  - \`"inference_result.state_name"\` (string): The state or jurisdiction that issued the driver's license, typically shown as a two-letter state abbreviation.
+  - \`"inference_result.id_number"\` (string): The unique driver's license identification number assigned by the issuing state.
+  - \`"inference_result.name_details.first_name"\` (string): The given name of the license holder.
+  - \`"inference_result.name_details.last_name"\` (string): The family name or surname of the license holder.
+  - \`"inference_result.personal_details.height"\` (string): The physical height of the license holder.
+  - \`"inference_result.address_details.city"\` (string): The city of residence for the license holder.
+
+**\`document_sections_bank_checks\`** (Class: "Bank-checks"):
+- **Description**: A written financial instrument directing a bank to pay a specific amount of money from the account holder's account to a designated payee, containing payment details, account information, and verification elements.
+- **Standard Columns**: (Same as above)
+- **Configuration-Specific Columns**:
+  - \`"inference_result.date"\` (string): The date when the check was written, typically handwritten or printed in the date field.
+  - \`"inference_result.dollar_amount"\` (string): The numerical amount to be paid as specified on the check.
+  - \`"inference_result.check_number"\` (string): The unique sequential number identifying this specific check.
+  - \`"inference_result.account_holder_name"\` (string): The name of the person or entity who owns the bank account and wrote the check.
+  - \`"inference_result.payee_name"\` (string): The name of the person or entity receiving the payment.
+  - \`"inference_result.bank_name"\` (string): The name of the financial institution where the account is held.
+
+**\`document_sections_bank_statement\`** (Class: "Bank-Statement"):
+- **Description**: A periodic financial document issued by banks detailing account activity, balances, and transactions over a specific time period, providing account holders with a summary of their financial activity and current account status.
+- **Standard Columns**: (Same as above)
+- **Configuration-Specific Columns**:
+  - \`"inference_result.account_holder_name"\` (string): The name of the person or entity who owns the bank account.
+  - \`"inference_result.account_number"\` (string): The unique identifier for the bank account, often partially masked for security.
+  - \`"inference_result.bank_name"\` (string): The name of the financial institution issuing the statement.
+  - \`"inference_result.statement_start_date"\` (string): The beginning date of the statement period.
+  - \`"inference_result.statement_end_date"\` (string): The ending date of the statement period.
+  - \`"inference_result.transaction_details"\` (string): JSON array containing detailed listing of all transactions during the statement period.
+
+**\`document_sections_homeowners_insurance_application\`** (Class: "Homeowners-Insurance-Application"):
+- **Description**: An application form for homeowners insurance coverage containing applicant personal information, property details, coverage requirements, existing insurance history, and underwriting data necessary for evaluating risk and determining appropriate coverage terms.
+- **Standard Columns**: (Same as above)
+- **Configuration-Specific Columns**:
+  - \`"inference_result.policy number"\` (string): The unique identifier assigned to the insurance policy for tracking and reference purposes.
+  - \`"inference_result.effective date"\` (string): The date when the insurance coverage begins and becomes active.
+  - \`"inference_result.expiration date"\` (string): The date when the insurance policy expires and requires renewal.
+  - \`"inference_result.named insured(s) and mailing address"\` (string): The complete name and mailing address of the primary insured party.
+  - \`"inference_result.primary applicant information.name"\` (string): The full name of the primary applicant.
+  - \`"inference_result.co-applicant information.name"\` (string): The full name of the co-applicant if applicable.
+
 ### Column Naming Patterns:
 - **Simple attributes**: \`inference_result.{attribute_name_lowercase}\` (all strings)
 - **Group attributes**: \`inference_result.{group_name_lowercase}.{sub_attribute_lowercase}\` (all strings)
 - **List attributes**: \`inference_result.{list_name_lowercase}\` (JSON string containing array data)
 
+### CRITICAL: Dot-Notation Column Names
+**These are SINGLE column identifiers containing dots, NOT table.column references:**
+- ✅ **CORRECT**: \`"document_class.type"\` (single column name containing a dot)
+- ❌ **WRONG**: \`"document_class"."type"\` (table.column syntax - this will FAIL)
+- ✅ **CORRECT**: \`"inference_result.ytdnetpay"\` (single column name containing dots)
+- ❌ **WRONG**: \`"inference_result"."ytdnetpay"\` (table.column syntax - this will FAIL)
+
 ### Important Querying Notes:
 - **All \`inference_result.*\` columns are string type** - even numeric data is stored as strings
 - **Always use double quotes** around column names: \`"inference_result.companyaddress.state"\`
+- **Dot notation columns**: Names like \`document_class.type\` are SINGLE column names with dots inside quotes
 - **List data is stored as JSON strings** - use JSON parsing functions to extract array elements
 - **Case sensitivity**: Column names are lowercase, use LOWER() for string comparisons
 - **Partitioning**: All tables partitioned by \`date\` in YYYY-MM-DD format

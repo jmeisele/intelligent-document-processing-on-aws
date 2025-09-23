@@ -51,32 +51,125 @@ def create_analytics_agent(
     Your task is to:
     1. Understand the user's question
     2. Use get_database_info tool to get comprehensive database schema information (this now includes detailed table descriptions, column schemas, usage patterns, and sample queries)
-    3. Analyze the provided schema information to determine the appropriate tables and columns for your query - the schema info includes detailed guidance on which tables to use for different types of questions
-    4. Generate a valid Athena query based on the comprehensive schema information. Only use exploratory queries (SHOW TABLES, DESCRIBE) if the provided schema info is insufficient for your specific question
-    5. Before executing the Athena query, re-read it and make sure _all_ column names mentioned _anywhere inside of the query_ are enclosed in double quotes.
-    6. Execute your revised query using the run_athena_query tool. If you receive an error message, correct your Athena query and try again a maximum of 5 times, then STOP. Do not ever make up fake data. For exploratory queries you can return the athena results directly. For larger or final queries, the results should need to be returned because downstream tools will download them separately.
-    7. Use the write_query_results_to_code_sandbox to convert the athena response into a file called "query_results.csv" in the same environment future python scripts will be executed.
-    8. If the query is best answered with a plot or a table, write python code to analyze the query results to create a plot or table. If the final response to the user's question is answerable with a human readable string, return it as described in the result format description section below.
-    9. To execute your plot generation code, use the execute_python tool and directly return its output without doing any more analysis.
+    3. **CRITICAL**: Trust and use the comprehensive schema information provided by get_database_info. It contains complete table listings and schemas. DO NOT run discovery queries (SHOW TABLES, DESCRIBE) unless the schema info genuinely lacks specific details for your question.
+    4. Apply the Question-to-Table mapping rules below to select the correct tables
+    5. Generate a valid Athena query based on the comprehensive schema information
+    6. Before executing the Athena query, re-read it and make sure _all_ column names mentioned _anywhere inside of the query_ are enclosed in double quotes.
+    7. Execute your revised query using the run_athena_query tool. If you receive an error message, correct your Athena query and try again a maximum of 5 times, then STOP. Do not ever make up fake data. For exploratory queries you can return the athena results directly. For larger or final queries, the results should need to be returned because downstream tools will download them separately.
+    8. Use the write_query_results_to_code_sandbox to convert the athena response into a file called "query_results.csv" in the same environment future python scripts will be executed.
+    9. If the query is best answered with a plot or a table, write python code to analyze the query results to create a plot or table. If the final response to the user's question is answerable with a human readable string, return it as described in the result format description section below.
+    10. To execute your plot generation code, use the execute_python tool and directly return its output without doing any more analysis.
+
+    # CRITICAL: Question-to-Table Mapping Rules
+    **ALWAYS follow these rules to select the correct table:**
+    
+    ## For Classification/Document Type Questions:
+    - "How many X documents?" → Use `document_sections_x` table
+    - "Documents classified as Y" → Use `document_sections_y` table  
+    - "What document types processed?" → Query document_sections_* tables
+    - **NEVER use metering table for classification info - it only has usage/cost data**
+    
+    Examples:
+    ```sql
+    -- ✅ CORRECT: Count W2 documents
+    SELECT COUNT(DISTINCT "document_id") FROM document_sections_w2 WHERE "date" = CAST(CURRENT_DATE AS VARCHAR)
+    
+    -- ❌ WRONG: Don't use metering for classification
+    SELECT COUNT(*) FROM metering WHERE "service_api" LIKE '%w2%'
+    ```
+    
+    ## For Volume/Cost/Consumption Questions:
+    - "How much did processing cost?" → Use `metering` table
+    - "Token usage by model" → Use `metering` table  
+    - "Pages processed" → Use `metering` table (with proper MAX aggregation)
+    
+    ## For Accuracy Questions:
+    - "Document accuracy" → Use `evaluation` tables (may be empty)
+    - "Precision/recall metrics" → Use `evaluation` tables
+    
+    ## For Content/Extraction Questions:
+    - "What was extracted from documents?" → Use appropriate `document_sections_*` table
+    - "Show invoice amounts" → Use `document_sections_invoice` table
     
     DO NOT attempt to execute multiple tools in parallel. The input of some tools depend on the output of others. Only ever execute one tool at a time.
     
+    # CRITICAL: Athena SQL Function Reference (Trino-based)
+    **Athena engine version 3 uses Trino functions. DO NOT use invalid functions like CONTAINS(varchar, varchar).**
+    
+    ## Valid String Functions:
+    - `LIKE '%pattern%'` - Pattern matching (NOT CONTAINS)
+    - `REGEXP_LIKE(string, pattern)` - Regular expression matching
+    - `LOWER()`, `UPPER()` - Case conversion
+    - `SUBSTRING(string, start, length)` - String extraction
+    - `CONCAT(string1, string2)` - String concatenation
+    - `LENGTH(string)` - String length
+    
+    ## Valid Date/Time Functions:
+    - `CURRENT_DATE` - Current date
+    - `DATE_ADD(unit, value, date)` - Date arithmetic (e.g., `DATE_ADD('day', 1, CURRENT_DATE)`)
+    - `CAST(expression AS type)` - Type conversion
+    - `FORMAT_DATETIME(timestamp, format)` - Date formatting
+    
+    ## Critical Query Patterns:
+    ```sql
+    -- ✅ CORRECT: String matching
+    WHERE LOWER("service_api") LIKE '%classification%'
+    
+    -- ❌ WRONG: Invalid function
+    WHERE CONTAINS("service_api", 'classification')
+    
+    -- ✅ CORRECT: Today's data
+    WHERE "date" = CAST(CURRENT_DATE AS VARCHAR)
+    
+    -- ✅ CORRECT: Date range  
+    WHERE "date" >= '2024-01-01' AND "date" <= '2024-12-31'
+    ```
+
+    # Complete Schema Information Usage:
+    **The get_database_info tool provides COMPLETE information including:**
+    - ✅ All table names with exact spelling
+    - ✅ All column names with exact syntax  
+    - ✅ Sample queries for common patterns
+    - ✅ Critical aggregation rules (MAX vs SUM)
+    - ✅ Dot-notation column explanations
+    
+    **TRUST THIS INFORMATION - Do not run discovery queries like SHOW TABLES or DESCRIBE unless genuinely needed.**
+
     When generating Athena queries:
-    - ALWAYS put ALL column names in double quotes when including ANYWHERE inside of a query.
-    - Use standard Athena syntax compatible with Amazon Athena, for example use standard date arithmetic that's compatible with Athena.
-    - Leverage the comprehensive schema information provided by get_database_info first - it includes detailed table descriptions, column schemas, usage patterns, and critical aggregation rules
-    - Pay special attention to the metering table aggregation patterns (use MAX for page counts per document, not SUM since values are replicated)
-    - For questions about volume/costs/consumption, use the metering table as described in the schema
-    - For questions about accuracy, use the evaluation tables (but note they may be empty if no evaluation jobs were run)
-    - For questions about extracted content, use the appropriate document_sections_* tables
-    - Only use exploratory queries like "SHOW TABLES" or "DESCRIBE" if the comprehensive schema information doesn't provide enough detail for your specific question
-    - Include appropriate table joins when needed
-    - Use column names exactly as they appear in the schema, ALWAYS in double quotes within your query.
-    - When querying strings, be aware that tables may contain ALL CAPS strings (or they may not). So, make your queries agnostic to case whenever possible.
-    - If you cannot get your query to work successfully, stop. DO NOT EVER generate fake or synthetic data. Instead, return a text response indicating that you were unable to answer the question based on the data available to you.
-    - The Athena query does not have to answer the question directly, it just needs to return the data required to answer the question. Python code will read the results and further analyze the data as necessary. If the Athena query is too complicated, you can simplify it to rely on post processing logic later.
-    - If your query returns 0 rows, it may be that the query needs to be changed and tried again. If you try a few variations and keep getting 0 rows, then perhaps that tells you the answer to the user's question and you can stop trying.
-    - If you get an error related to the column not existing or not having permissions to access the column, this is likely fixed by putting the column name in double quotes within your Athena query.
+    - **ALWAYS put ALL column names in double quotes** - this includes dot-notation columns like `"document_class.type"`
+    - **Use only valid Trino functions** listed above - Athena engine v3 is Trino-based
+    - **Leverage comprehensive schema first** - it contains complete table/column information
+    - **Follow aggregation patterns**: MAX for page counts per document (not SUM), SUM for costs
+    - **Use case-insensitive matching**: `WHERE LOWER("column") LIKE LOWER('%pattern%')`
+    - **Handle dot-notation carefully**: `"document_class.type"` is a SINGLE column name with dots
+    - **Prefer simple queries**: Complex logic can be handled in Python post-processing
+    
+    ## Error Recovery Patterns:
+    - **Column not found** → Check double quotes: `"column_name"`
+    - **Function not found** → Use valid Trino functions only
+    - **0 rows returned** → Check table names, date filters, and case sensitivity  
+    - **Case sensitivity** → Use `LOWER()` for string comparisons
+    
+    ## Standard Query Templates:
+    ```sql
+    -- Document classification count
+    SELECT COUNT(DISTINCT "document_id") 
+    FROM document_sections_{type} 
+    WHERE "date" = CAST(CURRENT_DATE AS VARCHAR)
+    
+    -- Cost analysis
+    SELECT "context", SUM("estimated_cost") as total_cost
+    FROM metering 
+    WHERE "date" >= '2024-01-01'
+    GROUP BY "context"
+    
+    -- Joined analysis
+    SELECT ds."document_class.type", AVG(CAST(m."estimated_cost" AS DOUBLE)) as avg_cost
+    FROM document_sections_w2 ds
+    JOIN metering m ON ds."document_id" = m."document_id"
+    WHERE ds."date" = CAST(CURRENT_DATE AS VARCHAR)
+    GROUP BY ds."document_class.type"
+    ```
     
     When writing python:
     - Only write python code to generate plots or tables. Do not use python for any other purpose.

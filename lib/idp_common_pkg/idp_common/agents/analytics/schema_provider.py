@@ -211,7 +211,7 @@ def get_dynamic_document_sections_description(
         config: Optional configuration dictionary. If None, loads from environment.
 
     Returns:
-        Deployment-specific description with exact table names and column schemas
+        Deployment-specific description with exact table names and column schemas, or error-aware fallback
     """
     try:
         if config is None:
@@ -222,7 +222,11 @@ def get_dynamic_document_sections_description(
 
         if not classes:
             logger.warning("No classes found in configuration")
-            return _get_fallback_description()
+            return _get_error_aware_fallback(
+                error_type="CONFIGURATION_ISSUE",
+                error_message="No document classes found in configuration. The 'classes' field is missing or empty.",
+                troubleshooting="Verify your configuration contains a 'classes' array with document type definitions.",
+            )
 
         description = """
 ## Document Sections Tables (Configuration-Based)
@@ -284,18 +288,21 @@ def get_dynamic_document_sections_description(
                 "  - Various `metadata.*` columns (strings): Processing metadata\n"
             )
 
-            # Configuration-specific columns
+            # Configuration-specific columns - reset column count for each table
             if attributes:
                 description += "- **Configuration-Specific Columns**:\n"
-                column_count = 0
-                for attr in attributes:
+                column_count = 0  # Reset for each table
+                for attr_index, attr in enumerate(attributes):
                     attr_desc_text, columns_added = _generate_attribute_columns(
                         attr, "  "
                     )
                     description += attr_desc_text
                     column_count += columns_added
-                    if column_count > 50:  # Limit output length
-                        description += f"  - ... and {len(attributes) - attributes.index(attr)} more attributes from configuration\n"
+                    # Limit columns within this individual table only
+                    if column_count > 20:  # Reasonable per-table limit
+                        remaining_attrs = len(attributes) - attr_index - 1
+                        if remaining_attrs > 0:
+                            description += f"  - ... and {remaining_attrs} more attributes from configuration\n"
                         break
             else:
                 description += "- **Configuration-Specific Columns**: None configured\n"
@@ -307,37 +314,57 @@ def get_dynamic_document_sections_description(
 - **Group attributes**: `inference_result.{group_name_lowercase}.{sub_attribute_lowercase}` (all strings)
 - **List attributes**: `inference_result.{list_name_lowercase}` (JSON string containing array data)
 
+### CRITICAL: Dot-Notation Column Names
+**These are SINGLE column identifiers containing dots, NOT table.column references:**
+- ✅ **CORRECT**: `"document_class.type"` (single column name containing a dot)
+- ❌ **WRONG**: `"document_class"."type"` (table.column syntax - this will FAIL)
+- ✅ **CORRECT**: `"inference_result.ytdnetpay"` (single column name containing dots)
+- ❌ **WRONG**: `"inference_result"."ytdnetpay"` (table.column syntax - this will FAIL)
+
 ### Important Querying Notes:
 - **All `inference_result.*` columns are string type** - even numeric data is stored as strings
 - **Always use double quotes** around column names: `"inference_result.companyaddress.state"`
+- **Dot notation columns**: Names like `document_class.type` are SINGLE column names with dots inside quotes
 - **List data is stored as JSON strings** - use JSON parsing functions to extract array elements
 - **Case sensitivity**: Column names are lowercase, use LOWER() for string comparisons
 - **Partitioning**: All tables partitioned by `date` in YYYY-MM-DD format
 
 ### Sample Queries:
 ```sql
--- Query specific attributes (example for Payslip)
+-- CORRECT: Filter by document type using dot-notation column name
+SELECT COUNT(DISTINCT "document_id") as w2_count
+FROM document_sections_w2
+WHERE "document_class.type" = 'W2'
+AND date >= '2024-01-01'
+
+-- CORRECT: Query specific attributes (example for Payslip)
 SELECT "document_id", 
+       "document_class.type",
        "inference_result.ytdnetpay",
        "inference_result.employeename.firstname",
        "inference_result.companyaddress.state"
 FROM document_sections_payslip
 WHERE date >= '2024-01-01'
+AND "document_class.type" = 'Payslip'
 
--- Parse JSON list data (example for FederalTaxes)
+-- CORRECT: Parse JSON list data (example for FederalTaxes)  
 SELECT "document_id",
+       "document_class.type",
        json_extract_scalar(tax_item, '$.ItemDescription') as tax_type,
        json_extract_scalar(tax_item, '$.YTD') as ytd_amount
 FROM document_sections_payslip
 CROSS JOIN UNNEST(json_parse("inference_result.federaltaxes")) as t(tax_item)
+WHERE "document_class.type" = 'Payslip'
 
--- Join with metering for cost analysis
+-- CORRECT: Join with metering for cost analysis
 SELECT ds."section_classification",
+       ds."document_class.type",
        COUNT(DISTINCT ds."document_id") as document_count,
        AVG(CAST(m."estimated_cost" AS double)) as avg_processing_cost
 FROM document_sections_w2 ds
 JOIN metering m ON ds."document_id" = m."document_id"
-GROUP BY ds."section_classification"
+WHERE ds."document_class.type" = 'W2'
+GROUP BY ds."section_classification", ds."document_class.type"
 ```
 
 **This schema information is generated from your actual configuration and shows exactly what tables and columns exist in your deployment.**
@@ -346,8 +373,34 @@ GROUP BY ds."section_classification"
         return description
 
     except Exception as e:
+        # Determine the type of error and provide appropriate error-aware fallback
+        error_message = str(e)
         logger.error(f"Error generating dynamic sections description: {e}")
-        return _get_fallback_description()
+
+        if "Configuration table name not provided" in error_message:
+            return _get_error_aware_fallback(
+                error_type="MISSING_CONFIGURATION",
+                error_message="Configuration table name not provided. The CONFIGURATION_TABLE_NAME environment variable is not set.",
+                troubleshooting="Set the CONFIGURATION_TABLE_NAME environment variable to point to your configuration DynamoDB table.",
+            )
+        elif "ClientError" in str(type(e)) or "DynamoDB" in error_message:
+            return _get_error_aware_fallback(
+                error_type="DYNAMODB_ACCESS_ERROR",
+                error_message=f"Cannot access configuration table: {error_message}",
+                troubleshooting="Check that the DynamoDB table exists, you have proper permissions, and AWS credentials are configured.",
+            )
+        elif "Default configuration not found" in error_message:
+            return _get_error_aware_fallback(
+                error_type="MISSING_DEFAULT_CONFIG",
+                error_message="Default configuration not found in the configuration table.",
+                troubleshooting="Ensure your configuration table contains a record with Configuration='Default'.",
+            )
+        else:
+            return _get_error_aware_fallback(
+                error_type="UNKNOWN_ERROR",
+                error_message=f"Unexpected error loading configuration: {error_message}",
+                troubleshooting="Check logs for detailed error information and verify your deployment configuration.",
+            )
 
 
 def _get_table_suffix(class_name: str) -> str:
@@ -412,6 +465,90 @@ def _generate_attribute_columns(attr: Dict[str, Any], indent: str) -> tuple[str,
         columns_added = 1
 
     return "\n".join(desc_parts) + "\n", columns_added
+
+
+def _get_error_aware_fallback(
+    error_type: str, error_message: str, troubleshooting: str
+) -> str:
+    """
+    Get error-aware fallback description that surfaces configuration problems prominently.
+
+    Args:
+        error_type: Type of error encountered
+        error_message: Detailed error message
+        troubleshooting: Troubleshooting guidance for the user
+
+    Returns:
+        Error-aware description that includes the error details and basic fallback info
+    """
+    return f"""
+# ⚠️ CONFIGURATION ERROR DETECTED
+
+**ERROR TYPE**: {error_type}
+
+**ERROR MESSAGE**: {error_message}
+
+**IMPACT**: Cannot load deployment-specific table schemas. Using generic fallback information below.
+
+**ACTION REQUIRED**: {troubleshooting}
+
+---
+
+## Fallback Document Sections Tables
+
+**⚠️ WARNING**: The information below is GENERIC and may not match your actual deployment. Fix the configuration error above for accurate table information.
+
+**Purpose**: Store actual extracted data from document sections in structured format for analytics
+
+**Key Usage**: Use these tables to query the actual extracted content and attributes from processed documents
+
+**IMPORTANT**: Configuration loading failed, but common document section tables may include:
+- `document_sections_w2` - W2 tax form processing
+- `document_sections_payslip` - Payslip processing  
+- `document_sections_bank_statement` - Bank statement processing
+- `document_sections_bank_checks` - Bank check processing
+
+### Common Schema for All Document Sections Tables:
+
+**Standard Metadata Columns** (all tables):
+- `document_class.type` (string): Document classification type
+- `document_id` (string): Unique identifier for the document
+- `section_id` (string): Unique identifier for the section
+- `section_classification` (string): Type/class of the section
+- `section_confidence` (string): Confidence score for the section classification
+- `explainability_info` (string): JSON containing explanation of extraction decisions
+- `timestamp` (timestamp): When the document was processed
+- `date` (string): Partition key in YYYY-MM-DD format
+
+**Dynamic Inference Columns**: `inference_result.*` columns based on extracted data (all strings)
+
+### CRITICAL: Dot-Notation Column Names
+**These are SINGLE column identifiers containing dots, NOT table.column references:**
+- ✅ **CORRECT**: `"document_class.type"` (single column name containing a dot)
+- ❌ **WRONG**: `"document_class"."type"` (table.column syntax - this will FAIL)
+
+### Sample Queries:
+```sql
+-- Basic query pattern (verify table names exist first)
+SELECT "document_id", "document_class.type", "section_classification", "timestamp"
+FROM document_sections_w2
+WHERE date >= '2024-01-01'
+AND "document_class.type" = 'W2'
+
+-- Join with metering for cost analysis  
+SELECT ds."section_classification",
+       COUNT(DISTINCT ds."document_id") as document_count,
+       AVG(CAST(m."estimated_cost" AS double)) as avg_processing_cost
+FROM document_sections_w2 ds
+JOIN metering m ON ds."document_id" = m."document_id"
+WHERE ds."document_class.type" = 'W2'
+GROUP BY ds."section_classification"
+```
+
+**⚠️ IMPORTANT**: Use SHOW TABLES to verify actual table names in your deployment, as the names above are generic examples.
+
+**Note**: Table schemas include dynamically generated `inference_result.*` columns based on extraction results from your specific configuration.
+"""
 
 
 def _get_fallback_description() -> str:
