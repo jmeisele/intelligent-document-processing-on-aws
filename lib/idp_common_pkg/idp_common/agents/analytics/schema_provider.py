@@ -205,13 +205,13 @@ def get_dynamic_document_sections_description(
     config: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
-    Generate description of dynamic document sections tables based on configuration.
+    Generate deployment-specific description of document sections tables based on actual configuration.
 
     Args:
         config: Optional configuration dictionary. If None, loads from environment.
 
     Returns:
-        Description of document sections tables with dynamically generated schema info
+        Deployment-specific description with exact table names and column schemas
     """
     try:
         if config is None:
@@ -220,196 +220,239 @@ def get_dynamic_document_sections_description(
         # Get document classes from config
         classes = config.get("classes", [])
 
+        if not classes:
+            logger.warning("No classes found in configuration")
+            return _get_fallback_description()
+
         description = """
-## Document Sections Tables (Dynamic)
+## Document Sections Tables (Configuration-Based)
 
 **Purpose**: Store actual extracted data from document sections in structured format for analytics
 
 **Key Usage**: Use these tables to query the actual extracted content and attributes from processed documents
 
-**Dynamic Nature**: Tables are automatically created based on document classifications encountered during processing
+**IMPORTANT**: Based on your current configuration, the following tables DEFINITELY exist. Do NOT use discovery queries (SHOW TABLES, DESCRIBE) for these - use them directly.
 
-### Common Characteristics:
-
-All document sections tables share these **common metadata columns**:
-- `section_id` (string): Unique identifier for the section
-- `document_id` (string): Unique identifier for the document  
-- `section_classification` (string): Type/class of the section
-- `section_confidence` (double): Confidence score for the section classification
-- `timestamp` (timestamp): When the document was processed
-
-**Partitioned by**: date (YYYY-MM-DD format)
-
-### Table Naming Pattern:
-Tables follow the pattern: `document_sections_{section_type_lowercase}`
-
-Examples:
-- `document_sections_invoice` - for invoice sections
-- `document_sections_receipt` - for receipt sections
-- `document_sections_w2` - for W2 tax form sections
-- `document_sections_bank_statement` - for bank statement sections
-
-### Dynamic Data Columns:
-Beyond the common columns, each table has **dynamically inferred columns** from JSON extraction results:
-
-**Column Naming Patterns**:
-- **Nested objects**: Flattened using dot notation (e.g., `customer.name`, `customer.address.street`)
-- **Arrays**: Converted to JSON strings  
-- **Primitive values**: Preserved as native types (strings, numbers, booleans)
-
-**Important**: When querying columns with periods in their names, **always use double quotes**:
-```sql
-SELECT "customer.name", "customer.address.city" 
-FROM document_sections_invoice
-```
-
-### Discovery Queries:
-For tables not listed in the configuration, use these queries to explore:
-
-```sql
--- List all tables (then filter for document_sections manually)
-SHOW TABLES
-
--- Alternative: Query information schema for document sections tables
-SELECT table_name 
-FROM information_schema.tables 
-WHERE table_name LIKE 'document_sections_%'
-
--- Describe a specific table's schema (only if not covered by config info above)
-DESCRIBE document_sections_tablename
-```
-
-**Note**: The tables listed in "Configured Document Classes" above should exist if those document types have been processed. Only use discovery queries for additional tables not covered by the configuration.
 """
 
-        # Add information about configured document classes if available
-        if classes:
-            # First, create a summary list of all known table names
-            table_names = []
-            for doc_class in classes:
-                class_name = doc_class.get("name", "Unknown")
-                table_name = f"document_sections_{class_name.lower().replace(' ', '_')}"
-                table_names.append(table_name)
+        # Generate table list
+        table_names = []
+        for doc_class in classes:
+            class_name = doc_class.get("name", "Unknown")
+            # Apply exact table name transformation logic
+            table_name = f"document_sections_{_get_table_suffix(class_name)}"
+            table_names.append(table_name)
 
-            description += "\n### Known Document Sections Tables:\n\n"
-            description += "**IMPORTANT**: The following tables exist based on your configuration. Do NOT use discovery queries (SHOW TABLES, DESCRIBE) for these - use them directly:\n\n"
+        description += "### Known Document Sections Tables:\n\n"
+        for table_name in table_names:
+            description += f"- `{table_name}`\n"
 
-            for table_name in table_names:
-                description += f"- `{table_name}`\n"
+        description += "\n### Complete Table Schemas:\n\n"
+        description += "Each table has the following structure:\n\n"
 
-            description += "\n### Configured Document Classes (Detailed):\n\n"
-            description += "Based on your configuration, the following document types have associated tables:\n\n"
+        # Generate detailed schema for each table
+        for doc_class in classes:
+            class_name = doc_class.get("name", "Unknown")
+            class_desc = doc_class.get("description", "No description available")
+            table_name = f"document_sections_{_get_table_suffix(class_name)}"
+            attributes = doc_class.get("attributes", [])
 
-            for doc_class in classes:
-                class_name = doc_class.get("name", "Unknown")
-                class_desc = doc_class.get("description", "No description available")
-                table_name = f"document_sections_{class_name.lower().replace(' ', '_')}"
+            description += f'**`{table_name}`** (Class: "{class_name}"):\n'
+            description += f"- **Description**: {class_desc}\n"
 
-                description += f"**{class_name}** → Table: `{table_name}`\n"
-                description += f"- Description: {class_desc}\n"
+            # Standard columns always present
+            description += "- **Standard Columns**:\n"
+            description += (
+                "  - `document_class.type` (string): Document classification type\n"
+            )
+            description += (
+                "  - `document_id` (string): Unique identifier for the document\n"
+            )
+            description += (
+                "  - `section_id` (string): Unique identifier for the section\n"
+            )
+            description += (
+                "  - `section_classification` (string): Type/class of the section\n"
+            )
+            description += "  - `section_confidence` (string): Confidence score for the section classification\n"
+            description += "  - `explainability_info` (string): JSON containing explanation of extraction decisions\n"
+            description += (
+                "  - `timestamp` (timestamp): When the document was processed\n"
+            )
+            description += "  - `date` (string): Partition key in YYYY-MM-DD format\n"
+            description += (
+                "  - Various `metadata.*` columns (strings): Processing metadata\n"
+            )
 
-                # Add attribute information if available
-                attributes = doc_class.get("attributes", [])
-                if attributes:
-                    description += f"- Expected attributes ({len(attributes)} total):\n"
-                    for attr in attributes[:5]:  # Show first 5 attributes as examples
-                        attr_name = attr.get("name", "Unknown")
-                        attr_desc = attr.get("description", "")
-                        attr_type = attr.get("attributeType", "simple")
+            # Configuration-specific columns
+            if attributes:
+                description += "- **Configuration-Specific Columns**:\n"
+                column_count = 0
+                for attr in attributes:
+                    attr_desc_text, columns_added = _generate_attribute_columns(
+                        attr, "  "
+                    )
+                    description += attr_desc_text
+                    column_count += columns_added
+                    if column_count > 50:  # Limit output length
+                        description += f"  - ... and {len(attributes) - attributes.index(attr)} more attributes from configuration\n"
+                        break
+            else:
+                description += "- **Configuration-Specific Columns**: None configured\n"
 
-                        if attr_type == "group":
-                            group_attrs = attr.get("groupAttributes", [])
-                            group_attr_names = [
-                                ga.get("name", "") for ga in group_attrs[:3]
-                            ]
-                            description += f"  - `{attr_name.lower().replace(' ', '.')}.*` (group): {attr_desc}\n"
-                            if group_attr_names:
-                                description += f"    - Sub-attributes: {', '.join(group_attr_names)}\n"
-                        elif attr_type == "list":
-                            description += f"  - `{attr_name.lower().replace(' ', '.')}` (list): {attr_desc}\n"
-                        else:
-                            description += f"  - `{attr_name.lower().replace(' ', '.')}`: {attr_desc}\n"
+            description += "\n"
 
-                    if len(attributes) > 5:
-                        description += (
-                            f"  - ... and {len(attributes) - 5} more attributes\n"
-                        )
+        description += """### Column Naming Patterns:
+- **Simple attributes**: `inference_result.{attribute_name_lowercase}` (all strings)
+- **Group attributes**: `inference_result.{group_name_lowercase}.{sub_attribute_lowercase}` (all strings)
+- **List attributes**: `inference_result.{list_name_lowercase}` (JSON string containing array data)
 
-                description += "\n"
+### Important Querying Notes:
+- **All `inference_result.*` columns are string type** - even numeric data is stored as strings
+- **Always use double quotes** around column names: `"inference_result.companyaddress.state"`
+- **List data is stored as JSON strings** - use JSON parsing functions to extract array elements
+- **Case sensitivity**: Column names are lowercase, use LOWER() for string comparisons
+- **Partitioning**: All tables partitioned by `date` in YYYY-MM-DD format
 
-        description += """
 ### Sample Queries:
-
 ```sql
--- Count documents by section type
-SELECT "section_classification", COUNT(*) as document_count
-FROM document_sections_invoice
-GROUP BY "section_classification"
-
--- Query specific extracted attributes (example for invoice)
+-- Query specific attributes (example for Payslip)
 SELECT "document_id", 
-       "customer.name" as customer_name,
-       "total_amount" as invoice_total,
-       "date" as processing_date
-FROM document_sections_invoice
+       "inference_result.ytdnetpay",
+       "inference_result.employeename.firstname",
+       "inference_result.companyaddress.state"
+FROM document_sections_payslip
 WHERE date >= '2024-01-01'
+
+-- Parse JSON list data (example for FederalTaxes)
+SELECT "document_id",
+       json_extract_scalar(tax_item, '$.ItemDescription') as tax_type,
+       json_extract_scalar(tax_item, '$.YTD') as ytd_amount
+FROM document_sections_payslip
+CROSS JOIN UNNEST(json_parse("inference_result.federaltaxes")) as t(tax_item)
 
 -- Join with metering for cost analysis
 SELECT ds."section_classification",
        COUNT(DISTINCT ds."document_id") as document_count,
-       AVG(m."estimated_cost") as avg_processing_cost
-FROM document_sections_invoice ds
+       AVG(CAST(m."estimated_cost" AS double)) as avg_processing_cost
+FROM document_sections_w2 ds
 JOIN metering m ON ds."document_id" = m."document_id"
 GROUP BY ds."section_classification"
 ```
 
-### Notes:
-- Table schemas evolve as new extraction patterns are discovered
-- Use `DESCRIBE table_name` to see current schema before complex queries
-- All timestamp/date columns refer to processing time, not document content dates
-- For JSON array fields, use JSON parsing functions to extract elements
+**This schema information is generated from your actual configuration and shows exactly what tables and columns exist in your deployment.**
 """
 
         return description
 
     except Exception as e:
         logger.error(f"Error generating dynamic sections description: {e}")
-        # Return basic description without discovery queries - agent should use known patterns
-        return """
+        return _get_fallback_description()
+
+
+def _get_table_suffix(class_name: str) -> str:
+    """
+    Convert class name to table suffix using exact transformation rules.
+
+    Args:
+        class_name: The class name from configuration
+
+    Returns:
+        Table suffix for use in document_sections_{suffix}
+    """
+    return class_name.lower().replace("-", "_").replace(" ", "_")
+
+
+def _generate_attribute_columns(attr: Dict[str, Any], indent: str) -> tuple[str, int]:
+    """
+    Generate column descriptions for an attribute.
+
+    Args:
+        attr: Attribute configuration dictionary
+        indent: Indentation string for formatting
+
+    Returns:
+        Tuple of (description_text, columns_added_count)
+    """
+    attr_name = attr.get("name", "unknown")
+    attr_desc = attr.get("description", "")
+    attr_type = attr.get("attributeType", "simple")
+
+    desc_parts = []
+    columns_added = 0
+
+    if attr_type == "simple":
+        column_name = f"inference_result.{attr_name.lower()}"
+        desc_parts.append(f'{indent}- `"{column_name}"` (string): {attr_desc}')
+        columns_added = 1
+
+    elif attr_type == "group":
+        group_attrs = attr.get("groupAttributes", [])
+        group_name_lower = attr_name.lower()
+        desc_parts.append(
+            f"{indent}- **{attr_name} Group** ({len(group_attrs)} columns):"
+        )
+
+        for group_attr in group_attrs:
+            sub_name = group_attr.get("name", "unknown")
+            sub_desc = group_attr.get("description", "")
+            column_name = f"inference_result.{group_name_lower}.{sub_name.lower()}"
+            desc_parts.append(f'{indent}  - `"{column_name}"` (string): {sub_desc}')
+            columns_added += 1
+
+    elif attr_type == "list":
+        column_name = f"inference_result.{attr_name.lower()}"
+        list_template = attr.get("listItemTemplate", {})
+        item_attrs = list_template.get("itemAttributes", [])
+        item_names = [ia.get("name", "") for ia in item_attrs]
+        desc_parts.append(f'{indent}- `"{column_name}"` (string): {attr_desc}')
+        desc_parts.append(
+            f"{indent}  - JSON array containing items with: {', '.join(item_names)}"
+        )
+        columns_added = 1
+
+    return "\n".join(desc_parts) + "\n", columns_added
+
+
+def _get_fallback_description() -> str:
+    """
+    Get fallback description when configuration loading fails.
+
+    Returns:
+        Basic description without discovery queries
+    """
+    return """
 ## Document Sections Tables (Dynamic)
 
 **Purpose**: Store actual extracted data from document sections in structured format for analytics
 
 **Key Usage**: Use these tables to query the actual extracted content and attributes from processed documents
 
-**IMPORTANT**: Configuration loading failed, but common document section tables typically include:
+**IMPORTANT**: Configuration loading failed, but common document section tables include:
 - `document_sections_w2` - W2 tax form processing
-- `document_sections_invoice` - Invoice processing  
-- `document_sections_receipt` - Receipt processing
+- `document_sections_payslip` - Payslip processing
 - `document_sections_bank_statement` - Bank statement processing
+- `document_sections_bank_checks` - Bank check processing
 
 ### Common Schema for All Document Sections Tables:
 
 **Standard Metadata Columns** (all tables):
+- `document_class.type` (string): Document classification type
+- `document_id` (string): Unique identifier for the document
 - `section_id` (string): Unique identifier for the section
-- `document_id` (string): Unique identifier for the document  
 - `section_classification` (string): Type/class of the section
-- `section_confidence` (double): Confidence score for the section classification
-- `timestamp` (timestamp): When the document was processed
-
-**Standard Inference Columns** (all tables):
+- `section_confidence` (string): Confidence score for the section classification
 - `explainability_info` (string): JSON containing explanation of extraction decisions
-- `inference_results` (string): JSON containing raw extraction results
+- `timestamp` (timestamp): When the document was processed
+- `date` (string): Partition key in YYYY-MM-DD format
 
-**Partitioned by**: date (YYYY-MM-DD format)
-
-**Dynamic Data Columns**: Beyond standard columns, tables have dynamically inferred columns from JSON extraction results using dot notation (e.g., `"employee.name"`, `"customer.address.city"`)
+**Dynamic Inference Columns**: `inference_result.*` columns based on extracted data (all strings)
 
 **Important**: Always use double quotes around column names containing periods in Athena queries.
 
 ### Sample Queries:
 ```sql
--- Query W2 data (common example)
+-- Basic query pattern
 SELECT "document_id", "section_classification", "timestamp"
 FROM document_sections_w2
 WHERE date >= '2024-01-01'
@@ -417,13 +460,13 @@ WHERE date >= '2024-01-01'
 -- Join with metering for cost analysis  
 SELECT ds."section_classification",
        COUNT(DISTINCT ds."document_id") as document_count,
-       AVG(m."estimated_cost") as avg_processing_cost
+       AVG(CAST(m."estimated_cost" AS double)) as avg_processing_cost
 FROM document_sections_w2 ds
 JOIN metering m ON ds."document_id" = m."document_id"
 GROUP BY ds."section_classification"
 ```
 
-**Note**: Table schemas include dynamically generated columns based on extraction results. Common patterns include employee/employer information for W2s, customer/vendor information for invoices, etc.
+**Note**: Table schemas include dynamically generated `inference_result.*` columns based on extraction results.
 """
 
 

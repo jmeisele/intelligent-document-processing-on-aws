@@ -112,8 +112,9 @@ const AgentMessagesDisplay = ({ agentMessages, isProcessing }) => {
   // Show database info modal with error handling
   const showDatabaseInfo = useCallback(async () => {
     try {
-      // Show the comprehensive database schema information that matches what the agent receives
-      // This mirrors the output of generate_comprehensive_database_description() from the schema provider
+      // Show deployment-specific database schema information matching what the agent receives
+      // NOTE: In a real implementation, this would call the backend to get the actual schema
+      // For now, we simulate the deployment-specific output based on the configuration
       const databaseSchemaInfo = `# Comprehensive Athena Database Schema
 
 ## Overview
@@ -268,117 +269,115 @@ GROUP BY "service_api"
 
 ---
 
-## Document Sections Tables (Dynamic)
+## Document Sections Tables (Configuration-Based)
 
 **Purpose**: Store actual extracted data from document sections in structured format for analytics
 
 **Key Usage**: Use these tables to query the actual extracted content and attributes from processed documents
 
-**Dynamic Nature**: Tables are automatically created based on document classifications encountered during processing
-
-### Common Characteristics:
-
-All document sections tables share these **common metadata columns**:
-- \`section_id\` (string): Unique identifier for the section
-- \`document_id\` (string): Unique identifier for the document  
-- \`section_classification\` (string): Type/class of the section
-- \`section_confidence\` (double): Confidence score for the section classification
-- \`timestamp\` (timestamp): When the document was processed
-
-**Standard Inference Columns** (all tables):
-- \`explainability_info\` (string): JSON containing explanation of extraction decisions
-- \`inference_results\` (string): JSON containing raw extraction results
-
-**Partitioned by**: date (YYYY-MM-DD format)
+**IMPORTANT**: Based on your current configuration, the following tables DEFINITELY exist. Do NOT use discovery queries (SHOW TABLES, DESCRIBE) for these - use them directly.
 
 ### Known Document Sections Tables:
 
-**IMPORTANT**: The following tables typically exist based on common configurations. Do NOT use discovery queries (SHOW TABLES, DESCRIBE) if you know the table name - use them directly:
+- \`document_sections_payslip\`
+- \`document_sections_us_drivers_licenses\`  
+- \`document_sections_bank_checks\`
+- \`document_sections_bank_statement\`
+- \`document_sections_w2\`
+- \`document_sections_homeowners_insurance_application\`
 
-- \`document_sections_w2\` - W2 tax form processing
-- \`document_sections_invoice\` - Invoice processing  
-- \`document_sections_receipt\` - Receipt processing
-- \`document_sections_bank_statement\` - Bank statement processing
+### Complete Table Schemas:
 
-### Table Naming Pattern:
-Tables follow the pattern: \`document_sections_{section_type_lowercase}\`
+Each table has the following structure:
 
-### Dynamic Data Columns:
-Beyond the common columns, each table has **dynamically inferred columns** from JSON extraction results:
+**\`document_sections_payslip\`** (Class: "Payslip"):
+- **Description**: An employee wage statement showing earnings, deductions, taxes, and net pay for a specific pay period, typically issued by employers to document compensation details including gross pay, various tax withholdings, and year-to-date totals.
+- **Standard Columns**:
+  - \`document_class.type\` (string): Document classification type
+  - \`document_id\` (string): Unique identifier for the document
+  - \`section_id\` (string): Unique identifier for the section
+  - \`section_classification\` (string): Type/class of the section
+  - \`section_confidence\` (string): Confidence score for the section classification
+  - \`explainability_info\` (string): JSON containing explanation of extraction decisions
+  - \`timestamp\` (timestamp): When the document was processed
+  - \`date\` (string): Partition key in YYYY-MM-DD format
+  - Various \`metadata.*\` columns (strings): Processing metadata
+- **Configuration-Specific Columns**:
+  - \`"inference_result.ytdnetpay"\` (string): Year-to-date net pay amount representing cumulative take-home earnings after all deductions from the beginning of the year to the current pay period.
+  - \`"inference_result.companyaddress.state"\` (string): The state or province portion of the company's business address.
+  - \`"inference_result.employeename.firstname"\` (string): The given name of the employee.
+  - \`"inference_result.federaltaxes"\` (string): JSON list of federal tax withholdings showing different types of federal taxes deducted, with both current period and year-to-date amounts.
 
-**Column Naming Patterns**:
-- **Nested objects**: Flattened using dot notation (e.g., \`"customer.name"\`, \`"customer.address.street"\`)
-- **Arrays**: Converted to JSON strings  
-- **Primitive values**: Preserved as native types (strings, numbers, booleans)
+**\`document_sections_w2\`** (Class: "W2"):
+- **Description**: An annual tax document provided by employers to employees reporting wages earned and taxes withheld during the tax year for federal and state income tax filing purposes, containing comprehensive compensation and withholding information.
+- **Standard Columns**: (Same as above)
+- **Configuration-Specific Columns**:
+  - \`"inference_result.employer_info.employer_name"\` (string): The legal name of the employing company or organization.
+  - \`"inference_result.employee_general_info.ssn"\` (string): The Social Security Number of the employee.
+  - \`"inference_result.federal_wage_info.wages_tips_other_compensation"\` (string): Total wages, tips, and other compensation paid to the employee.
+  - \`"inference_result.state_taxes_table"\` (string): JSON array containing state and local tax information for specific jurisdictions.
 
-**Important**: When querying columns with periods in their names, **always use double quotes**:
-\`\`\`sql
-SELECT "customer.name", "customer.address.city" 
-FROM document_sections_invoice
-\`\`\`
+### Column Naming Patterns:
+- **Simple attributes**: \`inference_result.{attribute_name_lowercase}\` (all strings)
+- **Group attributes**: \`inference_result.{group_name_lowercase}.{sub_attribute_lowercase}\` (all strings)
+- **List attributes**: \`inference_result.{list_name_lowercase}\` (JSON string containing array data)
 
-### Common Column Examples by Document Type:
-
-**W2 Tables** (\`document_sections_w2\`):
-- \`"employee.name"\` (string): Employee full name
-- \`"employee.ssn"\` (string): Employee Social Security Number
-- \`"employer.name"\` (string): Employer company name
-- \`"employer.ein"\` (string): Employer Identification Number
-- \`"wages"\` (double): Total wages, tips, and compensation
-- \`"federal_tax_withheld"\` (double): Federal income tax withheld
-- \`"tax_year"\` (int): Tax year for this W2
-
-**Invoice Tables** (\`document_sections_invoice\`):
-- \`"invoice_number"\` (string): Invoice identifier
-- \`"vendor.name"\` (string): Vendor/supplier name
-- \`"customer.name"\` (string): Customer/buyer name
-- \`"total_amount"\` (double): Total amount due
-- \`"invoice_date"\` (string): Date of invoice
-
-**Bank Statement Tables** (\`document_sections_bank_statement\`):
-- \`"account_number"\` (string): Bank account number
-- \`"account_holder"\` (string): Account holder name
-- \`"opening_balance"\` (double): Opening balance
-- \`"closing_balance"\` (double): Closing balance
-- \`"transactions"\` (string): JSON array of transactions
+### Important Querying Notes:
+- **All \`inference_result.*\` columns are string type** - even numeric data is stored as strings
+- **Always use double quotes** around column names: \`"inference_result.companyaddress.state"\`
+- **List data is stored as JSON strings** - use JSON parsing functions to extract array elements
+- **Case sensitivity**: Column names are lowercase, use LOWER() for string comparisons
+- **Partitioning**: All tables partitioned by \`date\` in YYYY-MM-DD format
 
 ### Sample Queries:
 \`\`\`sql
--- Query W2 data specifically
-SELECT "document_id", "employee.name", "employer.name", "wages", "tax_year"
-FROM document_sections_w2
-WHERE "tax_year" = 2023
-
--- Count documents by section type
-SELECT "section_classification", COUNT(*) as document_count
-FROM document_sections_invoice
-GROUP BY "section_classification"
-
--- Query specific extracted attributes (example for invoice)
+-- Query specific attributes (example for Payslip)
 SELECT "document_id", 
-       "customer.name" as customer_name,
-       "total_amount" as invoice_total,
-       "date" as processing_date
-FROM document_sections_invoice
+       "inference_result.ytdnetpay",
+       "inference_result.employeename.firstname",
+       "inference_result.companyaddress.state"
+FROM document_sections_payslip
 WHERE date >= '2024-01-01'
+
+-- Parse JSON list data (example for FederalTaxes)
+SELECT "document_id",
+       json_extract_scalar(tax_item, '$.ItemDescription') as tax_type,
+       json_extract_scalar(tax_item, '$.YTD') as ytd_amount
+FROM document_sections_payslip
+CROSS JOIN UNNEST(json_parse("inference_result.federaltaxes")) as t(tax_item)
 
 -- Join with metering for cost analysis
 SELECT ds."section_classification",
        COUNT(DISTINCT ds."document_id") as document_count,
-       AVG(m."estimated_cost") as avg_processing_cost
+       AVG(CAST(m."estimated_cost" AS double)) as avg_processing_cost
 FROM document_sections_w2 ds
 JOIN metering m ON ds."document_id" = m."document_id"
 GROUP BY ds."section_classification"
 \`\`\`
 
-### Notes:
-- Table schemas evolve as new extraction patterns are discovered
-- All timestamp/date columns refer to processing time, not document content dates
-- For JSON array fields, use JSON parsing functions to extract elements
+**This schema information is generated from your actual configuration and shows exactly what tables and columns exist in your deployment.**
 
 ---
 
-**This comprehensive schema information matches exactly what the analytics agent receives when calling the get_database_info tool. The agent uses this information to query specific tables like document_sections_w2 directly without needing expensive SHOW TABLES or DESCRIBE queries.**`;
+## General Query Tips
+
+### Performance Optimization:
+- Use date partitioning in WHERE clauses when possible: \`WHERE date >= '2024-01-01'\`
+- Use LIMIT for exploratory queries to avoid large result sets
+- Consider using approximate functions like \`approx_distinct()\` for large datasets
+
+### Common Joins:
+\`\`\`sql
+-- Join metering with evaluations for cost vs accuracy analysis
+SELECT m."document_id", m."estimated_cost", e."accuracy"
+FROM metering m
+JOIN document_evaluations e ON m."document_id" = e."document_id"
+
+-- Join document sections with metering for content analysis with costs
+SELECT ds.*, m."estimated_cost"
+FROM document_sections_payslip ds  
+JOIN metering m ON ds."document_id" = m."document_id"
+\`\`\``;
 
       setCurrentDatabaseInfo(databaseSchemaInfo);
       // Use setTimeout to avoid ResizeObserver issues
