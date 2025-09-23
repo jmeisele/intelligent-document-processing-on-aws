@@ -6,6 +6,9 @@ import os
 import subprocess
 import datetime
 import time
+import json
+import boto3
+from botocore.exceptions import ClientError
 from loguru import logger
 
 class InstallService():
@@ -307,9 +310,113 @@ class InstallService():
             logger.error(f"Unexpected error during service role deployment: {e}")
             return None
 
+    def create_permission_boundary_policy(self):
+        """Create an 'allow everything' permission boundary policy if it doesn't exist"""
+        
+        policy_name = "IDPPermissionBoundary"
+        iam = boto3.client('iam')
+        
+        try:
+            # First, check if the policy already exists
+            account_id = boto3.client('sts').get_caller_identity()['Account']
+            policy_arn = f"arn:aws:iam::{account_id}:policy/{policy_name}"
+            
+            # Try to get the existing policy
+            iam.get_policy(PolicyArn=policy_arn)
+            logger.info(f"Permission boundary policy already exists: {policy_arn}")
+            return policy_arn
+            
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchEntity':
+                # Policy doesn't exist, create it
+                policy_document = {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "*",
+                            "Resource": "*"
+                        }
+                    ]
+                }
+                
+                try:
+                    response = iam.create_policy(
+                        PolicyName=policy_name,
+                        PolicyDocument=json.dumps(policy_document),
+                        Description="Permission boundary for IDP deployment - allows all actions"
+                    )
+                    
+                    policy_arn = response['Policy']['Arn']
+                    logger.info(f"Created permission boundary policy: {policy_arn}")
+                    return policy_arn
+                    
+                except ClientError as create_error:
+                    logger.error(f"Error creating permission boundary policy: {create_error}")
+                    return None
+            else:
+                logger.error(f"Error checking for existing permission boundary policy: {e}")
+                return None
+
+    def validate_permission_boundary(self, stack_name, boundary_arn):
+        """Validate that all IAM roles in the stack have the permission boundary"""
+        cfn = boto3.client('cloudformation')
+        iam = boto3.client('iam')
+        
+        try:
+            # Get all IAM roles in the stack
+            paginator = cfn.get_paginator('list_stack_resources')
+            page_iterator = paginator.paginate(StackName=stack_name)
+            
+            roles = []
+            for page in page_iterator:
+                for resource in page['StackResourceSummaries']:
+                    if resource['ResourceType'] == 'AWS::IAM::Role':
+                        role_name = resource['PhysicalResourceId']
+                        roles.append(role_name)
+            
+            if not roles:
+                logger.info("No IAM roles found in the stack")
+                return True
+            
+            logger.info(f"Found {len(roles)} IAM roles in the stack")
+            failed_roles = []
+            
+            # Check each role
+            for role_name in roles:
+                try:
+                    response = iam.get_role(RoleName=role_name)
+                    role = response['Role']
+                    
+                    if 'PermissionsBoundary' in role:
+                        actual_boundary = role['PermissionsBoundary']['PermissionsBoundaryArn']
+                        if actual_boundary == boundary_arn:
+                            logger.debug(f"✅ {role_name}: Has correct permission boundary")
+                        else:
+                            logger.error(f"❌ {role_name}: Has wrong permission boundary: {actual_boundary}")
+                            failed_roles.append(role_name)
+                    else:
+                        logger.error(f"❌ {role_name}: Missing permission boundary")
+                        failed_roles.append(role_name)
+                        
+                except ClientError as e:
+                    logger.error(f"Error checking role {role_name}: {e}")
+                    failed_roles.append(role_name)
+            
+            if failed_roles:
+                logger.error(f"FAILED: {len(failed_roles)} roles do not have the correct permission boundary")
+                return False
+            else:
+                logger.info(f"SUCCESS: All {len(roles)} roles have the correct permission boundary")
+                return True
+                
+        except ClientError as e:
+            logger.error(f"Error validating permission boundary: {e}")
+            return False
+
     def install(self, admin_email: str, idp_pattern: str):
         """
-        Install the IDP stack using CloudFormation with service role.
+        Install the IDP stack using CloudFormation with service role and permission boundary.
         
         Args:
             admin_email: Email address for the admin user
@@ -319,22 +426,30 @@ class InstallService():
         s3_prefix = f"{self.cfn_prefix}/0.2.2"  # TODO: Make version configurable
 
         try:
-            # Step 1: Ensure CloudFormation service role exists
-            logger.info("Step 1: Ensuring CloudFormation service role exists...")
+            # Step 1: Create permission boundary policy
+            logger.info("Step 1: Creating permission boundary policy...")
+            permission_boundary_arn = self.create_permission_boundary_policy()
+            if not permission_boundary_arn:
+                logger.error("Failed to create permission boundary policy. Aborting deployment.")
+                return False
+
+            # Step 2: Ensure CloudFormation service role exists
+            logger.info("Step 2: Ensuring CloudFormation service role exists...")
             service_role_arn = self.deploy_service_role()
             if not service_role_arn:
                 logger.error("Failed to deploy or find service role. Aborting IDP deployment.")
                 return False
 
-            # Step 2: Deploy IDP stack using the service role
-            logger.info("Step 2: Deploying IDP stack using service role...")
+            # Step 3: Deploy IDP stack using the service role and permission boundary
+            logger.info("Step 3: Deploying IDP stack using service role and permission boundary...")
             
             # Verify template file exists
             template_path = os.path.join(self.abs_cwd, template_file)
             if not os.path.exists(template_path):
                 raise FileNotFoundError(f"Template file not found: {template_path}")
 
-            # Construct the CloudFormation deploy command with service role
+            logger.info(f"Using permission boundary ARN: {permission_boundary_arn}")
+            
             cmd = [
                 'aws', 'cloudformation', 'deploy',
                 '--region', self.region,
@@ -347,6 +462,7 @@ class InstallService():
                 "DocumentKnowledgeBase=DISABLED",
                 f"IDPPattern={idp_pattern}",
                 f"AdminEmail={admin_email}",
+                f"PermissionsBoundaryArn={permission_boundary_arn}",
                 '--stack-name', self.stack_name
             ]
 
@@ -371,7 +487,15 @@ class InstallService():
             if process.stderr:
                 logger.debug(f"CloudFormation deploy stderr: {process.stderr}")
 
-            logger.info(f"Successfully deployed stack {self.stack_name} in {self.region} using service role")
+            logger.info(f"Successfully deployed stack {self.stack_name} in {self.region}")
+            
+            # Step 4: Validate permission boundary on all roles
+            logger.info("Step 4: Validating permission boundary on all IAM roles...")
+            if not self.validate_permission_boundary(self.stack_name, permission_boundary_arn):
+                logger.error("Permission boundary validation failed!")
+                return False
+            
+            logger.info("Deployment and validation completed successfully!")
             return True
 
         except FileNotFoundError as e:
