@@ -112,6 +112,7 @@ deployment_validation:
 
   script:
     # Check if service role has sufficient permissions for main stack deployment
+    - python3 scripts/validate_service_role_permissions.py
     - |
       python3 -c "
       import yaml
