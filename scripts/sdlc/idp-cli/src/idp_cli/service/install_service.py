@@ -1,15 +1,16 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 
-from typing import Optional
+import json
 import os
 import subprocess
-import datetime
 import time
-import json
+from typing import Optional
+
 import boto3
 from botocore.exceptions import ClientError
 from loguru import logger
+
 
 class InstallService():
     def __init__(self, 
@@ -195,7 +196,7 @@ class InstallService():
             logger.error(f"Failed to cleanup stack {stack_name}: {e}")
             return False
 
-    def get_existing_service_role_arn(self):
+    def get_service_role_arn(self):
         """
         Check if CloudFormation service role stack exists and return its ARN.
         
@@ -237,17 +238,11 @@ class InstallService():
 
     def deploy_service_role(self):
         """
-        Deploy the CloudFormation service role stack only if it doesn't exist.
+        Deploy the CloudFormation service role stack.
         
         Returns:
             str: The ARN of the service role, or None if deployment failed
         """
-        # First check if service role already exists
-        existing_arn = self.get_existing_service_role_arn()
-        if existing_arn:
-            logger.info("CloudFormation service role already exists, skipping deployment")
-            return existing_arn
-
         service_role_stack_name = f"{self.cfn_prefix}-cloudformation-service-role"
         service_role_template = 'iam-roles/cloudformation-management/IDP-Cloudformation-Service-Role.yaml'
         
@@ -284,7 +279,7 @@ class InstallService():
                 logger.debug(f"Service role deploy stderr: {process.stderr}")
 
             # Get the service role ARN from stack outputs
-            service_role_arn = self.get_existing_service_role_arn()
+            service_role_arn = self.get_service_role_arn()
             if service_role_arn:
                 logger.info(f"Successfully deployed service role: {service_role_arn}")
                 return service_role_arn
@@ -359,27 +354,50 @@ class InstallService():
                 return None
 
     def validate_permission_boundary(self, stack_name, boundary_arn):
-        """Validate that all IAM roles in the stack have the permission boundary"""
+        """Validate that all IAM roles in the stack and nested stacks have the permission boundary"""
         cfn = boto3.client('cloudformation')
         iam = boto3.client('iam')
         
+        def get_all_stacks(stack_name):
+            """Recursively get all nested stacks"""
+            stacks = [stack_name]
+            try:
+                paginator = cfn.get_paginator('list_stack_resources')
+                page_iterator = paginator.paginate(StackName=stack_name)
+                
+                for page in page_iterator:
+                    for resource in page['StackResourceSummaries']:
+                        if resource['ResourceType'] == 'AWS::CloudFormation::Stack':
+                            nested_stack_name = resource['PhysicalResourceId']
+                            stacks.extend(get_all_stacks(nested_stack_name))
+            except ClientError:
+                pass
+            return stacks
+        
         try:
-            # Get all IAM roles in the stack
-            paginator = cfn.get_paginator('list_stack_resources')
-            page_iterator = paginator.paginate(StackName=stack_name)
+            # Get all stacks (main + nested)
+            all_stacks = get_all_stacks(stack_name)
+            logger.info(f"Checking {len(all_stacks)} stacks for IAM roles")
             
             roles = []
-            for page in page_iterator:
-                for resource in page['StackResourceSummaries']:
-                    if resource['ResourceType'] == 'AWS::IAM::Role':
-                        role_name = resource['PhysicalResourceId']
-                        roles.append(role_name)
+            for stack in all_stacks:
+                try:
+                    paginator = cfn.get_paginator('list_stack_resources')
+                    page_iterator = paginator.paginate(StackName=stack)
+                    
+                    for page in page_iterator:
+                        for resource in page['StackResourceSummaries']:
+                            if resource['ResourceType'] == 'AWS::IAM::Role':
+                                role_name = resource['PhysicalResourceId']
+                                roles.append(role_name)
+                except ClientError:
+                    continue
             
             if not roles:
-                logger.info("No IAM roles found in the stack")
+                logger.info("No IAM roles found in any stack")
                 return True
             
-            logger.info(f"Found {len(roles)} IAM roles in the stack")
+            logger.info(f"Found {len(roles)} IAM roles across all stacks")
             failed_roles = []
             
             # Check each role
@@ -433,11 +451,11 @@ class InstallService():
                 logger.error("Failed to create permission boundary policy. Aborting deployment.")
                 return False
 
-            # Step 2: Ensure CloudFormation service role exists
-            logger.info("Step 2: Ensuring CloudFormation service role exists...")
+            # Step 2: Deploy CloudFormation service role
+            logger.info("Step 2: Deploying CloudFormation service role...")
             service_role_arn = self.deploy_service_role()
             if not service_role_arn:
-                logger.error("Failed to deploy or find service role. Aborting IDP deployment.")
+                logger.error("Failed to deploy service role. Aborting IDP deployment.")
                 return False
 
             # Step 3: Deploy IDP stack using the service role and permission boundary
