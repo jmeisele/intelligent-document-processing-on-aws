@@ -177,6 +177,7 @@ Resources:
               Configuration:
                 S3Bucket: !Ref BucketName
                 S3ObjectKey: !Ref FileKey
+                PollForSourceChanges: true
               OutputArtifacts:
                 - Name: SourceOutput
               RunOrder: 1
