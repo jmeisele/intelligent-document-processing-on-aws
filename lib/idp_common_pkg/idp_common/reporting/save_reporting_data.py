@@ -375,9 +375,11 @@ class SaveReportingData:
             )
             return False
 
-        # Escape section_type to make it table-name-safe
-        escaped_section_type = re.sub(r"[/\\:*?\"<>|-]", "_", section_type.lower())
-        table_name = f"document_sections_{escaped_section_type}"
+        # Escape section_type to make it table-name-safe and s3 prefix-safe
+        # Note: we escape '-' in tablename but not in s3 prefix, only to provide backward compatability for data already stored.
+        section_type_tablename = re.sub(r"[/\\:*?\"<>|-]", "_", section_type.lower())
+        section_type_prefix = re.sub(r"[/\\:*?\"<>|]", "_", section_type.lower())
+        table_name = f"document_sections_{section_type_tablename}"
 
         # Convert schema to Glue columns
         columns = self._convert_schema_to_glue_columns(schema)
@@ -388,7 +390,7 @@ class SaveReportingData:
             "Description": f"Document sections table for type: {section_type}",
             "StorageDescriptor": {
                 "Columns": columns,
-                "Location": f"s3://{self.reporting_bucket}/document_sections/{escaped_section_type}/",
+                "Location": f"s3://{self.reporting_bucket}/document_sections/{section_type_prefix}/",
                 "InputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
                 "OutputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
                 "Compressed": True,
@@ -407,7 +409,7 @@ class SaveReportingData:
                 "projection.date.range": "2024-01-01,2030-12-31",
                 "projection.date.interval": "1",
                 "projection.date.interval.unit": "DAYS",
-                "storage.location.template": f"s3://{self.reporting_bucket}/document_sections/{escaped_section_type}/date=${{date}}/",
+                "storage.location.template": f"s3://{self.reporting_bucket}/document_sections/{section_type_prefix}/date=${{date}}/",
             },
         }
 
@@ -1244,13 +1246,13 @@ class SaveReportingData:
                     section.classification if section.classification else "unknown"
                 )
                 # Escape section_type to make it filesystem-safe and lowercase for consistency
-                escaped_section_type = re.sub(
-                    r"[/\\:*?\"<>|-]", "_", section_type.lower()
+                section_type_prefix = re.sub(
+                    r"[/\\:*?\"<>|]", "_", section_type.lower()
                 )
 
                 s3_key = (
                     f"document_sections/"
-                    f"{escaped_section_type}/"
+                    f"{section_type_prefix}/"
                     f"date={date_partition}/"
                     f"{escaped_doc_id}_section_{section.section_id}.parquet"
                 )

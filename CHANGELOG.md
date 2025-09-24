@@ -7,6 +7,9 @@ SPDX-License-Identifier: MIT-0
 
 ### Added
 
+### Fixed
+- Fix missing data in Glue tables when using a document class that contains a dash (-). 
+
 ## [0.3.16]
 
 ### Added
