@@ -90,6 +90,9 @@ integration_tests:
   script:
     - aws --version
     - aws sts get-caller-identity --no-cli-pager
+    - echo "AWS_CREDS_TARGET_ROLE=${AWS_CREDS_TARGET_ROLE}"
+    - echo "AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}"
+    - echo "IDP_ACCOUNT_ID=${IDP_ACCOUNT_ID}"
     - cd ./scripts/sdlc/idp-cli
     - poetry install
     - make put
