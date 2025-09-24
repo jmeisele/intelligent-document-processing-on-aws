@@ -247,6 +247,12 @@ class InstallService():
         service_role_template = 'iam-roles/cloudformation-management/IDP-Cloudformation-Service-Role.yaml'
         
         try:
+            # Check if the service role is managed by a different stack
+            existing_stack_name = self._find_managing_stack()
+            if existing_stack_name and existing_stack_name != service_role_stack_name:
+                logger.info(f"Service role managed by different stack: {existing_stack_name}. Using existing stack for deployment.")
+                service_role_stack_name = existing_stack_name
+            
             # Verify template file exists
             template_path = os.path.join(self.abs_cwd, service_role_template)
             if not os.path.exists(template_path):
@@ -278,8 +284,8 @@ class InstallService():
             if process.stderr:
                 logger.debug(f"Service role deploy stderr: {process.stderr}")
 
-            # Get the service role ARN from stack outputs
-            service_role_arn = self.get_service_role_arn()
+            # Get the service role ARN - use the actual deployed stack name
+            service_role_arn = self._get_service_role_arn_from_stack(service_role_stack_name)
             if service_role_arn:
                 logger.info(f"Successfully deployed service role: {service_role_arn}")
                 return service_role_arn
@@ -297,12 +303,90 @@ class InstallService():
             if e.stderr:
                 logger.debug(f"Command stderr: {e.stderr}")
             
-            # Cleanup failed service role deployment
-            logger.info("Cleaning up failed service role deployment...")
-            self.cleanup_failed_stack(service_role_stack_name)
+            logger.info(f"Service role deployment failed. Stack '{service_role_stack_name}' left for debugging.")
             return None
         except Exception as e:
             logger.error(f"Unexpected error during service role deployment: {e}")
+            return None
+
+    def _find_managing_stack(self):
+        """
+        Find which CloudFormation stack manages the IDPAcceleratorCloudFormationServiceRole.
+        
+        Returns:
+            str: Stack name that manages the service role, or None if not found
+        """
+        try:
+            # List all stacks that might contain the service role
+            list_stacks_cmd = [
+                'aws', 'cloudformation', 'list-stacks',
+                '--region', self.region,
+                '--stack-status-filter', 'CREATE_COMPLETE', 'UPDATE_COMPLETE',
+                '--query', 'StackSummaries[?contains(StackName, `cloudformation-service-role`)].StackName',
+                '--output', 'text'
+            ]
+            
+            process = subprocess.run(
+                list_stacks_cmd,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            stack_names = process.stdout.strip().split() if process.stdout.strip() else []
+            
+            # Check each stack to see if it has the ServiceRoleArn output
+            for stack_name in stack_names:
+                try:
+                    service_role_arn = self._get_service_role_arn_from_stack(stack_name)
+                    if service_role_arn:
+                        logger.debug(f"Found service role managed by stack: {stack_name}")
+                        return stack_name
+                        
+                except Exception:
+                    continue
+                    
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error finding managing stack: {e}")
+            return None
+
+    def _get_service_role_arn_from_stack(self, stack_name):
+        """
+        Get service role ARN from a specific stack.
+        
+        Returns:
+            str: The ARN of the service role, or None if not found
+        """
+        try:
+            describe_cmd = [
+                'aws', 'cloudformation', 'describe-stacks',
+                '--region', self.region,
+                '--stack-name', stack_name,
+                '--query', 'Stacks[0].Outputs[?OutputKey==`ServiceRoleArn`].OutputValue',
+                '--output', 'text'
+            ]
+            
+            process = subprocess.run(
+                describe_cmd,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            service_role_arn = process.stdout.strip()
+            if service_role_arn and service_role_arn != "None":
+                return service_role_arn
+            else:
+                return None
+
+        except subprocess.CalledProcessError:
+            return None
+        except Exception as e:
+            logger.error(f"Error getting service role ARN from stack {stack_name}: {e}")
             return None
 
     def create_permission_boundary_policy(self):
