@@ -48,54 +48,6 @@ def get_analytics_config() -> Dict[str, Any]:
     return config
 
 
-def load_db_description() -> str:
-    """
-    Load the database description using the comprehensive schema provider.
-
-    This function now generates detailed table descriptions including:
-    - Metering table with proper aggregation patterns
-    - Evaluation tables with comprehensive schemas
-    - Dynamic document sections tables based on configuration
-
-    Returns:
-        String containing the comprehensive database description
-    """
-    try:
-        # Import here to avoid circular imports
-        from .schema_provider import generate_comprehensive_database_description
-
-        logger.info("Loading comprehensive database description from schema provider")
-        description = generate_comprehensive_database_description()
-        logger.debug(f"Generated database description of length: {len(description)}")
-        return description
-
-    except Exception as e:
-        logger.error(f"Error loading comprehensive database description: {e}")
-        # Fallback to basic description if schema provider fails
-        return """
-# Database Schema Information
-
-## Note
-Advanced schema information is temporarily unavailable. Use the following basic queries to explore:
-
-```sql
--- List all tables
-SHOW TABLES
-
--- Describe table structure  
-DESCRIBE table_name
-
--- Explore metering data
-SELECT * FROM metering LIMIT 10
-
--- List document sections tables
-SHOW TABLES LIKE 'document_sections*'
-```
-
-**Important**: Always enclose column names in double quotes in Athena queries.
-"""
-
-
 def load_python_plot_generation_examples() -> str:
     """
     Load sample python plot generation examples.

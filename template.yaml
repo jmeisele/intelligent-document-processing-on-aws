@@ -3596,6 +3596,7 @@ Resources:
       Environment:
         Variables:
           LOG_LEVEL: !Ref LogLevel
+          CONFIGURATION_TABLE_NAME: !Ref ConfigurationTable
           STRANDS_LOG_LEVEL: !Ref LogLevel
           AGENT_TABLE: !Ref AgentTable
           APPSYNC_API_URL: !GetAtt GraphQLApi.GraphQLUrl
@@ -3613,6 +3614,8 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref AgentTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ConfigurationTable
         - S3CrudPolicy:
             BucketName: !If
               - ShouldCreateReportingBucket

@@ -479,7 +479,7 @@ def _get_error_aware_fallback(
         troubleshooting: Troubleshooting guidance for the user
 
     Returns:
-        Error-aware description that includes the error details and basic fallback info
+        Error-aware description that includes the error details
     """
     return f"""
 # ⚠️ CONFIGURATION ERROR DETECTED
@@ -488,201 +488,221 @@ def _get_error_aware_fallback(
 
 **ERROR MESSAGE**: {error_message}
 
-**IMPACT**: Cannot load deployment-specific table schemas. Using generic fallback information below.
+**IMPACT**: Cannot load deployment-specific table schemas.
 
 **ACTION REQUIRED**: {troubleshooting}
-
----
-
-## Fallback Document Sections Tables
-
-**⚠️ WARNING**: The information below is GENERIC and may not match your actual deployment. Fix the configuration error above for accurate table information.
-
-**Purpose**: Store actual extracted data from document sections in structured format for analytics
-
-**Key Usage**: Use these tables to query the actual extracted content and attributes from processed documents
-
-**IMPORTANT**: Configuration loading failed, but common document section tables may include:
-- `document_sections_w2` - W2 tax form processing
-- `document_sections_payslip` - Payslip processing  
-- `document_sections_bank_statement` - Bank statement processing
-- `document_sections_bank_checks` - Bank check processing
-
-### Common Schema for All Document Sections Tables:
-
-**Standard Metadata Columns** (all tables):
-- `document_class.type` (string): Document classification type
-- `document_id` (string): Unique identifier for the document
-- `section_id` (string): Unique identifier for the section
-- `section_classification` (string): Type/class of the section
-- `section_confidence` (string): Confidence score for the section classification
-- `explainability_info` (string): JSON containing explanation of extraction decisions
-- `timestamp` (timestamp): When the document was processed
-- `date` (string): Partition key in YYYY-MM-DD format
-
-**Dynamic Inference Columns**: `inference_result.*` columns based on extracted data (all strings)
-
-### CRITICAL: Dot-Notation Column Names
-**These are SINGLE column identifiers containing dots, NOT table.column references:**
-- ✅ **CORRECT**: `"document_class.type"` (single column name containing a dot)
-- ❌ **WRONG**: `"document_class"."type"` (table.column syntax - this will FAIL)
-
-### Sample Queries:
-```sql
--- Basic query pattern (verify table names exist first)
-SELECT "document_id", "document_class.type", "section_classification", "timestamp"
-FROM document_sections_w2
-WHERE date >= '2024-01-01'
-AND "document_class.type" = 'W2'
-
--- Join with metering for cost analysis  
-SELECT ds."section_classification",
-       COUNT(DISTINCT ds."document_id") as document_count,
-       AVG(CAST(m."estimated_cost" AS double)) as avg_processing_cost
-FROM document_sections_w2 ds
-JOIN metering m ON ds."document_id" = m."document_id"
-WHERE ds."document_class.type" = 'W2'
-GROUP BY ds."section_classification"
-```
-
-**⚠️ IMPORTANT**: Use SHOW TABLES to verify actual table names in your deployment, as the names above are generic examples.
-
-**Note**: Table schemas include dynamically generated `inference_result.*` columns based on extraction results from your specific configuration.
 """
 
 
-def _get_fallback_description() -> str:
+def get_database_overview(config: Optional[Dict[str, Any]] = None) -> str:
     """
-    Get fallback description when configuration loading fails.
-
-    Returns:
-        Basic description without discovery queries
-    """
-    return """
-## Document Sections Tables (Dynamic)
-
-**Purpose**: Store actual extracted data from document sections in structured format for analytics
-
-**Key Usage**: Use these tables to query the actual extracted content and attributes from processed documents
-
-**IMPORTANT**: Configuration loading failed, but common document section tables include:
-- `document_sections_w2` - W2 tax form processing
-- `document_sections_payslip` - Payslip processing
-- `document_sections_bank_statement` - Bank statement processing
-- `document_sections_bank_checks` - Bank check processing
-
-### Common Schema for All Document Sections Tables:
-
-**Standard Metadata Columns** (all tables):
-- `document_class.type` (string): Document classification type
-- `document_id` (string): Unique identifier for the document
-- `section_id` (string): Unique identifier for the section
-- `section_classification` (string): Type/class of the section
-- `section_confidence` (string): Confidence score for the section classification
-- `explainability_info` (string): JSON containing explanation of extraction decisions
-- `timestamp` (timestamp): When the document was processed
-- `date` (string): Partition key in YYYY-MM-DD format
-
-**Dynamic Inference Columns**: `inference_result.*` columns based on extracted data (all strings)
-
-**Important**: Always use double quotes around column names containing periods in Athena queries.
-
-### Sample Queries:
-```sql
--- Basic query pattern
-SELECT "document_id", "section_classification", "timestamp"
-FROM document_sections_w2
-WHERE date >= '2024-01-01'
-
--- Join with metering for cost analysis  
-SELECT ds."section_classification",
-       COUNT(DISTINCT ds."document_id") as document_count,
-       AVG(CAST(m."estimated_cost" AS double)) as avg_processing_cost
-FROM document_sections_w2 ds
-JOIN metering m ON ds."document_id" = m."document_id"
-GROUP BY ds."section_classification"
-```
-
-**Note**: Table schemas include dynamically generated `inference_result.*` columns based on extraction results.
-"""
-
-
-def generate_comprehensive_database_description(
-    config: Optional[Dict[str, Any]] = None,
-) -> str:
-    """
-    Generate a comprehensive database description including all table types.
+    Get a fast, lightweight overview of available tables with brief descriptions.
+    This is the first step in the two-step progressive disclosure system.
 
     Args:
         config: Optional configuration dictionary for dynamic sections
 
     Returns:
-        Complete database description with all tables and schemas
+        Concise database overview with table listings and query guidance
     """
-    description = """# Comprehensive Athena Database Schema
+    try:
+        if config is None:
+            config = get_config()
 
-## Overview
+        # Get document classes from config
+        classes = config.get("classes", [])
 
-This database contains three main categories of tables for document processing analytics:
+        overview = """# Database Overview - Available Tables
 
-1. **Metering Table**: Usage metrics, costs, and consumption data
-2. **Evaluation Tables**: Accuracy assessment data (typically empty unless evaluation jobs are run)  
-3. **Document Sections Tables**: Extracted content from processed documents (dynamically created)
+### Usage metering and cost
+Table name: `metering`
+**Purpose**: Usage metrics, costs, and consumption data  
+**Use for**: Document volume, processing costs, token usage, model performance
+**Key columns**: `document_id`, `context`, `service_api`, `estimated_cost`, `date`
 
-## Important Notes
+### Accuracy evaluations
+Table name: `document_evaluations` - Overall document accuracy scores
+Table name: `section_evaluations` - Section-level accuracy by document type  
+Table name: `attribute_evaluations` - Detailed attribute-level comparisons
+**Use for**: Accuracy analysis, precision/recall metrics
 
-- **Column Names**: Always enclose column names in double quotes in Athena queries
-- **Partitioning**: All tables are partitioned by date (YYYY-MM-DD format) for efficient querying
-- **Timestamps**: All date/timestamp columns refer to processing time, not document content dates
-- **Case Sensitivity**: Use LOWER() functions when comparing string values as case may vary
-
----
+### Document Sections Tables (extracted content)
 """
 
-    # Add each table category description
-    description += get_metering_table_description()
-    description += "\n---\n"
-    description += get_evaluation_tables_description()
-    description += "\n---\n"
-    description += get_dynamic_document_sections_description(config)
+        if classes:
+            overview += "**Configuration-based tables in your deployment:**\n"
+            for doc_class in classes:
+                class_name = doc_class.get("name", "Unknown")
+                class_desc = doc_class.get("description", "")
+                table_name = f"document_sections_{_get_table_suffix(class_name)}"
+                overview += f"Table name: `{table_name}` - {class_desc}\n"
+        overview += """
+**Use for**: Extracted document content, classification results, specific field values
 
-    description += """
----
+## Critical Query Guidance
 
-## General Query Tips
+### Question-to-Table Mapping:
+- **"How many X documents?"** → Use `document_sections_x` table
+- **"What document types processed?"** → Query multiple `document_sections_*` tables
+- **"Processing costs/volume?"** → Use `metering` table
+- **"Document accuracy?"** → Use evaluation tables (if available)
 
-### Table Discovery:
-```sql
--- List all tables
-SHOW TABLES
+### Key SQL Rules:
+- **Always use double quotes** around column names: `"document_id"`
+- **Dot-notation columns** are single identifiers: `"document_class.type"`
+- **Today's data**: `WHERE "date" = CAST(CURRENT_DATE AS VARCHAR)`
+- **Count documents**: `COUNT(DISTINCT "document_id")`
 
--- Get document sections tables (filter manually from SHOW TABLES output)
--- Alternative: Query information schema for document sections tables
-SELECT table_name 
-FROM information_schema.tables 
-WHERE table_name LIKE 'document_sections_%'
+### Next Steps:
+Use `get_table_info(['table1', 'table2'])` to get detailed schemas for specific tables you need to query.
+"""
+        logger.info(f"Database Overview: {overview}")
+        return overview
 
--- Get table schema
-DESCRIBE table_name
-```
+    except Exception as e:
+        logger.error(f"Error generating database overview: {e}")
+        return """# Database Overview - Error Loading Configuration"""
 
-### Performance Optimization:
-- Use date partitioning in WHERE clauses when possible: `WHERE date >= '2024-01-01'`
-- Use LIMIT for exploratory queries to avoid large result sets
-- Consider using approximate functions like `approx_distinct()` for large datasets
 
-### Common Joins:
-```sql
--- Join metering with evaluations for cost vs accuracy analysis
-SELECT m."document_id", m."estimated_cost", e."accuracy"
-FROM metering m
-JOIN document_evaluations e ON m."document_id" = e."document_id"
+def get_table_info(
+    table_names: list[str], config: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Get detailed schema information for specific tables.
+    This is the second step in the two-step progressive disclosure system.
 
--- Join document sections with metering for content analysis with costs
-SELECT ds.*, m."estimated_cost"
-FROM document_sections_invoice ds  
-JOIN metering m ON ds."document_id" = m."document_id"
-```
+    Args:
+        table_names: List of table names to get detailed information for
+        config: Optional configuration dictionary for dynamic sections
+
+    Returns:
+        Detailed schema information for the requested tables
+    """
+    if not table_names:
+        logger.error("get_table_info(): No table names provided.")
+        return "No table names provided. Please specify which tables you need detailed information for."
+
+    detailed_info = f"# Detailed Schema Information for {len(table_names)} Table(s)\n\n"
+
+    for table_name in table_names:
+        table_name = table_name.lower().strip()
+
+        if table_name == "metering":
+            detailed_info += get_metering_table_description()
+            detailed_info += "\n---\n\n"
+
+        elif table_name.startswith("document_evaluations") or table_name in [
+            "document_evaluations",
+            "section_evaluations",
+            "attribute_evaluations",
+        ]:
+            detailed_info += get_evaluation_tables_description()
+            detailed_info += "\n---\n\n"
+
+        elif table_name.startswith("document_sections_"):
+            # Extract the class name from table name
+            suffix = table_name.replace("document_sections_", "")
+            detailed_info += _get_specific_document_sections_table_info(suffix, config)
+            detailed_info += "\n---\n\n"
+
+        else:
+            detailed_info += f"## Unknown Table: {table_name}\n\n"
+            detailed_info += "**Error**: Table name not recognized.\n"
+
+    logger.info(f"Table Info: {detailed_info}")
+    return detailed_info
+
+
+def _get_specific_document_sections_table_info(
+    table_suffix: str, config: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Get detailed information for a specific document sections table.
+
+    Args:
+        table_suffix: The suffix part of the table name (after document_sections_)
+        config: Optional configuration dictionary
+
+    Returns:
+        Detailed schema information for the specific table
+    """
+    try:
+        if config is None:
+            config = get_config()
+
+        classes = config.get("classes", [])
+        table_name = f"document_sections_{table_suffix}"
+
+        # Find the matching class for this table
+        matching_class = None
+        for doc_class in classes:
+            class_name = doc_class.get("name", "")
+            if _get_table_suffix(class_name) == table_suffix:
+                matching_class = doc_class
+                break
+
+        if not matching_class:
+            msg = f"**Error**: Could not find configuration for table `{table_name}`."
+            logger.error(msg)
+            return msg
+
+        class_name = matching_class.get("name", "Unknown")
+        class_desc = matching_class.get("description", "No description available")
+        attributes = matching_class.get("attributes", [])
+
+        info = f"""## Document Sections Table: {table_name}
+
+**Class**: "{class_name}"  
+**Description**: {class_desc}
+
+### Complete Schema:
+
+#### Standard Columns (present in all document_sections tables):
+- `"document_id"` (string): Unique identifier for the document
+- `"section_id"` (string): Unique identifier for the section  
+- `"section_classification"` (string): Type/class of the document section
+- `"section_confidence"` (string): Confidence score for classification
+- `"explainability_info"` (string): JSON with extraction field confidence scores and geometry
+- `"timestamp"` (timestamp): When document was processed in YYYY-MM-DD hh:mm:ss.ms format
+- `"date"` (string): Partition key in YYYY-MM-DD format
+
+#### Columns specific to this table:
 """
 
-    return description
+        if attributes:
+            for attr in attributes:
+                attr_desc_text, _ = _generate_attribute_columns(attr, "")
+                info += attr_desc_text
+        else:
+            info += "No configuration-specific columns defined.\n"
+
+        info += f"""
+
+### Sample Queries for {table_name}:
+```sql
+-- Count documents of this type today
+SELECT COUNT(DISTINCT "document_id") as document_count
+FROM {table_name}
+WHERE "date" = CAST(CURRENT_DATE AS VARCHAR)
+
+-- Get documents with extracted data
+SELECT "document_id", "section_classification"
+FROM {table_name}
+WHERE "date" >= '2024-01-01'
+ORDER BY "timestamp" DESC
+LIMIT 10
+
+```
+
+### Important Notes:
+- All `"inference_result.*"` columns are stored as strings
+- Use `LOWER()` for case-insensitive string matching
+- Dot-notation column names like `"document_class.type"` are single column identifiers
+- Table is partitioned by `"date"` - include date filters for better performance
+"""
+
+        return info
+
+    except Exception as e:
+        logger.error(f"Error getting table info for {table_suffix}: {e}")
+        return "**Error**: Could not load detailed schema information."

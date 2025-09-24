@@ -15,7 +15,12 @@ from strands.models import BedrockModel
 
 from ..common.config import load_result_format_description
 from .config import load_python_plot_generation_examples
-from .tools import CodeInterpreterTools, get_database_info, run_athena_query
+from .tools import (
+    CodeInterpreterTools,
+    get_database_overview,
+    get_table_info,
+    run_athena_query,
+)
 from .utils import register_code_interpreter_tools
 
 logger = logging.getLogger(__name__)
@@ -50,16 +55,34 @@ def create_analytics_agent(
     # Task
     Your task is to:
     1. Understand the user's question
-    2. Use get_database_info tool to get comprehensive database schema information (this now includes detailed table descriptions, column schemas, usage patterns, and sample queries)
-    3. **CRITICAL**: Trust and use the comprehensive schema information provided by get_database_info. It contains complete table listings and schemas. DO NOT run discovery queries (SHOW TABLES, DESCRIBE) unless the schema info genuinely lacks specific details for your question.
-    4. Apply the Question-to-Table mapping rules below to select the correct tables
-    5. Generate a valid Athena query based on the comprehensive schema information
-    6. Before executing the Athena query, re-read it and make sure _all_ column names mentioned _anywhere inside of the query_ are enclosed in double quotes.
-    7. Execute your revised query using the run_athena_query tool. If you receive an error message, correct your Athena query and try again a maximum of 5 times, then STOP. Do not ever make up fake data. For exploratory queries you can return the athena results directly. For larger or final queries, the results should need to be returned because downstream tools will download them separately.
+    2. **EFFICIENT APPROACH**: Use get_database_overview() to get a fast overview of available tables and their purposes
+    3. Apply the Question-to-Table mapping rules below to select the correct tables for your query
+    4. Use get_table_info(['table1', 'table2']) to get detailed schemas ONLY for the tables you need
+    5. Generate a valid Athena query based on the targeted schema information
+    6. **VALIDATE YOUR SQL**: Before executing, check for these common mistakes:
+       - All column names enclosed in double quotes: `"column_name"`
+       - No PostgreSQL operators: Replace `~` with `REGEXP_LIKE()`
+       - No invalid functions: Replace `CONTAINS()` with `LIKE`, `ILIKE` with `LOWER() + LIKE`
+       - Only valid Trino functions used
+       - Proper date formatting and casting
+    7. Execute your validated query using the run_athena_query tool. If you receive an error message, correct your Athena query and try again a maximum of 5 times, then STOP. Do not ever make up fake data. For exploratory queries you can return the athena results directly. For larger or final queries, the results should need to be returned because downstream tools will download them separately.
     8. Use the write_query_results_to_code_sandbox to convert the athena response into a file called "query_results.csv" in the same environment future python scripts will be executed.
     9. If the query is best answered with a plot or a table, write python code to analyze the query results to create a plot or table. If the final response to the user's question is answerable with a human readable string, return it as described in the result format description section below.
     10. To execute your plot generation code, use the execute_python tool and directly return its output without doing any more analysis.
 
+    # CRITICAL: Two-Step Database Information Approach
+    **For optimal performance and accuracy:**
+    
+    ## Step 1: Overview (Fast)
+    - Always start with `get_database_overview()` to see available tables
+    - This gives you table names, purposes, and question-to-table mapping guidance
+    - **~500 tokens vs 3000+ tokens** - much faster for simple questions
+    
+    ## Step 2: Detailed Schemas (On-Demand) 
+    - Use `get_table_info(['table1', 'table2'])` for specific tables you need
+    - Only request detailed info for tables relevant to your query
+    - Get complete column listings, sample queries, and aggregation rules
+    
     # CRITICAL: Question-to-Table Mapping Rules
     **ALWAYS follow these rules to select the correct table:**
     
@@ -94,15 +117,42 @@ def create_analytics_agent(
     DO NOT attempt to execute multiple tools in parallel. The input of some tools depend on the output of others. Only ever execute one tool at a time.
     
     # CRITICAL: Athena SQL Function Reference (Trino-based)
-    **Athena engine version 3 uses Trino functions. DO NOT use invalid functions like CONTAINS(varchar, varchar).**
+    **Athena engine version 3 uses Trino functions. DO NOT use PostgreSQL-style operators or invalid functions.**
     
-    ## Valid String Functions:
-    - `LIKE '%pattern%'` - Pattern matching (NOT CONTAINS)
-    - `REGEXP_LIKE(string, pattern)` - Regular expression matching
+    ## CRITICAL: Regular Expression Operators
+    **Athena does NOT support PostgreSQL-style regex operators:**
+    - ❌ NEVER use `~`, `~*`, `!~`, or `!~*` operators (these will cause query failures)
+    - ✅ ALWAYS use `REGEXP_LIKE(column, 'pattern')` for regex matching
+    - ✅ Use `NOT REGEXP_LIKE(column, 'pattern')` for negative matching
+
+    ### Common Regex Examples:
+    ```sql
+    -- ❌ WRONG: PostgreSQL-style (will fail with operator error)
+    WHERE "inference_result.wages" ~ '^[0-9.]+$'
+    WHERE "service_api" ~* 'classification'
+    WHERE "document_type" !~ 'invalid'
+    
+    -- ✅ CORRECT: Athena/Trino style
+    WHERE REGEXP_LIKE("inference_result.wages", '^[0-9.]+$')
+    WHERE REGEXP_LIKE(LOWER("service_api"), 'classification') 
+    WHERE NOT REGEXP_LIKE("document_type", 'invalid')
+    ```
+    
+    ## Valid String Functions (Trino-based):
+    - `LIKE '%pattern%'` - Pattern matching (NOT CONTAINS function)
+    - `REGEXP_LIKE(string, pattern)` - Regular expression matching (NOT ~ operator)
     - `LOWER()`, `UPPER()` - Case conversion
+    - `POSITION(substring IN string)` - Find substring position (NOT STRPOS)
     - `SUBSTRING(string, start, length)` - String extraction
     - `CONCAT(string1, string2)` - String concatenation
     - `LENGTH(string)` - String length
+    - `TRIM(string)` - Remove whitespace
+    
+    ## ❌ COMMON MISTAKES - Functions/Operators that DON'T exist in Athena:
+    - `CONTAINS(string, substring)` → Use `string LIKE '%substring%'`
+    - `ILIKE` operator → Use `LOWER(column) LIKE LOWER('pattern')`
+    - `STRPOS(string, substring)` → Use `POSITION(substring IN string)`
+    - `~` regex operator → Use `REGEXP_LIKE(column, 'pattern')`
     
     ## Valid Date/Time Functions:
     - `CURRENT_DATE` - Current date
@@ -118,21 +168,25 @@ def create_analytics_agent(
     -- ❌ WRONG: Invalid function
     WHERE CONTAINS("service_api", 'classification')
     
+    -- ✅ CORRECT: Numeric validation with regex
+    WHERE REGEXP_LIKE("inference_result.amount", '^[0-9]+\.?[0-9]*$')
+    
+    -- ❌ WRONG: PostgreSQL regex operator
+    WHERE "inference_result.amount" ~ '^[0-9.]+$'
+    
+    -- ✅ CORRECT: Case-insensitive pattern matching
+    WHERE LOWER("document_type") LIKE LOWER('%invoice%')
+    
+    -- ❌ WRONG: ILIKE operator
+    WHERE "document_type" ILIKE '%invoice%'
+    
     -- ✅ CORRECT: Today's data
     WHERE "date" = CAST(CURRENT_DATE AS VARCHAR)
     
     -- ✅ CORRECT: Date range  
     WHERE "date" >= '2024-01-01' AND "date" <= '2024-12-31'
     ```
-
-    # Complete Schema Information Usage:
-    **The get_database_info tool provides COMPLETE information including:**
-    - ✅ All table names with exact spelling
-    - ✅ All column names with exact syntax  
-    - ✅ Sample queries for common patterns
-    - ✅ Critical aggregation rules (MAX vs SUM)
-    - ✅ Dot-notation column explanations
-    
+   
     **TRUST THIS INFORMATION - Do not run discovery queries like SHOW TABLES or DESCRIBE unless genuinely needed.**
 
     When generating Athena queries:
@@ -145,6 +199,10 @@ def create_analytics_agent(
     - **Prefer simple queries**: Complex logic can be handled in Python post-processing
     
     ## Error Recovery Patterns:
+    - **`~ operator not found`** → Replace with `REGEXP_LIKE(column, 'pattern')`
+    - **`ILIKE operator not found`** → Use `LOWER(column) LIKE LOWER('pattern')`
+    - **`Function CONTAINS not found`** → Use `column LIKE '%substring%'`
+    - **`Function STRPOS not found`** → Use `POSITION(substring IN column)`
     - **Column not found** → Check double quotes: `"column_name"`
     - **Function not found** → Use valid Trino functions only
     - **0 rows returned** → Check table names, date filters, and case sensitivity  
@@ -229,7 +287,8 @@ def create_analytics_agent(
         run_athena_query_with_config,
         code_interpreter_tools.write_query_results_to_code_sandbox,
         code_interpreter_tools.execute_python,
-        get_database_info,
+        get_database_overview,  # Fast, lightweight table overview
+        get_table_info,  # Detailed schema for specific tables
     ]
 
     # Get model ID from environment variable
