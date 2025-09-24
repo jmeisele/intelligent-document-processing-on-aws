@@ -22,19 +22,32 @@ QUEUE_URL = os.environ.get('QUEUE_URL')
 DATA_RETENTION_DAYS = int(os.environ.get('DATA_RETENTION_IN_DAYS', '90'))
 
 def handler(event, context):
-    logger.info(f"Event: {json.dumps(event)}")
-
+    logger.info(f"ProcessChanges resolver invoked with event: {json.dumps(event)}")
+    
+    # Add comprehensive error handling
     try:
         # Extract arguments from the GraphQL event
         args = event.get('arguments', {})
+        logger.info(f"Arguments received: {json.dumps(args)}")
+        
         object_key = args.get('objectKey')
         modified_sections = args.get('modifiedSections', [])
         
         if not object_key:
-            raise ValueError("objectKey is required")
+            logger.error("objectKey is required but not provided")
+            return {
+                'success': False,
+                'message': 'objectKey is required',
+                'processingJobId': None
+            }
         
         if not modified_sections:
-            raise ValueError("modifiedSections is required")
+            logger.error("modifiedSections is required but not provided")
+            return {
+                'success': False,
+                'message': 'modifiedSections is required',
+                'processingJobId': None
+            }
 
         logger.info(f"Processing changes for document: {object_key}")
         logger.info(f"Modified sections: {json.dumps(modified_sections)}")
@@ -209,19 +222,29 @@ def handler(event, context):
             logger.warning("QUEUE_URL not configured, skipping SQS message")
             processing_job_id = None
 
-        return {
+        # Log successful completion
+        logger.info(f"Successfully processed changes for {len(modified_sections)} sections")
+        
+        response = {
             'success': True,
             'message': f'Successfully processed changes for {len(modified_sections)} sections',
             'processingJobId': processing_job_id
         }
+        
+        logger.info(f"Returning response: {json.dumps(response)}")
+        return response
 
     except Exception as e:
-        logger.error(f"Error processing changes: {str(e)}")
-        return {
+        logger.error(f"Error processing changes: {str(e)}", exc_info=True)
+        
+        error_response = {
             'success': False,
             'message': f'Error processing changes: {str(e)}',
             'processingJobId': None
         }
+        
+        logger.error(f"Returning error response: {json.dumps(error_response)}")
+        return error_response
 
 def clear_extraction_data(s3_uri):
     """Clear extraction data from S3"""

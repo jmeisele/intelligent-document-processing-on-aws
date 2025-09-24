@@ -206,7 +206,7 @@ const createColumnDefinitions = (pages, documentItem, mergedConfig) => [
   },
 ];
 
-// Edit mode column definitions - expanded to use full available width
+// Edit mode column definitions - expanded to use maximum available width
 const createEditColumnDefinitions = (
   validationErrors,
   updateSection,
@@ -221,7 +221,7 @@ const createEditColumnDefinitions = (
       <EditableIdCell item={item} validationErrors={validationErrors} updateSectionId={updateSectionId} />
     ),
     minWidth: 160,
-    width: 240,
+    width: 300,
     isResizable: true,
   },
   {
@@ -236,7 +236,7 @@ const createEditColumnDefinitions = (
       />
     ),
     minWidth: 200,
-    width: 300,
+    width: 400,
     isResizable: true,
   },
   {
@@ -245,8 +245,8 @@ const createEditColumnDefinitions = (
     cell: (item) => (
       <EditablePageIdsCell item={item} validationErrors={validationErrors} updateSection={updateSection} />
     ),
-    minWidth: 200,
-    width: 350,
+    minWidth: 250,
+    width: 500,
     isResizable: true,
   },
   {
@@ -254,7 +254,7 @@ const createEditColumnDefinitions = (
     header: 'Actions',
     cell: (item) => <EditableActionsCell item={item} deleteSection={deleteSection} />,
     minWidth: 100,
-    width: 130,
+    width: 150,
     isResizable: true,
   },
 ];
@@ -495,6 +495,20 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
     setShowConfirmModal(false);
 
     try {
+      // Try different possible property names for the object key
+      const objectKey =
+        documentItem?.ObjectKey ||
+        documentItem?.objectKey ||
+        documentItem?.key ||
+        documentItem?.Key ||
+        documentItem?.id ||
+        documentItem?.Id;
+
+      if (!objectKey) {
+        const availableProps = documentItem ? Object.keys(documentItem).join(', ') : 'none';
+        throw new Error(`Document object key is missing. Available properties: ${availableProps}`);
+      }
+
       // Sort sections by starting page ID
       const sortedSections = sortSectionsByPageId(editedSections);
 
@@ -521,21 +535,24 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
 
       const allChanges = [...modifiedSections, ...deletedSectionIds];
 
-      // Call the GraphQL API
-      const result = await API.graphql(
-        graphqlOperation(processChanges, {
-          objectKey: documentItem?.ObjectKey,
-          modifiedSections: allChanges,
+      // Call the GraphQL API with timeout
+      const result = await Promise.race([
+        API.graphql(
+          graphqlOperation(processChanges, {
+            objectKey,
+            modifiedSections: allChanges,
+          }),
+        ),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Request timed out after 30 seconds')), 30000);
         }),
-      );
+      ]);
 
-      const response = result.data.processChanges;
+      const response = result.data?.processChanges;
 
-      if (!response.success) {
-        throw new Error(response.message || 'Failed to process changes');
+      if (!response?.success) {
+        throw new Error(response?.message || 'Failed to process changes - no response received');
       }
-
-      console.log('Successfully processed changes:', response);
 
       // Call the optional save handler for UI updates
       if (onSaveChanges) {
@@ -546,10 +563,23 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
       setIsEditMode(false);
       setEditedSections([]);
       setValidationErrors({});
+
+      alert('Changes processed successfully!');
     } catch (error) {
-      console.error('Error saving changes:', error);
-      // Handle error (could show toast notification)
-      alert(`Error processing changes: ${error.message}`);
+      // Handle different types of errors
+      let errorMessage = 'Failed to process changes';
+
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.errors?.length > 0) {
+        errorMessage = error.errors[0].message || 'GraphQL error occurred';
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.data?.processChanges?.message) {
+        errorMessage = error.data.processChanges.message;
+      }
+
+      alert(`Error processing changes: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }
