@@ -1245,7 +1245,7 @@ class SaveReportingData:
                 )
                 # Escape section_type to make it filesystem-safe and lowercase for consistency
                 escaped_section_type = re.sub(
-                    r"[/\\:*?\"<>|]", "_", section_type.lower()
+                    r"[/\\:*?\"<>|-]", "_", section_type.lower()
                 )
 
                 s3_key = (
