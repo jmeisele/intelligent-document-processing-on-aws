@@ -428,16 +428,34 @@ class SaveReportingData:
             existing_column_names = {col["Name"] for col in existing_columns}
             new_column_names = {col["Name"] for col in columns}
 
-            # If there are new columns, update the table
-            if new_column_names - existing_column_names:
-                logger.info(f"Updating Glue table {table_name} with new columns")
+            # Check if location has changed
+            existing_location = (
+                existing_table.get("Table", {})
+                .get("StorageDescriptor", {})
+                .get("Location", "")
+            )
+            new_location = table_input["StorageDescriptor"]["Location"]
+
+            # Check if columns or location have changed
+            columns_changed = bool(new_column_names - existing_column_names)
+            location_changed = existing_location != new_location
+
+            # If there are new columns or location has changed, update the table
+            if columns_changed or location_changed:
+                if columns_changed:
+                    logger.info(f"Updating Glue table {table_name} with new columns")
+                if location_changed:
+                    logger.info(
+                        f"Updating Glue table {table_name} with new location: {existing_location} -> {new_location}"
+                    )
+
                 self.glue_client.update_table(
                     DatabaseName=self.database_name, TableInput=table_input
                 )
                 return True
             else:
                 logger.debug(
-                    f"Glue table {table_name} already exists with current schema"
+                    f"Glue table {table_name} already exists with current schema and location"
                 )
                 return False
 
@@ -863,21 +881,34 @@ class SaveReportingData:
 
         try:
             # Check if table exists
-            self.glue_client.get_table(DatabaseName=self.database_name, Name=table_name)
+            existing_table_response = self.glue_client.get_table(
+                DatabaseName=self.database_name, Name=table_name
+            )
 
             # Table exists, check if we need to update it
-            existing_table = self.glue_client.get_table(
-                DatabaseName=self.database_name, Name=table_name
-            )["Table"]
+            existing_table = existing_table_response["Table"]
             existing_columns = existing_table["StorageDescriptor"]["Columns"]
 
             # Check if new columns need to be added
             existing_column_names = {col["Name"] for col in existing_columns}
             new_column_names = {col["Name"] for col in columns}
 
-            if not new_column_names.issubset(existing_column_names):
-                # Update table with new columns
-                logger.info(f"Updating Glue table {table_name} with new columns")
+            # Check if location has changed
+            existing_location = existing_table["StorageDescriptor"].get("Location", "")
+            new_location = table_input["StorageDescriptor"]["Location"]
+
+            # Check if columns or location have changed
+            columns_changed = not new_column_names.issubset(existing_column_names)
+            location_changed = existing_location != new_location
+
+            if columns_changed or location_changed:
+                if columns_changed:
+                    logger.info(f"Updating Glue table {table_name} with new columns")
+                if location_changed:
+                    logger.info(
+                        f"Updating Glue table {table_name} with new location: {existing_location} -> {new_location}"
+                    )
+
                 self.glue_client.update_table(
                     DatabaseName=self.database_name, TableInput=table_input
                 )
