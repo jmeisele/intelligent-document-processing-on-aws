@@ -356,7 +356,7 @@ class Document:
 
     def to_json(self) -> str:
         """Convert document to JSON string."""
-        return json.dumps(self.to_dict())
+        return json.dumps(self.to_dict(), default=str)
 
     @classmethod
     def from_json(cls, json_str: str) -> "Document":
