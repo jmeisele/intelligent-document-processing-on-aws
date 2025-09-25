@@ -60,6 +60,13 @@ def handler(event, context):
             if not document:
                 raise ValueError(f"Document {object_key} not found")
             
+            # Set bucket names from environment variables (fix for null bucket issue)
+            input_bucket = os.environ.get('INPUT_BUCKET')
+            output_bucket = os.environ.get('OUTPUT_BUCKET')
+            document.input_bucket = input_bucket
+            document.output_bucket = output_bucket
+            logger.info(f"Set document buckets - input_bucket: {input_bucket}, output_bucket: {output_bucket}")
+            
             logger.info(f"Found document: {document.id}")
             
         except Exception as e:

@@ -6196,6 +6196,8 @@ Resources:
           QUEUE_URL: !Ref DocumentQueue
           DATA_RETENTION_IN_DAYS: !Ref DataRetentionInDays
           WORKING_BUCKET: !Ref WorkingBucket
+          INPUT_BUCKET: !Ref InputBucket
+          OUTPUT_BUCKET: !Ref OutputBucket
       LoggingConfig:
         LogGroup: !Ref ProcessChangesResolverFunctionLogGroup
       Policies:

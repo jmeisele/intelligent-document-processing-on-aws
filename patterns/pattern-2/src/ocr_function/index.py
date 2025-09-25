@@ -36,6 +36,13 @@ def handler(event, context):
     working_bucket = os.environ.get('WORKING_BUCKET')
     document = Document.load_document(event["document"], working_bucket, logger)
     
+    # Log loaded document for troubleshooting
+    logger.info(f"Loaded document - ID: {document.id}, input_key: {document.input_key}")
+    logger.info(f"Document buckets - input_bucket: {document.input_bucket}, output_bucket: {document.output_bucket}")
+    logger.info(f"Document status: {document.status}, num_pages: {document.num_pages}")
+    logger.info(f"Document pages count: {len(document.pages)}, sections count: {len(document.sections)}")
+    logger.info(f"Full document content: {json.dumps(document.to_dict(), default=str)}")
+    
     # Intelligent OCR detection: Skip if pages already have OCR data
     pages_with_ocr = 0
     for page in document.pages.values():

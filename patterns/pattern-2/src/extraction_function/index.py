@@ -35,6 +35,13 @@ def handler(event, context):
     working_bucket = os.environ.get('WORKING_BUCKET')
     full_document = Document.load_document(event.get("document", {}), working_bucket, logger)
     
+    # Log loaded document for troubleshooting
+    logger.info(f"Loaded document - ID: {full_document.id}, input_key: {full_document.input_key}")
+    logger.info(f"Document buckets - input_bucket: {full_document.input_bucket}, output_bucket: {full_document.output_bucket}")
+    logger.info(f"Document status: {full_document.status}, num_pages: {full_document.num_pages}")
+    logger.info(f"Document pages count: {len(full_document.pages)}, sections count: {len(full_document.sections)}")
+    logger.info(f"Full document content: {json.dumps(full_document.to_dict(), default=str)}")
+    
     # Get the section ID directly from the Map state input
     # Now using the simplified array of section IDs format
     section_id = event.get("section_id")
