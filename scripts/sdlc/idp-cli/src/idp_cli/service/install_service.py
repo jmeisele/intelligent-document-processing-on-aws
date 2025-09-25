@@ -136,106 +136,6 @@ class InstallService():
             return False
         
 
-    def cleanup_failed_stack(self, stack_name):
-        """
-        Clean up failed stack if it exists in ROLLBACK_COMPLETE state.
-        
-        Args:
-            stack_name: Name of the stack to clean up
-            
-        Returns:
-            bool: True if cleanup successful or not needed, False if cleanup failed
-        """
-        try:
-            # Check stack status
-            cmd = [
-                'aws', 'cloudformation', 'describe-stacks',
-                '--region', self.region,
-                '--stack-name', stack_name,
-                '--query', 'Stacks[0].StackStatus',
-                '--output', 'text'
-            ]
-            
-            process = subprocess.run(
-                cmd,
-                check=True,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
-            stack_status = process.stdout.strip()
-            
-            if stack_status in ['ROLLBACK_COMPLETE', 'CREATE_FAILED', 'DELETE_FAILED']:
-                logger.info(f"Cleaning up failed stack {stack_name} (status: {stack_status})")
-                
-                delete_cmd = [
-                    'aws', 'cloudformation', 'delete-stack',
-                    '--region', self.region,
-                    '--stack-name', stack_name
-                ]
-                
-                subprocess.run(delete_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                
-                # Wait for deletion to complete
-                wait_cmd = [
-                    'aws', 'cloudformation', 'wait', 'stack-delete-complete',
-                    '--region', self.region,
-                    '--stack-name', stack_name
-                ]
-                
-                subprocess.run(wait_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                logger.info(f"Successfully cleaned up failed stack {stack_name}")
-                
-            return True
-            
-        except subprocess.CalledProcessError:
-            # Stack doesn't exist - no cleanup needed
-            return True
-        except Exception as e:
-            logger.error(f"Failed to cleanup stack {stack_name}: {e}")
-            return False
-
-    def get_service_role_arn(self):
-        """
-        Check if CloudFormation service role stack exists and return its ARN.
-        
-        Returns:
-            str: The ARN of the existing service role, or None if not found
-        """
-        service_role_stack_name = f"{self.cfn_prefix}-cloudformation-service-role"
-        
-        try:
-            describe_cmd = [
-                'aws', 'cloudformation', 'describe-stacks',
-                '--region', self.region,
-                '--stack-name', service_role_stack_name,
-                '--query', 'Stacks[0].Outputs[?OutputKey==`ServiceRoleArn`].OutputValue',
-                '--output', 'text'
-            ]
-
-            process = subprocess.run(
-                describe_cmd,
-                check=True,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-
-            service_role_arn = process.stdout.strip()
-            if service_role_arn and service_role_arn != "None":
-                logger.info(f"Found existing service role: {service_role_arn}")
-                return service_role_arn
-            else:
-                return None
-
-        except subprocess.CalledProcessError:
-            logger.debug(f"Service role stack {service_role_stack_name} not found")
-            return None
-        except Exception as e:
-            logger.error(f"Error checking for existing service role: {e}")
-            return None
-
     def deploy_service_role(self):
         """
         Deploy the CloudFormation service role stack.
@@ -278,8 +178,8 @@ class InstallService():
             if process.stderr:
                 logger.debug(f"Service role deploy stderr: {process.stderr}")
 
-            # Get the service role ARN from stack outputs
-            service_role_arn = self.get_service_role_arn()
+            # Get the service role ARN from the deployed stack
+            service_role_arn = self._get_service_role_arn_from_stack(service_role_stack_name)
             if service_role_arn:
                 logger.info(f"Successfully deployed service role: {service_role_arn}")
                 return service_role_arn
@@ -296,62 +196,78 @@ class InstallService():
                 logger.debug(f"Command stdout: {e.stdout}")
             if e.stderr:
                 logger.debug(f"Command stderr: {e.stderr}")
-            
-            # Cleanup failed service role deployment
-            logger.info("Cleaning up failed service role deployment...")
-            self.cleanup_failed_stack(service_role_stack_name)
             return None
         except Exception as e:
             logger.error(f"Unexpected error during service role deployment: {e}")
             return None
 
-    def create_permission_boundary_policy(self):
-        """Create an 'allow everything' permission boundary policy if it doesn't exist"""
+    def _get_service_role_arn_from_stack(self, stack_name):
+        """
+        Get service role ARN from a specific stack.
         
-        policy_name = "IDPPermissionBoundary"
+        Returns:
+            str: The ARN of the service role, or None if not found
+        """
+        try:
+            describe_cmd = [
+                'aws', 'cloudformation', 'describe-stacks',
+                '--region', self.region,
+                '--stack-name', stack_name,
+                '--query', 'Stacks[0].Outputs[?OutputKey==`ServiceRoleArn`].OutputValue',
+                '--output', 'text'
+            ]
+            
+            process = subprocess.run(
+                describe_cmd,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            service_role_arn = process.stdout.strip()
+            if service_role_arn and service_role_arn != "None":
+                return service_role_arn
+            else:
+                return None
+
+        except subprocess.CalledProcessError:
+            return None
+        except Exception as e:
+            logger.error(f"Error getting service role ARN from stack {stack_name}: {e}")
+            return None
+
+    def create_permission_boundary_policy(self):
+        """Create an 'allow everything' permission boundary policy"""
+        
+        policy_name = f"{self.cfn_prefix}-IDPPermissionBoundary"
         iam = boto3.client('iam')
         
         try:
-            # First, check if the policy already exists
-            account_id = boto3.client('sts').get_caller_identity()['Account']
-            policy_arn = f"arn:aws:iam::{account_id}:policy/{policy_name}"
+            policy_document = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "*",
+                        "Resource": "*"
+                    }
+                ]
+            }
             
-            # Try to get the existing policy
-            iam.get_policy(PolicyArn=policy_arn)
-            logger.info(f"Permission boundary policy already exists: {policy_arn}")
+            response = iam.create_policy(
+                PolicyName=policy_name,
+                PolicyDocument=json.dumps(policy_document),
+                Description="Permission boundary for IDP deployment - allows all actions"
+            )
+            
+            policy_arn = response['Policy']['Arn']
+            logger.info(f"Created permission boundary policy: {policy_arn}")
             return policy_arn
             
-        except ClientError as e:
-            if e.response['Error']['Code'] == 'NoSuchEntity':
-                # Policy doesn't exist, create it
-                policy_document = {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Action": "*",
-                            "Resource": "*"
-                        }
-                    ]
-                }
-                
-                try:
-                    response = iam.create_policy(
-                        PolicyName=policy_name,
-                        PolicyDocument=json.dumps(policy_document),
-                        Description="Permission boundary for IDP deployment - allows all actions"
-                    )
-                    
-                    policy_arn = response['Policy']['Arn']
-                    logger.info(f"Created permission boundary policy: {policy_arn}")
-                    return policy_arn
-                    
-                except ClientError as create_error:
-                    logger.error(f"Error creating permission boundary policy: {create_error}")
-                    return None
-            else:
-                logger.error(f"Error checking for existing permission boundary policy: {e}")
-                return None
+        except ClientError as create_error:
+            logger.error(f"Error creating permission boundary policy: {create_error}")
+            return None
 
     def validate_permission_boundary(self, stack_name, boundary_arn):
         """Validate that all IAM roles in the stack and nested stacks have the permission boundary"""
@@ -511,6 +427,7 @@ class InstallService():
             logger.info("Step 4: Validating permission boundary on all IAM roles...")
             if not self.validate_permission_boundary(self.stack_name, permission_boundary_arn):
                 logger.error("Permission boundary validation failed!")
+                logger.error("Deployment failed due to security policy violations.")
                 return False
             
             logger.info("Deployment and validation completed successfully!")
@@ -525,10 +442,6 @@ class InstallService():
                 logger.debug(f"Command stdout: {e.stdout}")
             if e.stderr:
                 logger.debug(f"Command stderr: {e.stderr}")
-            
-            # Cleanup failed deployment for next attempt
-            logger.info("Cleaning up failed deployment for next attempt...")
-            self.cleanup_failed_stack(self.stack_name)
             return False
         except Exception as e:
             logger.error(f"Unexpected error during stack deployment: {e}")
