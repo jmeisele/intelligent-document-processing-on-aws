@@ -555,8 +555,8 @@
         <mxCell id="vtWkSjNYZ8vGSXr8Y3BF-35" value="-1" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
           <mxGeometry x="437" y="477" width="30" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="vtWkSjNYZ8vGSXr8Y3BF-43" value="Amazon &lt;br&gt;CloudWatch&amp;nbsp;" style="outlineConnect=0;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws3.cloudwatch;fillColor=#759C3E;gradientColor=none;" parent="1" vertex="1">
-          <mxGeometry x="867" y="50" width="82.5" height="93" as="geometry" />
+        <mxCell id="vtWkSjNYZ8vGSXr8Y3BF-43" value="Amazon &lt;br&gt;CloudWatch&amp;nbsp;" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch_2;" parent="1" vertex="1">
+          <mxGeometry x="867" y="50" width="78" height="78" as="geometry" />
         </mxCell>
         <mxCell id="vtWkSjNYZ8vGSXr8Y3BF-44" value="&lt;b style=&quot;font-size: 16px;&quot;&gt;GenAI IDP AWS Cloudformation Stack&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;" parent="1" vertex="1">
           <mxGeometry x="10" y="40" width="330" height="30" as="geometry" />
