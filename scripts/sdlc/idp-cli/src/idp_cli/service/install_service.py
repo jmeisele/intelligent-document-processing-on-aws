@@ -136,66 +136,6 @@ class InstallService():
             return False
         
 
-    def cleanup_failed_stack(self, stack_name):
-        """
-        Clean up failed stack if it exists in ROLLBACK_COMPLETE state.
-        
-        Args:
-            stack_name: Name of the stack to clean up
-            
-        Returns:
-            bool: True if cleanup successful or not needed, False if cleanup failed
-        """
-        try:
-            # Check stack status
-            cmd = [
-                'aws', 'cloudformation', 'describe-stacks',
-                '--region', self.region,
-                '--stack-name', stack_name,
-                '--query', 'Stacks[0].StackStatus',
-                '--output', 'text'
-            ]
-            
-            process = subprocess.run(
-                cmd,
-                check=True,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
-            stack_status = process.stdout.strip()
-            
-            if stack_status in ['ROLLBACK_COMPLETE', 'CREATE_FAILED', 'DELETE_FAILED']:
-                logger.info(f"Cleaning up failed stack {stack_name} (status: {stack_status})")
-                
-                delete_cmd = [
-                    'aws', 'cloudformation', 'delete-stack',
-                    '--region', self.region,
-                    '--stack-name', stack_name
-                ]
-                
-                subprocess.run(delete_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                
-                # Wait for deletion to complete
-                wait_cmd = [
-                    'aws', 'cloudformation', 'wait', 'stack-delete-complete',
-                    '--region', self.region,
-                    '--stack-name', stack_name
-                ]
-                
-                subprocess.run(wait_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                logger.info(f"Successfully cleaned up failed stack {stack_name}")
-                
-            return True
-            
-        except subprocess.CalledProcessError:
-            # Stack doesn't exist - no cleanup needed
-            return True
-        except Exception as e:
-            logger.error(f"Failed to cleanup stack {stack_name}: {e}")
-            return False
-
     def deploy_service_role(self):
         """
         Deploy the CloudFormation service role stack.
@@ -487,6 +427,7 @@ class InstallService():
             logger.info("Step 4: Validating permission boundary on all IAM roles...")
             if not self.validate_permission_boundary(self.stack_name, permission_boundary_arn):
                 logger.error("Permission boundary validation failed!")
+                logger.error("Deployment failed due to security policy violations.")
                 return False
             
             logger.info("Deployment and validation completed successfully!")
@@ -501,10 +442,6 @@ class InstallService():
                 logger.debug(f"Command stdout: {e.stdout}")
             if e.stderr:
                 logger.debug(f"Command stderr: {e.stderr}")
-            
-            # Cleanup failed deployment for next attempt
-            logger.info("Cleaning up failed deployment for next attempt...")
-            self.cleanup_failed_stack(self.stack_name)
             return False
         except Exception as e:
             logger.error(f"Unexpected error during stack deployment: {e}")
