@@ -13,7 +13,7 @@ Resources:
   CloudFormationServiceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub '${AWS::StackName}-IDPAcceleratorCloudFormationServiceRole'
+      RoleName: !Sub '${AWS::StackName}-CFServiceRole'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
