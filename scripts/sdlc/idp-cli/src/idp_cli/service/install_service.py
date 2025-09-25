@@ -256,8 +256,6 @@ class InstallService():
                 logger.debug(f"Command stdout: {e.stdout}")
             if e.stderr:
                 logger.debug(f"Command stderr: {e.stderr}")
-            
-            logger.info(f"Service role deployment failed. Stack '{service_role_stack_name}' left for debugging.")
             return None
         except Exception as e:
             logger.error(f"Unexpected error during service role deployment: {e}")
@@ -302,7 +300,7 @@ class InstallService():
     def create_permission_boundary_policy(self):
         """Create an 'allow everything' permission boundary policy"""
         
-        policy_name = "IDPPermissionBoundary"
+        policy_name = f"{self.cfn_prefix}-IDPPermissionBoundary"
         iam = boto3.client('iam')
         
         try:

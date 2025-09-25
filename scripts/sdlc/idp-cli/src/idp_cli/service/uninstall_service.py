@@ -73,12 +73,11 @@ class UninstallService():
 
     def delete_permission_boundary_policy(self):
         """Delete the permission boundary policy if it exists"""
-        policy_name = "IDPPermissionBoundary"
+        policy_name = f"{self.cfn_prefix}-IDPPermissionBoundary"
         
         try:
             iam = boto3.client('iam')
-            account_id = boto3.client('sts').get_caller_identity()['Account']
-            policy_arn = f"arn:aws:iam::{account_id}:policy/{policy_name}"
+            policy_arn = f"arn:aws:iam::{self.account_id}:policy/{policy_name}"
             
             logger.info(f"Attempting to delete permission boundary policy: {policy_arn}")
             iam.delete_policy(PolicyArn=policy_arn)
