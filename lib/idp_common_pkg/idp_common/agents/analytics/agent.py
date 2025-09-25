@@ -15,9 +15,9 @@ import strands
 from ..common.config import load_result_format_description
 from ..common.strands_bedrock_model import create_strands_bedrock_model
 from .config import load_python_plot_generation_examples
+from .schema_provider import get_database_overview as _get_database_overview
 from .tools import (
     CodeInterpreterTools,
-    get_database_overview,
     get_table_info,
     run_athena_query,
 )
@@ -48,6 +48,9 @@ def create_analytics_agent(
     # Load python code examples
     python_plot_generation_examples = load_python_plot_generation_examples()
 
+    # Load database overview once during agent creation for embedding in system prompt
+    database_overview = _get_database_overview()
+
     # Define the system prompt for the analytics agent
     system_prompt = f"""
     You are an AI agent that converts natural language questions into Athena queries, executes those queries, and writes python code to convert the query results into json representing either a plot, a table, or a string.
@@ -55,7 +58,7 @@ def create_analytics_agent(
     # Task
     Your task is to:
     1. Understand the user's question
-    2. **EFFICIENT APPROACH**: Use get_database_overview() to get a fast overview of available tables and their purposes
+    2. **EFFICIENT APPROACH**: Review the database overview below to see available tables and their purposes
     3. Apply the Question-to-Table mapping rules below to select the correct tables for your query
     4. Use get_table_info(['table1', 'table2']) to get detailed schemas ONLY for the tables you need
     5. Generate a valid Athena query based on the targeted schema information
@@ -70,15 +73,18 @@ def create_analytics_agent(
     9. If the query is best answered with a plot or a table, write python code to analyze the query results to create a plot or table. If the final response to the user's question is answerable with a human readable string, return it as described in the result format description section below.
     10. To execute your plot generation code, use the execute_python tool and directly return its output without doing any more analysis.
 
-    # CRITICAL: Two-Step Database Information Approach
+    # Database Overview - Available Tables
+    {database_overview}
+    
+    # CRITICAL: Optimized Database Information Approach
     **For optimal performance and accuracy:**
     
-    ## Step 1: Overview (Fast)
-    - Always start with `get_database_overview()` to see available tables
+    ## Step 1: Review Database Overview (Above)
+    - The complete database overview is provided above in this prompt
     - This gives you table names, purposes, and question-to-table mapping guidance
-    - **~500 tokens vs 3000+ tokens** - much faster for simple questions
+    - No tool call needed - information is immediately available
     
-    ## Step 2: Detailed Schemas (On-Demand) 
+    ## Step 2: Get Detailed Schemas (On-Demand Only)
     - Use `get_table_info(['table1', 'table2'])` for specific tables you need
     - Only request detailed info for tables relevant to your query
     - Get complete column listings, sample queries, and aggregation rules
@@ -287,7 +293,6 @@ def create_analytics_agent(
         run_athena_query_with_config,
         code_interpreter_tools.write_query_results_to_code_sandbox,
         code_interpreter_tools.execute_python,
-        get_database_overview,  # Fast, lightweight table overview
         get_table_info,  # Detailed schema for specific tables
     ]
 

@@ -6,11 +6,12 @@ SPDX-License-Identifier: MIT-0
 ## [Unreleased]
 
 ### Added
-- **Analytics Agent 2-Phase Schema Optimization for Improved Performance**
-  - Implemented progressive schema disclosure system with efficient 2-phase approach
-  - Phase 1: `get_database_overview()` provides fast table listing and guidance (~500 tokens vs 3000+ tokens - 6x faster)
-  - Phase 2: `get_table_info(['specific_tables'])` loads detailed schemas only for tables actually needed by the query
-  - Enhanced SQL guidance with comprehensive Athena/Trino function reference and PostgreSQL operator warnings to prevent common query failures
+- **Analytics Agent Schema Optimization for Improved Performance**
+  - **Embedded Database Overview**: Complete table listing and guidance embedded directly in system prompt (no tool call needed)
+  - **On-Demand Detailed Schemas**: `get_table_info(['specific_tables'])` loads detailed column information only for tables actually needed by the query
+  - **Significant Performance Gains**: Eliminates redundant tool calls on every query while maintaining token efficiency
+  - **Enhanced SQL Guidance**: Comprehensive Athena/Trino function reference with explicit PostgreSQL operator warnings to prevent common query failures like `~` regex operator mistakes
+  - **Faster Time-to-Query**: Agent has immediate access to table overview and can proceed directly to detailed schema loading for relevant tables
 
 ### Fixed
 - Fix missing data in Glue tables when using a document class that contains a dash (-). 
