@@ -6,20 +6,20 @@ import os
 import boto3
 import logging
 from datetime import datetime, timezone
-from boto3.dynamodb.conditions import Key
+
+# Import IDP Common modules
+from idp_common.models import Document, Section, Status
+from idp_common.docs_service import create_document_service
 
 logger = logging.getLogger()
 logger.setLevel(os.environ.get('LOG_LEVEL', 'INFO'))
 
 # Initialize AWS clients
-dynamodb = boto3.resource('dynamodb')
 s3_client = boto3.client('s3')
 sqs_client = boto3.client('sqs')
 
 # Environment variables
-DOCUMENTS_TABLE = os.environ.get('DOCUMENTS_TABLE')
 QUEUE_URL = os.environ.get('QUEUE_URL')
-DATA_RETENTION_DAYS = int(os.environ.get('DATA_RETENTION_IN_DAYS', '90'))
 
 def handler(event, context):
     logger.info(f"ProcessChanges resolver invoked with event: {json.dumps(event)}")
@@ -52,168 +52,115 @@ def handler(event, context):
         logger.info(f"Processing changes for document: {object_key}")
         logger.info(f"Modified sections: {json.dumps(modified_sections)}")
 
-        # Get the document from DynamoDB
-        table = dynamodb.Table(DOCUMENTS_TABLE)
-        doc_pk = f"doc#{object_key}"
-        
-        response = table.get_item(Key={'PK': doc_pk, 'SK': doc_pk})
-        if 'Item' not in response:
-            raise ValueError(f"Document {object_key} not found")
-        
-        document = response['Item']
-        logger.info(f"Found document: {document.get('ObjectKey')}")
+        # Use Document service to get the document
+        try:
+            doc_service = create_document_service()
+            document = doc_service.get_document(object_key)  # Returns Document object directly
+            
+            if not document:
+                raise ValueError(f"Document {object_key} not found")
+            
+            logger.info(f"Found document: {document.id}")
+            
+        except Exception as e:
+            logger.error(f"Error retrieving document {object_key}: {str(e)}")
+            raise ValueError(f"Document {object_key} not found or error retrieving: {str(e)}")
 
-        # Process section modifications
-        updated_sections = []
-        updated_pages = []
+        # Track modified section IDs for selective processing
         modified_section_ids = []
         
-        # Convert existing sections and pages to dictionaries for easier manipulation
-        existing_sections = {section['Id']: section for section in document.get('Sections', [])}
-        existing_pages = {page['Id']: page for page in document.get('Pages', [])}
-        
+        # Process each modification
         for modified_section in modified_sections:
             section_id = modified_section['sectionId']
             classification = modified_section['classification']
-            page_ids = modified_section['pageIds']
+            page_ids = [int(pid) for pid in modified_section['pageIds']]  # Ensure integer page IDs
             is_new = modified_section.get('isNew', False)
             is_deleted = modified_section.get('isDeleted', False)
             
             if is_deleted:
-                # Remove the section (don't add to updated_sections)
+                # Remove the section from the document
                 logger.info(f"Deleting section: {section_id}")
-                # Also need to clear the extraction data from S3
-                if section_id in existing_sections:
-                    output_uri = existing_sections[section_id].get('OutputJSONUri')
-                    if output_uri:
-                        clear_extraction_data(output_uri)
+                
+                # Find and remove the section
+                document.sections = [s for s in document.sections if s.section_id != section_id]
+                
+                # Clear the extraction data from S3
+                for section in document.sections:
+                    if section.section_id == section_id and section.extraction_result_uri:
+                        clear_extraction_data(section.extraction_result_uri)
+                        break
+                        
                 continue
             
-            # Create or update section
-            section = {
-                'Id': section_id,
-                'Class': classification,
-                'PageIds': page_ids,
-                'OutputJSONUri': None  # Clear extraction data for reprocessing
-            }
+            # Find existing section or create new one
+            existing_section = None
+            for i, section in enumerate(document.sections):
+                if section.section_id == section_id:
+                    existing_section = section
+                    break
             
-            # If this was an existing section, preserve any confidence threshold alerts
-            if section_id in existing_sections and not is_new:
-                existing_section = existing_sections[section_id]
-                if 'ConfidenceThresholdAlerts' in existing_section:
-                    section['ConfidenceThresholdAlerts'] = existing_section['ConfidenceThresholdAlerts']
+            if existing_section:
+                # Update existing section
+                logger.info(f"Updating existing section: {section_id}")
+                existing_section.classification = classification
+                existing_section.page_ids = [str(pid) for pid in page_ids]
                 
-                # Clear the existing extraction data
-                output_uri = existing_section.get('OutputJSONUri')
-                if output_uri:
-                    clear_extraction_data(output_uri)
+                # Clear extraction data for reprocessing
+                if existing_section.extraction_result_uri:
+                    clear_extraction_data(existing_section.extraction_result_uri)
+                    existing_section.extraction_result_uri = None
+                    existing_section.attributes = None
+                    
+            else:
+                # Create new section
+                logger.info(f"Creating new section: {section_id}")
+                new_section = Section(
+                    section_id=section_id,
+                    classification=classification,
+                    confidence=1.0,
+                    page_ids=[str(pid) for pid in page_ids],
+                    extraction_result_uri=None,
+                    attributes=None
+                )
+                document.sections.append(new_section)
             
-            updated_sections.append(section)
             modified_section_ids.append(section_id)
             
             # Update page classifications to match section classification
             for page_id in page_ids:
-                if page_id in existing_pages:
-                    page = existing_pages[page_id].copy()
-                    page['Class'] = classification
-                    updated_pages.append(page)
+                page_id_str = str(page_id)
+                if page_id_str in document.pages:
+                    document.pages[page_id_str].classification = classification
                     logger.info(f"Updated page {page_id} classification to {classification}")
 
-        # Add unchanged sections back
-        for section_id, section in existing_sections.items():
-            if section_id not in [ms['sectionId'] for ms in modified_sections]:
-                updated_sections.append(section)
-        
-        # Add unchanged pages back
-        all_modified_page_ids = set()
-        for modified_section in modified_sections:
-            if not modified_section.get('isDeleted', False):
-                all_modified_page_ids.update(modified_section['pageIds'])
-        
-        for page_id, page in existing_pages.items():
-            if page_id not in all_modified_page_ids:
-                updated_pages.append(page)
+        # Update document status and timing
+        current_time = datetime.now(timezone.utc).isoformat()
+        document.status = Status.QUEUED
+        document.queued_time = current_time
 
         # Sort sections by starting page ID
-        updated_sections.sort(key=lambda s: min(s.get('PageIds', [float('inf')])))
-        
-        # Sort pages by ID
-        updated_pages.sort(key=lambda p: p.get('Id', 0))
+        document.sections.sort(key=lambda s: min([int(pid) for pid in s.page_ids] + [float('inf')]))
 
-        # Update the document in DynamoDB
-        current_time = datetime.now(timezone.utc).isoformat()
-        
-        update_expression = "SET #sections = :sections, #pages = :pages, #status = :status, #queued_time = :queued_time"
-        expression_attribute_names = {
-            '#sections': 'Sections',
-            '#pages': 'Pages', 
-            '#status': 'ObjectStatus',
-            '#queued_time': 'QueuedTime'
-        }
-        expression_attribute_values = {
-            ':sections': updated_sections,
-            ':pages': updated_pages,
-            ':status': 'QUEUED',
-            ':queued_time': current_time
-        }
+        logger.info(f"Document updated with {len(document.sections)} sections and {len(document.pages)} pages")
 
-        table.update_item(
-            Key={'PK': doc_pk, 'SK': doc_pk},
-            UpdateExpression=update_expression,
-            ExpressionAttributeNames=expression_attribute_names,
-            ExpressionAttributeValues=expression_attribute_values
-        )
+        # NOTE: We intentionally do NOT write the document back to the database here.
+        # The processing pipeline will handle document updates via AppSync as it processes.
+        # This avoids race conditions and ensures consistent state management.
 
-        logger.info(f"Updated document {object_key} with {len(updated_sections)} sections and {len(updated_pages)} pages")
+        # Send Document JSON directly to SQS (compatible with QueueProcessor expectation)
+        # The QueueProcessor expects Document.from_json() format, not nested under "document" key
+        sqs_message = document.to_dict()
 
-        # Create the document object for SQS processing
-        document_for_processing = {
-            'id': object_key,
-            'input_bucket': document.get('InputBucket', ''),
-            'input_key': object_key,
-            'output_bucket': document.get('OutputBucket', ''),
-            'status': 'QUEUED',
-            'queued_time': current_time,
-            'num_pages': len(updated_pages),
-            'pages': {str(page['Id']): {
-                'page_id': str(page['Id']),
-                'image_uri': page.get('ImageUri'),
-                'raw_text_uri': page.get('TextUri'),
-                'parsed_text_uri': page.get('TextUri'),
-                'text_confidence_uri': page.get('TextConfidenceUri'),
-                'classification': page.get('Class'),
-                'confidence': 1.0,
-                'tables': [],
-                'forms': {}
-            } for page in updated_pages},
-            'sections': [{
-                'section_id': section['Id'],
-                'classification': section['Class'],
-                'confidence': 1.0,
-                'page_ids': [str(pid) for pid in section['PageIds']],
-                'extraction_result_uri': section.get('OutputJSONUri'),
-                'attributes': None,
-                'confidence_threshold_alerts': section.get('ConfidenceThresholdAlerts', [])
-            } for section in updated_sections],
-            'metering': document.get('Metering', {}),
-            'metadata': {},
-            'errors': []
-        }
-
-        # Send to SQS with selective processing flags
-        sqs_message = {
-            'document': document_for_processing,
-            'processing_mode': 'selective',
-            'skip_ocr': True,
-            'skip_classification': True,
-            'modified_sections': modified_section_ids,
-            'reprocess_extraction_only': True
-        }
+        # Log the SQS message for debugging
+        message_body = json.dumps(sqs_message, default=str)
+        logger.info(f"SQS message prepared (size: {len(message_body)} chars)")
+        logger.info(f"SQS message content: {message_body}")
+        logger.info(f"Modified sections will be reprocessed: {modified_section_ids}")
 
         if QUEUE_URL:
             response = sqs_client.send_message(
                 QueueUrl=QUEUE_URL,
-                MessageBody=json.dumps(sqs_message)
+                MessageBody=message_body
             )
             
             logger.info(f"Sent document to SQS queue. MessageId: {response.get('MessageId')}")

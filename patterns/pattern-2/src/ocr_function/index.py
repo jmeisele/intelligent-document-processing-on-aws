@@ -32,24 +32,25 @@ def handler(event, context):
     """       
     logger.info(f"Event: {json.dumps(event)}")
     
-    # Check for selective processing flags
-    skip_ocr = event.get("skip_ocr", False)
-    processing_mode = event.get("processing_mode", "normal")
-    
     # Get document from event
     document = Document.from_dict(event["document"])
     
-    # If selective processing is enabled and OCR should be skipped, return existing data
-    if skip_ocr and processing_mode == "selective":
-        logger.info(f"Skipping OCR processing for document {document.id} - selective processing mode")
+    # Intelligent OCR detection: Skip if pages already have OCR data
+    pages_with_ocr = 0
+    for page in document.pages.values():
+        if page.image_uri and page.raw_text_uri:
+            pages_with_ocr += 1
+    
+    if pages_with_ocr == len(document.pages) and len(document.pages) > 0:
+        logger.info(f"Skipping OCR processing for document {document.id} - all {len(document.pages)} pages already have OCR data")
         
-        # Ensure document has the expected status and execution ARN
+        # Ensure document has the expected execution ARN
         document.workflow_execution_arn = event.get("execution_arn")
         
-        # Update document status if needed (but don't change to OCR since we're skipping)
+        # Update document execution ARN for tracking
         if document.status == Status.QUEUED:
             document_service = create_document_service()
-            logger.info(f"Updating document execution ARN for selective processing")
+            logger.info(f"Updating document execution ARN for OCR skip")
             document_service.update_document(document)
         
         # Prepare output with existing document data

@@ -480,6 +480,47 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
     });
   };
 
+  // Check if a section has actually been modified
+  const hasActualChanges = (section, originalSections) => {
+    // If it's a new section, it's always a change
+    if (section.isNew) {
+      return true;
+    }
+
+    // Find the original section
+    const originalSection = originalSections?.find((orig) => orig.Id === section.OriginalId);
+    if (!originalSection) {
+      // If we can't find the original, treat as modified (shouldn't happen)
+      return true;
+    }
+
+    // Check for changes in classification
+    if (section.Class !== originalSection.Class) {
+      return true;
+    }
+
+    // Check for changes in page IDs (deep comparison)
+    const originalPageIds = [...(originalSection.PageIds || [])].sort();
+    const currentPageIds = [...(section.PageIds || [])].sort();
+
+    if (originalPageIds.length !== currentPageIds.length) {
+      return true;
+    }
+
+    for (let i = 0; i < originalPageIds.length; i += 1) {
+      if (originalPageIds[i] !== currentPageIds[i]) {
+        return true;
+      }
+    }
+
+    // Check for section ID changes
+    if (section.Id !== section.OriginalId) {
+      return true;
+    }
+
+    return false;
+  };
+
   // Handle save changes
   const handleSaveChanges = async () => {
     if (!validateSections(editedSections)) {
@@ -509,11 +550,14 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
         throw new Error(`Document object key is missing. Available properties: ${availableProps}`);
       }
 
-      // Sort sections by starting page ID
-      const sortedSections = sortSectionsByPageId(editedSections);
+      // Filter to only include sections that have actually changed
+      const actuallyModifiedSections = editedSections.filter((section) => hasActualChanges(section, sections));
 
-      // Identify modified sections
-      const modifiedSections = sortedSections.map((section) => ({
+      // Sort modified sections by starting page ID
+      const sortedModifiedSections = sortSectionsByPageId(actuallyModifiedSections);
+
+      // Create payload for actually modified sections only
+      const modifiedSections = sortedModifiedSections.map((section) => ({
         sectionId: section.Id,
         classification: section.Class,
         pageIds: section.PageIds,
@@ -534,6 +578,11 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
           })) || [];
 
       const allChanges = [...modifiedSections, ...deletedSectionIds];
+
+      // Log the changes for debugging
+      console.log(`Processing ${allChanges.length} actual changes out of ${editedSections.length} total sections`);
+      console.log('Modified sections:', modifiedSections);
+      console.log('Deleted sections:', deletedSectionIds);
 
       // Call the GraphQL API with timeout
       const result = await Promise.race([

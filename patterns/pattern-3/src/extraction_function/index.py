@@ -54,6 +54,22 @@ def handler(event, context):
     
     logger.info(f"Processing section {section_id} with {len(section.page_ids)} pages")
     
+    # Intelligent Extraction detection: Skip if section already has extraction data
+    if section.extraction_result_uri and section.extraction_result_uri.strip():
+        logger.info(f"Skipping extraction for section {section_id} - already has extraction data: {section.extraction_result_uri}")
+        
+        # Return the section without processing
+        response = {
+            "section_id": section_id,
+            "document": full_document.serialize_document(working_bucket, f"extraction_skip_{section_id}", logger)
+        }
+        
+        logger.info(f"Extraction skipped - Response: {json.dumps(response, default=str)}")
+        return response
+    else:
+        logger.info(f"Processing section {section_id} - no extraction data found, proceeding with extraction")
+    
+    # Normal extraction processing
     # Update document status to EXTRACTING
     full_document.status = Status.EXTRACTING
     document_service = create_document_service()

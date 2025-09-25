@@ -34,6 +34,32 @@ def handler(event, context):
     working_bucket = os.environ.get('WORKING_BUCKET')
     document = Document.load_document(event["OCRResult"]["document"], working_bucket, logger)
     
+    # Intelligent Classification detection: Skip if pages already have classifications
+    pages_with_classification = 0
+    for page in document.pages.values():
+        if page.classification and page.classification.strip():
+            pages_with_classification += 1
+    
+    if pages_with_classification == len(document.pages) and len(document.pages) > 0:
+        logger.info(f"Skipping classification for document {document.id} - all {len(document.pages)} pages already classified")
+        
+        # Ensure document has the expected execution ARN
+        document.workflow_execution_arn = event.get("execution_arn")
+        
+        # Update document execution ARN for tracking
+        document_service = create_document_service()
+        logger.info(f"Updating document execution ARN for classification skip")
+        document_service.update_document(document)
+        
+        # Prepare output with existing document data
+        response = {
+            "document": document.serialize_document(working_bucket, "classification_skip", logger)
+        }
+        
+        logger.info(f"Classification skipped - Response: {json.dumps(response, default=str)}")
+        return response
+    
+    # Normal classification processing
     # Update document status to CLASSIFYING
     document.status = Status.CLASSIFYING
     document.workflow_execution_arn = event.get("execution_arn")

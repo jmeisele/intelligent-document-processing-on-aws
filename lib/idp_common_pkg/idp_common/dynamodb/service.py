@@ -304,13 +304,25 @@ class DocumentDynamoDBService:
                 logger.warning(f"Unknown status '{object_status}', using QUEUED")
                 doc.status = Status.QUEUED
 
-        # Convert metering data
-        metering_json = item.get("Metering")
-        if metering_json:
+        # Convert metering data - handle both JSON string and native dict formats
+        metering_data = item.get("Metering")
+        if metering_data:
             try:
-                doc.metering = json.loads(metering_json)
+                if isinstance(metering_data, str):
+                    # It's a JSON string, parse it
+                    if metering_data.strip():  # Only parse non-empty strings
+                        doc.metering = json.loads(metering_data)
+                    else:
+                        doc.metering = {}
+                else:
+                    # It's already a dict/object (native DynamoDB format), use it directly
+                    doc.metering = metering_data
             except json.JSONDecodeError:
-                logger.warning("Failed to parse metering data")
+                logger.warning("Failed to parse metering JSON string, using empty dict")
+                doc.metering = {}
+            except Exception as e:
+                logger.warning(f"Error processing metering data: {e}, using empty dict")
+                doc.metering = {}
 
         # Convert pages
         pages_data = item.get("Pages", [])

@@ -35,6 +35,34 @@ def handler(event, context):
     # Get document from event
     document = Document.from_dict(event["document"])
     
+    # Intelligent OCR detection: Skip if pages already have OCR data
+    pages_with_ocr = 0
+    for page in document.pages.values():
+        if page.image_uri and page.raw_text_uri:
+            pages_with_ocr += 1
+    
+    if pages_with_ocr == len(document.pages) and len(document.pages) > 0:
+        logger.info(f"Skipping OCR processing for document {document.id} - all {len(document.pages)} pages already have OCR data")
+        
+        # Ensure document has the expected execution ARN
+        document.workflow_execution_arn = event.get("execution_arn")
+        
+        # Update document execution ARN for tracking
+        if document.status == Status.QUEUED:
+            document_service = create_document_service()
+            logger.info(f"Updating document execution ARN for OCR skip")
+            document_service.update_document(document)
+        
+        # Prepare output with existing document data
+        working_bucket = os.environ.get('WORKING_BUCKET')
+        response = {
+            "document": document.serialize_document(working_bucket, "ocr_skip", logger)
+        }
+        
+        logger.info(f"OCR skipped - Response: {json.dumps(response, default=str)}")
+        return response
+    
+    # Normal OCR processing
     # Update document status to OCR and update in AppSync
     document.status = Status.OCR
     document.workflow_execution_arn = event.get("execution_arn")

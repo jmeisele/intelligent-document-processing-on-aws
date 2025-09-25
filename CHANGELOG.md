@@ -7,6 +7,12 @@ SPDX-License-Identifier: MIT-0
 
 ### Added
 
+### Fixed
+- **Edit Sections Mode Performance and Architecture Optimizations**
+  - Fixed ProcessChanges mutation to send only modified sections instead of all sections, dramatically reducing payload size and improving performance
+  - Refactored process_changes_resolver to use Document class and service architecture, eliminating race conditions from manual DynamoDB writes  
+  - Enhanced DynamoDB service with robust data format handling for metering field, resolving JSON parsing errors when data is stored as native objects vs strings
+
 ## [0.3.16]
 
 ### Added
