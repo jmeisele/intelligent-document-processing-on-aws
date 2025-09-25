@@ -32,8 +32,9 @@ def handler(event, context):
     """       
     logger.info(f"Event: {json.dumps(event)}")
     
-    # Get document from event
-    document = Document.from_dict(event["document"])
+    # Get document from event - handle both compressed and uncompressed
+    working_bucket = os.environ.get('WORKING_BUCKET')
+    document = Document.load_document(event["document"], working_bucket, logger)
     
     # Intelligent OCR detection: Skip if pages already have OCR data
     pages_with_ocr = 0

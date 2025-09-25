@@ -286,7 +286,7 @@ class DocumentDynamoDBService:
         doc = Document(
             id=item.get("ObjectKey"),
             input_key=item.get("ObjectKey"),
-            num_pages=item.get("PageCount", 0),
+            num_pages=int(item.get("PageCount", 0)),  # Ensure PageCount is integer
             queued_time=item.get("QueuedTime"),
             start_time=item.get("WorkflowStartTime"),
             completion_time=item.get("CompletionTime"),
@@ -329,10 +329,13 @@ class DocumentDynamoDBService:
         if pages_data is not None:  # Ensure pages_data is not None before iterating
             for page_data in pages_data:
                 page_id = str(page_data.get("Id"))
+                text_uri = page_data.get("TextUri")
                 doc.pages[page_id] = Page(
                     page_id=page_id,
                     image_uri=page_data.get("ImageUri"),
-                    raw_text_uri=page_data.get("TextUri"),
+                    raw_text_uri=text_uri,
+                    parsed_text_uri=text_uri,  # Set both raw and parsed to same URI
+                    text_confidence_uri=page_data.get("TextConfidenceUri"),
                     classification=page_data.get("Class"),
                 )
 

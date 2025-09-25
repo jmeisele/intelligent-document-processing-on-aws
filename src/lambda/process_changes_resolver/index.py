@@ -110,6 +110,10 @@ def handler(event, context):
                     clear_extraction_data(existing_section.extraction_result_uri)
                     existing_section.extraction_result_uri = None
                     existing_section.attributes = None
+                
+                # Clear confidence threshold alerts for modified sections
+                existing_section.confidence_threshold_alerts = []
+                logger.info(f"Cleared confidence alerts for modified section: {section_id}")
                     
             else:
                 # Create new section
@@ -133,26 +137,41 @@ def handler(event, context):
                     document.pages[page_id_str].classification = classification
                     logger.info(f"Updated page {page_id} classification to {classification}")
 
-        # Update document status and timing
+        # Update document status and timing - reset for reprocessing
         current_time = datetime.now(timezone.utc).isoformat()
         document.status = Status.QUEUED
+        document.initial_event_time = current_time
         document.queued_time = current_time
+        document.start_time = None
+        document.completion_time = None
+        document.workflow_execution_arn = None
 
         # Sort sections by starting page ID
         document.sections.sort(key=lambda s: min([int(pid) for pid in s.page_ids] + [float('inf')]))
 
         logger.info(f"Document updated with {len(document.sections)} sections and {len(document.pages)} pages")
 
+        # Log uncompressed document for troubleshooting
+        uncompressed_document_json = json.dumps(document.to_dict(), default=str)
+        logger.info(f"Uncompressed document (size: {len(uncompressed_document_json)} chars): {uncompressed_document_json}")
+
         # NOTE: We intentionally do NOT write the document back to the database here.
         # The processing pipeline will handle document updates via AppSync as it processes.
         # This avoids race conditions and ensures consistent state management.
 
-        # Send Document JSON directly to SQS (compatible with QueueProcessor expectation)
-        # The QueueProcessor expects Document.from_json() format, not nested under "document" key
-        sqs_message = document.to_dict()
+        # Compress document before sending to SQS for large document optimization
+        working_bucket = os.environ.get('WORKING_BUCKET')
+        if working_bucket:
+            # Use document compression (always compress with 0KB threshold)
+            sqs_message_content = document.serialize_document(working_bucket, "process_changes", logger)
+            logger.info(f"Document compressed for SQS (always compress)")
+        else:
+            # Fallback to direct document dict if no working bucket
+            sqs_message_content = document.to_dict()
+            logger.warning("No WORKING_BUCKET configured, sending uncompressed document")
 
         # Log the SQS message for debugging
-        message_body = json.dumps(sqs_message, default=str)
+        message_body = json.dumps(sqs_message_content, default=str)
         logger.info(f"SQS message prepared (size: {len(message_body)} chars)")
         logger.info(f"SQS message content: {message_body}")
         logger.info(f"Modified sections will be reprocessed: {modified_section_ids}")
