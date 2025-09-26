@@ -117,7 +117,7 @@ const DiscoveryPanel = () => {
   const updateDiscoveryJob = useCallback((updatedJob) => {
     console.log('Updating discovery job status:', updatedJob);
     setDiscoveryJobs((currentJobs) => {
-      const jobIndex = currentJobs.findIndex(job => job.jobId === updatedJob.jobId);
+      const jobIndex = currentJobs.findIndex((job) => job.jobId === updatedJob.jobId);
       if (jobIndex >= 0) {
         const newJobs = [...currentJobs];
         const oldJob = newJobs[jobIndex];
@@ -134,8 +134,8 @@ const DiscoveryPanel = () => {
   useEffect(() => {
     console.log('Setting up global discovery job subscription');
 
-    // Note: This is a simplified approach. In a production system, you might want to 
-    // subscribe to all jobs or use a different pattern, but for now we'll subscribe 
+    // Note: This is a simplified approach. In a production system, you might want to
+    // subscribe to all jobs or use a different pattern, but for now we'll subscribe
     // to individual jobs as they're created.
 
     // We'll set up subscriptions for active jobs, but with better lifecycle management
@@ -145,9 +145,7 @@ const DiscoveryPanel = () => {
       if (job.status === 'PENDING' || job.status === 'IN_PROGRESS') {
         console.log(`Setting up subscription for discovery job: ${job.jobId}`);
 
-        const subscription = API.graphql(
-          graphqlOperation(onDiscoveryJobStatusChange, { jobId: job.jobId }),
-        ).subscribe({
+        const subscription = API.graphql(graphqlOperation(onDiscoveryJobStatusChange, { jobId: job.jobId })).subscribe({
           next: (data) => {
             console.log('Discovery job status changed:', data);
             const updatedJob = data?.data?.onDiscoveryJobStatusChange;
@@ -177,10 +175,7 @@ const DiscoveryPanel = () => {
         subscription.unsubscribe();
       });
     };
-  }, [
-    JSON.stringify(discoveryJobs.map(job => ({ jobId: job.jobId, status: job.status }))),
-    updateDiscoveryJob,
-  ]); // Only re-run when job IDs or statuses change
+  }, [JSON.stringify(discoveryJobs.map((job) => ({ jobId: job.jobId, status: job.status }))), updateDiscoveryJob]);
 
   if (!settings.DiscoveryBucket) {
     return (
@@ -222,7 +217,7 @@ const DiscoveryPanel = () => {
     reader.onload = (event) => {
       try {
         const content = event.target.result;
-        
+
         // Check if file is empty
         if (!content || content.trim().length === 0) {
           setError('Ground truth file is empty. Please select a valid JSON file.');
@@ -231,9 +226,9 @@ const DiscoveryPanel = () => {
           e.target.value = '';
           return;
         }
-        
+
         JSON.parse(content); // This will throw if invalid JSON
-        
+
         // JSON is valid, set the file
         setGroundTruthFile(file);
         setUploadStatus([]);
@@ -248,14 +243,14 @@ const DiscoveryPanel = () => {
         e.target.value = '';
       }
     };
-    
+
     reader.onerror = () => {
       setError('Failed to read ground truth file');
       setGroundTruthFile(null);
       setIsValidatingJson(false);
       e.target.value = '';
     };
-    
+
     reader.readAsText(file);
   };
 
@@ -330,9 +325,6 @@ const DiscoveryPanel = () => {
       // Upload document file
       console.log(`Getting upload credentials for document: ${documentFile.name}, ${documentFile.type}....`);
       console.log(`Uploading to discovery bucket: ${settings.DiscoveryBucket}...`);
-      // generate jobId UUID
-      const jobId = crypto.randomUUID();
-      console.log(`JobId is : ${jobId}...`);
       let groundTruthFileName = null;
       if (groundTruthFile) {
         groundTruthFileName = groundTruthFile.name;
@@ -345,7 +337,6 @@ const DiscoveryPanel = () => {
           prefix: prefix || '',
           bucket: settings.DiscoveryBucket,
           groundTruthFileName: groundTruthFileName || '',
-          jobId: jobId || '',
         }),
       );
 
@@ -451,6 +442,11 @@ const DiscoveryPanel = () => {
   return (
     <SpaceBetween size="l">
       <Container header={<Header variant="h2">Discovery</Header>}>
+        <Alert type="warning" header="Important Notice">
+          Use this feature in non-production environments to discover documents and images. Fine-tune and test the
+          generated custom class configuration before exporting it to production.
+        </Alert>
+
         {error && (
           <Alert type="error" dismissible onDismiss={() => setError(null)}>
             {error}
@@ -481,11 +477,11 @@ const DiscoveryPanel = () => {
             </FormField>
 
             <FormField label="Ground Truth File" description="Select the JSON file with expected results">
-              <input 
-                type="file" 
-                onChange={handleGroundTruthFileChange} 
-                disabled={isUploading || isValidatingJson} 
-                accept=".json" 
+              <input
+                type="file"
+                onChange={handleGroundTruthFileChange}
+                disabled={isUploading || isValidatingJson}
+                accept=".json"
               />
               {isValidatingJson && (
                 <Box margin={{ top: 'xs' }}>
@@ -509,10 +505,10 @@ const DiscoveryPanel = () => {
             />
           </FormField>
 
-          <Button 
-            variant="primary" 
-            onClick={uploadFiles} 
-            loading={isUploading} 
+          <Button
+            variant="primary"
+            onClick={uploadFiles}
+            loading={isUploading}
             disabled={!documentFile || isUploading || isValidatingJson}
           >
             Start Discovery

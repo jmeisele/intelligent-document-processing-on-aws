@@ -100,16 +100,12 @@ def process_discovery_job(job_id, document_key, ground_truth_key, bucket):
         logger.info(f"Processing discovery job {job_id}: document={document_key}, ground_truth={ground_truth_key}")
 
         # Get required environment variables
-        region = os.environ.get("AWS_REGION", "us-west-2")
+        region = os.environ.get("AWS_REGION")
         
-        # Load discovery configuration
-        config = load_discovery_configuration()
-
-        # Initialize ClassesDiscovery with configuration
+        # Initialize ClassesDiscovery
         classes_discovery = ClassesDiscovery(
             input_bucket=bucket,
             input_prefix=document_key,
-            config=config,
             region=region
         )
 
@@ -302,98 +298,3 @@ def update_job_status(job_id, status, error_message=None):
     update_job_status_via_appsync(job_id, status, error_message)
 
 
-def load_discovery_configuration():
-    """Load discovery configuration from DynamoDB or default values."""
-    try:
-        # Try to load from DynamoDB configuration table
-        configuration_table_name = os.environ.get("CONFIGURATION_TABLE_NAME", "")
-        if configuration_table_name:
-            table = dynamodb.Table(configuration_table_name)
-            
-            response = table.get_item(Key={"Configuration": "Default"})
-            if "Item" in response:
-                logger.info("Loaded discovery configuration from DynamoDB")
-                return response["Item"]
-    except Exception as e:
-        logger.warning(f"Could not load configuration from DynamoDB: {e}")
-    
-    # Return default configuration
-    logger.info("Using default discovery configuration")
-    return get_default_discovery_config()
-
-
-def get_default_discovery_config():
-    """Return default discovery configuration."""
-    return {
-        "discovery": {
-            "without_ground_truth": {
-                "model_id": os.environ.get("BEDROCK_MODEL_ID", "us.amazon.nova-pro-v1:0"),
-                "temperature": 1.0,
-                "top_p": 0.1,
-                "max_tokens": 10000,
-                "system_prompt": "You are an expert in processing forms. Extracting data from images and documents. Analyze forms line by line to identify field names, data types, and organizational structure. Focus on creating comprehensive blueprints for document processing without extracting actual values.",
-                "user_prompt": """This image contains forms data. Analyze the form line by line.
-Image may contains multiple pages, process all the pages. 
-Form may contain multiple name value pair in one line. 
-Extract all the names in the form including the name value pair which doesn't have value. 
-Organize them into groups, extract field_name, data_type and field description.
-Field_name should be less than 60 characters, should not have space use '-' instead of space.
-field_description is a brief description of the field and the location of the field like box number or line number in the form and section of the form.
-Field_name should be unique within the group.
-Add two fields document_class and document_description. 
-For document_class generate a short name based on the document content like W4, I-9, Paystub. 
-For document_description generate a description about the document in less than 50 words. 
-Group the fields based on the section they are grouped in the form. Group should have attributeType as "group".
-If the group repeats, add an additional field groupType and set the value as "Table".
-Do not extract the values.
-Return the extracted data in JSON format."""
-            },
-            "with_ground_truth": {
-                "model_id": os.environ.get("BEDROCK_MODEL_ID", "us.amazon.nova-pro-v1:0"),
-                "temperature": 1.0,
-                "top_p": 0.1,
-                "max_tokens": 10000,
-                "system_prompt": "You are an expert in processing forms. Extracting data from images and documents. Use provided ground truth data as reference to optimize field extraction and ensure consistency with expected document structure and field definitions.",
-                "user_prompt": """This image contains unstructured data. Analyze the data line by line using the provided ground truth as reference.                        
-<GROUND_TRUTH_REFERENCE>
-{ground_truth_json}
-</GROUND_TRUTH_REFERENCE>
-Ground truth reference JSON has the fields we are interested in extracting from the document/image. Use the ground truth to optimize field extraction. Match field names, data types, and groupings from the reference.
-Image may contain multiple pages, process all pages.
-Extract all field names including those without values.
-Do not change the group name and field name from ground truth in the extracted data json.
-Add field_description field for every field which will contain instruction to LLM to extract the field data from the image/document. Add data_type field for every field. 
-Add two fields document_class and document_description. 
-For document_class generate a short name based on the document content like W4, I-9, Paystub. 
-For document_description generate a description about the document in less than 50 words.
-If the group repeats and follows table format, add a special field group_type with value "Table"  and description field for the group.                         
-Do not extract the values."""
-            },
-            "output_format": {
-                "sample_json": """{
-    "document_class" : "Form-1040",
-    "document_description" : "Brief summary of the document",
-    "groups" : [
-        {
-            "name" : "PersonalInformation",
-            "description" : "Personal information of Tax payer",
-            "attributeType" : "group",
-            "groupType" : "normal",
-            "groupAttributes" : [
-                {
-                    "name": "FirstName",
-                    "dataType" : "string",
-                    "description" : "First Name of Taxpayer"
-                },
-                {
-                    "name": "Age",
-                    "dataType" : "number",
-                    "description" : "Age of Taxpayer"
-                }
-            ]
-        }
-    ]
-}"""
-            }
-        }
-    }

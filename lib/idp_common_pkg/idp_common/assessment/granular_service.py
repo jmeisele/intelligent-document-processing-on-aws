@@ -1800,16 +1800,18 @@ class GranularAssessmentService:
                 )
                 if error_message:
                     logger.error(f"Error: {error_message}")
-                    document.status = Status.FAILED
-                    document.errors.append(error_message)
+                    # Errors are to be analyzed
+                    # document.status = Status.FAILED
+                    # document.errors.append(error_message)
 
                 # Add task errors to document errors
                 task_errors = [t.error_message for t in failed_tasks if t.error_message]
                 if task_errors:
                     error_msg = self._convert_error_list_to_string(task_errors)
                     logger.error(f"Task Error: {error_msg}")
-                    document.status = Status.FAILED
-                    document.errors.append(error_msg)
+                    # Errors are to be analyzed
+                    # document.status = Status.FAILED
+                    # document.errors.append(error_msg)
 
                 # Check if we should trigger state machine retries for throttling exceptions
                 # This mirrors the classification service pattern

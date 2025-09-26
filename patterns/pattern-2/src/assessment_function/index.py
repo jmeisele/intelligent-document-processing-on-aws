@@ -10,6 +10,7 @@ from idp_common import get_config, assessment
 from idp_common.models import Document, Status
 from idp_common.docs_service import create_document_service
 from idp_common import s3
+from idp_common.utils import normalize_boolean_value
 from assessment_validator import AssessmentValidator
 
 # Custom exception for throttling scenarios
@@ -200,9 +201,15 @@ def handler(event, context):
             updated_document.errors.append(str(e))
 
     # Assessment validation
-    assessment_enabled = config.get('assessment', {}).get('enabled', False)
+    assessment_config = config.get('assessment', {})
+    assessment_enabled = normalize_boolean_value(assessment_config.get('enabled', False))
+    validation_enabled = assessment_enabled and normalize_boolean_value(assessment_config.get('validation_enabled', True))
+    logger.info(f"Assessment Enabled:{assessment_enabled}")
+    logger.info(f"Validation Enabled:{validation_enabled}")
     if not assessment_enabled:
         logger.info("Assessment is disabled.")
+    elif not validation_enabled:
+        logger.info("Assessment validation is disabled.")
     else:
         for section in updated_document.sections:
             if section.section_id == section_id and section.extraction_result_uri:
@@ -210,9 +217,9 @@ def handler(event, context):
                 # Load extraction data with assessment results
                 extraction_data = s3.get_json_content(section.extraction_result_uri)
                 validator = AssessmentValidator(extraction_data,
-                                                assessment_config=config.get('assessment', {}),
-                                                enable_missing_check=False,
-                                                enable_count_check=False)
+                                                assessment_config=assessment_config,
+                                                enable_missing_check=True,
+                                                enable_count_check=True)
                 validation_results = validator.validate_all()
                 if not validation_results['is_valid']:
                     # Handle validation failure

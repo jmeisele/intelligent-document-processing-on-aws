@@ -113,7 +113,7 @@ Parameters:
       - "default"
     Description: >-
      Select the configuration preset for Pattern 1. Each configuration contains pre-tuned settings for specific document processing scenarios - see https://github.com/aws-samples/sample-genai-idp/blob/main/config_library/README.md. Note: This selected configuration will be replaced by the Custom Configuration Path if specified.
-    
+
   # Pattern 2 Parameters
 
   Pattern2Configuration:
@@ -220,7 +220,6 @@ Parameters:
       Set to true during test cycles to evaluate and compare accuracy for different patterns and prompts for each document.
       If false, evaluation is not automatically attempted for each processed document. Set to false when deployed in production.
 
-
   # Optional Knowledge Base Configuration
   DocumentKnowledgeBase:
     Default: "BEDROCK_KNOWLEDGE_BASE (Create)"
@@ -229,6 +228,14 @@ Parameters:
       - "DISABLED"
       - "BEDROCK_KNOWLEDGE_BASE (Create)"
     Description: Use document processing results as knowledge base content. Model access for amazon.titan-embed-text-v2:0 MUST be enabled in Amazon Bedrock.
+
+  KnowledgeBaseVectorStore:
+    Type: String
+    Default: "OPENSEARCH_SERVERLESS"
+    AllowedValues:
+      - "OPENSEARCH_SERVERLESS"
+      - "S3_VECTORS"
+    Description: Choose vector store type for Bedrock Knowledge Base. OpenSearch Serverless (default) for sub-millisecond queries, S3 Vectors for cost-effective storage with sub-second latency.
 
   KnowledgeBaseModelId:
     Type: String
@@ -445,6 +452,7 @@ Conditions:
   DocumentSectionsCrawlerScheduleEnabled: !Not [!Equals [!Ref DocumentSectionsCrawlerFrequency, "Manual"]]
   HasPermissionsBoundary: !Not [!Equals [!Ref PermissionsBoundaryArn, ""]]
   HasCustomConfigPath: !Not [!Equals [!Ref CustomConfigPath, ""]]
+  IsS3VectorsVectorStore: !Equals [!Ref KnowledgeBaseVectorStore, "S3_VECTORS"]
 
 
 Metadata:
@@ -498,6 +506,7 @@ Metadata:
           default: "Document Knowledge Base"
         Parameters:
           - DocumentKnowledgeBase
+          - KnowledgeBaseVectorStore
           - KnowledgeBaseModelId
       - Label:
           default: "Agentic Analysis"
@@ -804,7 +813,7 @@ Resources:
         PermissionsBoundaryArn: !Ref PermissionsBoundaryArn
 
 
-  DOCUMENTBEDROCKKB:
+  DOCUMENTKB:
     DependsOn:
       - IsStacknameLengthOK
     Type: AWS::CloudFormation::Stack
@@ -816,7 +825,9 @@ Resources:
         pInputDocumentUploadFolderPrefix: ""
         pS3SyncScheduleExpression: "cron(0/30 * ? * * *)"  # default is to sync documents every 30 minutes
         pCustomerManagedEncryptionKeyArn: !GetAtt CustomerManagedEncryptionKey.Arn
-        pChunkingStrategy: 'No chunking'
+        pChunkingStrategy: 'Fixed-size chunking'
+        pMaxTokens: 8192
+        pVectorStoreType: !Ref KnowledgeBaseVectorStore
         LogLevel: !Ref LogLevel
         PermissionsBoundaryArn: !Ref PermissionsBoundaryArn
 
@@ -1007,6 +1018,20 @@ Resources:
               - kms:GenerateDataKey*
               - kms:DescribeKey
             Resource: "*"
+          - !If
+            - IsS3VectorsVectorStore
+            - Sid: Allow S3 Vectors indexing service to use the key
+              Effect: Allow
+              Principal:
+                Service: !Sub "indexing.s3vectors.${AWS::URLSuffix}"
+              Action:
+                - kms:Encrypt
+                - kms:Decrypt
+                - kms:ReEncrypt*
+                - kms:GenerateDataKey*
+                - kms:DescribeKey
+              Resource: "*"
+            - !Ref AWS::NoValue
 
   CustomerManagedEncryptionKeyAlias:
     Type: AWS::KMS::Alias
@@ -5814,6 +5839,12 @@ Resources:
       FieldName: updateDiscoveryJobStatus
       DataSourceName: !GetAtt DiscoveryTableDataSource.Name
       RequestMappingTemplate: |-
+        ## Validate status is one of the allowed values
+        #set($validStatuses = ["PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"])
+        #if(!$validStatuses.contains($ctx.args.status))
+          $util.error("Invalid status value. Status must be one of: PENDING, IN_PROGRESS, COMPLETED, FAILED", "ValidationException")
+        #end
+        
         #set($expNames = {})
         #set($expValues = {})
         
@@ -5971,7 +6002,7 @@ Resources:
           LOG_LEVEL: !Ref LogLevel
           KB_ID: !If
             - ShouldUseDocumentKnowledgeBase
-            - !GetAtt DOCUMENTBEDROCKKB.Outputs.KnowledgeBaseID
+            - !GetAtt DOCUMENTKB.Outputs.KnowledgeBaseID
             - ""
           KB_ACCOUNT_ID: !Ref AWS::AccountId
           KB_REGION: !Ref AWS::Region
@@ -5987,7 +6018,7 @@ Resources:
               Action:
                 - bedrock:Retrieve
                 - bedrock:RetrieveAndGenerate
-              Resource: !Sub "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${DOCUMENTBEDROCKKB.Outputs.KnowledgeBaseID}"
+              Resource: !Sub "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${DOCUMENTKB.Outputs.KnowledgeBaseID}"
             - !Ref AWS::NoValue
           - Effect: Allow
             Action:
@@ -6092,7 +6123,7 @@ Resources:
               Action:
                 - bedrock:Retrieve
                 - bedrock:RetrieveAndGenerate
-              Resource: !Sub "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${DOCUMENTBEDROCKKB.Outputs.KnowledgeBaseID}"
+              Resource: !Sub "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${DOCUMENTKB.Outputs.KnowledgeBaseID}"
             - !Ref AWS::NoValue
           - Effect: Allow
             Action:
@@ -6323,7 +6354,11 @@ Resources:
                 - n 22.14.0
                 - npm install -g npm@11.1.0
                 - echo Installing Web UI dependencies
-                - npm install
+                - rm -rf node_modules
+                - npm cache clean --force
+                - npm ci
+                - echo Checking for and fixing security vulnerabilities
+                - npm audit fix || echo "Some vulnerabilities could not be automatically fixed"
             build:
               commands:
                 - echo Build started on `date`

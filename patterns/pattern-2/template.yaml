@@ -513,33 +513,38 @@ Resources:
                 description: "Classification methodology to use"
                 enum: ["multimodalPageLevelClassification", "textbasedHolisticClassification"]
                 order: 2
+              maxPagesForClassification:
+                type: string
+                description: "Number of pages to use for classification [When set to a number, forces the entire document to be assigned a single class]"
+                enum: ["ALL", "1", "2", "3", "5", "10"]
+                order: 3
               temperature:
                 type: number
                 minimum: 0
                 maximum: 1
                 description: Sampling temperature
-                order: 3
+                order: 4
               top_k:
                 type: integer
                 minimum: 1
                 description: Sampling Top K
-                order: 4
+                order: 5
               top_p:
                 type: number
                 description: Sampling Top P
-                order: 5
+                order: 6
               max_tokens:
                 type: number
                 description: Max tokens
-                order: 6
+                order: 7
               system_prompt:
                 type: string
                 description: System prompt
-                order: 7
+                order: 8
               task_prompt:
                 type: string
                 description: Task prompt - include placeholders {CLASS_NAMES_AND_DESCRIPTIONS} (replaced with the class names and descriptions for all specified classes), {FEW_SHOT_EXAMPLES} (replaced by classPrompt and image data from examples in class definitions), {DOCUMENT_TEXT} (replaced by the OCR output), and for multi-modal classification {DOCUMENT_IMAGE} (replaced by the page image attachment). Optionally use <<CACHEPOINT>> to separate static and dynamic elements of prompt for Bedrock prompt caching.
-                order: 8
+                order: 9
           extraction:
             order: 4
             type: object
@@ -632,11 +637,20 @@ Resources:
                 description: Enable or disable assessment processing
                 default: true
                 order: 0
+              validation_enabled:
+                type: boolean
+                description: Enable or disable assessment validation checks
+                default: false
+                order: 1
+                dependsOn: {
+                  field: "enabled",
+                  value: true
+                }
               image:
                 type: object
                 sectionLabel: Image Processing Settings
                 description: Configure image resolution and processing options for for image attachments in assessment
-                order: 1
+                order: 2
                 properties:
                   target_width:
                     type: number
@@ -654,7 +668,7 @@ Resources:
                 type: object
                 sectionLabel: Granular Assessment Configuration
                 description: Configure granular assessment for improved accuracy and scalability with large documents
-                order: 1
+                order: 3
                 properties:
                   enabled:
                     type: boolean
@@ -699,38 +713,38 @@ Resources:
                 description: Default confidence threshold for all attributes (0.0 to 1.0). If an attribute doesn't have its own threshold, this default will be used for confidence threshold alerts.
                 minimum: 0
                 maximum: 1
-                order: 2
+                order: 4
               model:
                 type: string
                 description: Bedrock model ID
                 enum: ["us.amazon.nova-lite-v1:0", "us.amazon.nova-pro-v1:0", "us.amazon.nova-premier-v1:0", "us.anthropic.claude-3-haiku-20240307-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0:1m", "us.anthropic.claude-opus-4-20250514-v1:0", "us.anthropic.claude-opus-4-1-20250805-v1:0"]
-                order: 3
+                order: 5
               temperature:
                 type: number
                 description: Sampling temperature
-                order: 4
+                order: 6
               top_k:
                 type: number
                 description: Sampling Top K
-                order: 5
+                order: 7
               top_p:
                 type: number
                 description: Sampling Top P
-                order: 6
+                order: 8
               max_tokens:
                 type: number
                 description: Max tokens
-                order: 7
+                order: 9
               system_prompt:
                 type: string
                 format: textarea
                 description: System prompt
-                order: 8
+                order: 10
               task_prompt:
                 type: string
                 format: textarea
                 description: Task prompt - supports placeholders {DOCUMENT_TEXT} (markdown text), {OCR_TEXT_CONFIDENCE} (OCR text blocks with confidence), {DOCUMENT_CLASS}, {ATTRIBUTE_NAMES_AND_DESCRIPTIONS}, {EXTRACTION_RESULTS}, {GRANULAR_CONTEXT} and {DOCUMENT_IMAGE}. Use <<CACHEPOINT>> to separate static and dynamic elements of prompt for Bedrock prompt caching.
-                order: 9
+                order: 11
           summarization:
             order: 6
             type: object

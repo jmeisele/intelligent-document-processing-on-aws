@@ -858,6 +858,9 @@ class BedrockClient:
                     elif isinstance(content_item, dict) and 'bytes' in content_item:
                         # Handle raw binary format
                         content_item['bytes'] = '[binary_data]'
+                    elif isinstance(content_item, dict) and 'document' in content_item:
+                        # Handle different image format used by some models
+                        content_item['document'] = '[document_data]'
         
         return sanitized
     

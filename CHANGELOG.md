@@ -5,6 +5,38 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+### Added
+
+## [0.3.16]
+
+### Added
+
+- **S3 Vectors Support for Cost-Optimized Knowledge Base Storage**
+  - Added S3 Vectors as alternative vector store option to OpenSearch Serverless for Bedrock Knowledge Base with lower storage costs
+  - Custom resource Lambda implementation for S3 vector bucket and index management (using boto3 s3vectors client) with proper IAM permissions and resource cleanup
+  - Unified Knowledge Base interface supporting both vector store types with automatic resource provisioning based on user selection
+
+- **Page Limit Configuration for Classification Control**
+  - Added `maxPagesForClassification` configuration option to control how many pages are used during document classification
+  - **Default Behavior**: `"ALL"` - uses all pages for classification (existing behavior)
+  - **Limited Page Classification**: Set to numeric value (e.g., `"1"`, `"2"`, `"3"`) to classify only the first N pages
+  - **Important**: When using numeric limit, the classification result from the first N pages is applied to ALL pages in the document, effectively forcing the entire document to be assigned a single class with one section
+  - **Use Cases**: Performance optimization for large documents, cost reduction for documents with consistent classification patterns, simplified processing for homogeneous document types
+
+- **CloudFormation Service Role for Delegated Deployment Access**
+  - Added example CloudFormation service role template that enables non-administrator users to deploy and maintain IDP stacks without requiring ongoing administrator permissions
+  - Administrators can provision the service role once with elevated privileges, then delegate deployment capabilities to developer/DevOps teams
+  - Includes comprehensive documentation and cross-referenced deployment guides explaining the security model and setup process
+
+
+### Fixed
+- Fixed issue where CloudFront policy statements were still appearing in generated GovCloud templates despite CloudFront resources being removed
+- Fix duplicate Glue tables are created when using a document class that contains a dash (-). Resolved by replacing dash in section types with underscore character when creating the table, to align with the table name generated later by the Glue crawler - resolves #57.
+- Fix occasional UI error 'Failed to get document details - please try again later' - resolves #58
+- Fixed UI zipfile creation to exclude .aws-sam directories and .env files from deployment package
+- Added security recommendation to set LogLevel parameter to WARN or ERROR (not INFO) for production deployments to prevent logging of sensitive information including PII data, document contents, and S3 presigned URLs
+- Hardened several aspects of the new Discovery feature
+
 ## [0.3.15]
 
 ### Added

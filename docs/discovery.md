@@ -1236,6 +1236,9 @@ def discovery_with_fallback(discovery_service, document_key, ground_truth_key=No
 **Discovery Output Format**
 - Output format is configuration via View/Edit configuration. JSON format should follow custom classes format.  
 - Output in any other format will result in failure.
+**Production Usage**
+- We recommend not to use the Discovery module in production. This is to reduce the risk of any hallunication during the document discovery. 
+- We recommend to use discovery module in your lower environment to discovery and construct the configurations. Export the tested configuration to production deployment.
 
 
 The Discovery module provides a powerful foundation for understanding and processing new document types. By following these guidelines and best practices, you can effectively leverage the module to bootstrap document processing workflows and continuously improve their accuracy and coverage.
