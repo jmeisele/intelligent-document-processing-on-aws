@@ -6,6 +6,14 @@ SPDX-License-Identifier: MIT-0
 ## [Unreleased]
 
 ### Added
+
+- **Edit Sections Feature for Modifying Class/Type and Reprocessing Extraction**
+  - Added Edit Sections interface for Pattern-2 and Pattern-3 workflows with reprocessing optimization
+  - **Key Features**: Section management (create, update, delete), classification updates, page reassignment with overlap detection, real-time validation
+  - **Selective Reprocessing**: Only modified sections are reprocessed while preserving existing data for unmodified sections
+  - **Processing Pipeline**: All functions (OCR/Classification/Extraction/Assessment) automatically skip redundant operations based on data presence
+  - **Pattern Compatibility**: Full functionality for Pattern-2/Pattern-3, informative modal for Pattern-1 explaining BDA not yet supported
+
 - **Analytics Agent Schema Optimization for Improved Performance**
   - **Embedded Database Overview**: Complete table listing and guidance embedded directly in system prompt (no tool call needed)
   - **On-Demand Detailed Schemas**: `get_table_info(['specific_tables'])` loads detailed column information only for tables actually needed by the query
@@ -16,12 +24,6 @@ SPDX-License-Identifier: MIT-0
 ### Fixed
 - Fix missing data in Glue tables when using a document class that contains a dash (-). 
 
-
-### Fixed
-- **Edit Sections Mode Performance and Architecture Optimizations**
-  - Fixed ProcessChanges mutation to send only modified sections instead of all sections, dramatically reducing payload size and improving performance
-  - Refactored process_changes_resolver to use Document class and service architecture, eliminating race conditions from manual DynamoDB writes  
-  - Enhanced DynamoDB service with robust data format handling for metering field, resolving JSON parsing errors when data is stored as native objects vs strings
 
 ## [0.3.16]
 
