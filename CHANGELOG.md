@@ -6,6 +6,14 @@ SPDX-License-Identifier: MIT-0
 ## [Unreleased]
 
 ### Added
+
+- **Edit Sections Feature for Modifying Class/Type and Reprocessing Extraction**
+  - Added Edit Sections interface for Pattern-2 and Pattern-3 workflows with reprocessing optimization
+  - **Key Features**: Section management (create, update, delete), classification updates, page reassignment with overlap detection, real-time validation
+  - **Selective Reprocessing**: Only modified sections are reprocessed while preserving existing data for unmodified sections
+  - **Processing Pipeline**: All functions (OCR/Classification/Extraction/Assessment) automatically skip redundant operations based on data presence
+  - **Pattern Compatibility**: Full functionality for Pattern-2/Pattern-3, informative modal for Pattern-1 explaining BDA not yet supported
+
 - **Analytics Agent Schema Optimization for Improved Performance**
   - **Embedded Database Overview**: Complete table listing and guidance embedded directly in system prompt (no tool call needed)
   - **On-Demand Detailed Schemas**: `get_table_info(['specific_tables'])` loads detailed column information only for tables actually needed by the query
