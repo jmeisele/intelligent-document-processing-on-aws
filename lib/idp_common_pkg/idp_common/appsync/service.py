@@ -118,6 +118,10 @@ class DocumentAppSyncService:
                     "ImageUri": page.image_uri or "",
                     "TextUri": page.parsed_text_uri or page.raw_text_uri or "",
                     "TextConfidenceUri": page.text_confidence_uri or "",
+                    # Convert confidence to float if it's a Decimal
+                    "Confidence": float(page.confidence)
+                    if page.confidence is not None
+                    else 0.0,
                 }
                 pages_data.append(page_data)
 
@@ -143,16 +147,28 @@ class DocumentAppSyncService:
                     "PageIds": page_ids,
                     "Class": section.classification,
                     "OutputJSONUri": section.extraction_result_uri or "",
+                    # Convert confidence to float if it's a Decimal
+                    "Confidence": float(section.confidence)
+                    if section.confidence is not None
+                    else 1.0,
                 }
 
                 # Convert confidence threshold alerts
                 if section.confidence_threshold_alerts:
                     alerts_data = []
                     for alert in section.confidence_threshold_alerts:
+                        # Convert Decimal values to string to avoid serialization issues
+                        confidence_value = alert.get("confidence")
+                        confidence_threshold_value = alert.get("confidence_threshold")
+
                         alert_data = {
                             "attributeName": alert.get("attribute_name"),
-                            "confidence": alert.get("confidence"),
-                            "confidenceThreshold": alert.get("confidence_threshold"),
+                            "confidence": float(confidence_value)
+                            if confidence_value is not None
+                            else None,
+                            "confidenceThreshold": float(confidence_threshold_value)
+                            if confidence_threshold_value is not None
+                            else None,
                         }
                         alerts_data.append(alert_data)
                     section_data["ConfidenceThresholdAlerts"] = alerts_data
