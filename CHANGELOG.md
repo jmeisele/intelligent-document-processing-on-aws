@@ -5,6 +5,8 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+## [0.3.17]
+
 ### Added
 
 - **Edit Sections Feature for Modifying Class/Type and Reprocessing Extraction**
