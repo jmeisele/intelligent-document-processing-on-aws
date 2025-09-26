@@ -22,6 +22,7 @@ import { API, graphqlOperation } from 'aws-amplify';
 import FileViewer from '../document-viewer/JSONViewer';
 import { getSectionConfidenceAlertCount, getSectionConfidenceAlerts } from '../common/confidence-alerts-utils';
 import useConfiguration from '../../hooks/use-configuration';
+import useSettingsContext from '../../contexts/settings';
 import processChanges from '../../graphql/queries/processChanges';
 
 // Cell renderer components
@@ -264,8 +265,10 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
   const [editedSections, setEditedSections] = useState([]);
   const [validationErrors, setValidationErrors] = useState({});
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showPattern1Modal, setShowPattern1Modal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const { mergedConfig: configuration } = useConfiguration();
+  const { settings } = useSettingsContext();
 
   // Initialize edited sections when entering edit mode
   useEffect(() => {
@@ -521,6 +524,21 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
     return false;
   };
 
+  // Check if current pattern is Pattern-1
+  const isPattern1 = () => {
+    const pattern = settings?.IDPPattern;
+    return pattern && pattern.toLowerCase().includes('pattern1');
+  };
+
+  // Handle Edit Sections button click
+  const handleEditSectionsClick = () => {
+    if (isPattern1()) {
+      setShowPattern1Modal(true);
+    } else {
+      setIsEditMode(true);
+    }
+  };
+
   // Handle save changes
   const handleSaveChanges = async () => {
     if (!validateSections(editedSections)) {
@@ -660,7 +678,7 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
             actions={
               <SpaceBetween direction="horizontal" size="xs">
                 {!isEditMode ? (
-                  <Button variant="primary" iconName="edit" onClick={() => setIsEditMode(true)}>
+                  <Button variant="primary" iconName="edit" onClick={handleEditSectionsClick}>
                     Edit Sections
                   </Button>
                 ) : (
@@ -753,6 +771,53 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
           </ul>
           <Box>
             <strong>Are you sure you want to continue?</strong>
+          </Box>
+        </SpaceBetween>
+      </Modal>
+
+      {/* Pattern-1 Information Modal */}
+      <Modal
+        onDismiss={() => setShowPattern1Modal(false)}
+        visible={showPattern1Modal}
+        footer={
+          <Box float="right">
+            <Button variant="primary" onClick={() => setShowPattern1Modal(false)}>
+              Got it
+            </Button>
+          </Box>
+        }
+        header="Edit Sections - Pattern-1"
+      >
+        <SpaceBetween size="m">
+          <Alert type="info" header="Feature Not Available for Pattern-1">
+            <Box>
+              The Edit Sections feature is currently available for <strong>Pattern-2</strong> and <strong>Pattern-3</strong> only.
+            </Box>
+          </Alert>
+          
+          <Box>
+            <strong>Why is this different for Pattern-1?</strong>
+          </Box>
+          
+          <Box>
+            Pattern-1 uses <strong>Bedrock Data Automation (BDA)</strong> which has its own section management approach 
+            that integrates directly with Amazon Bedrock's document processing blueprints. 
+            Section boundaries are automatically determined by the BDA service based on the document structure 
+            and configured blueprints.
+          </Box>
+          
+          <Box>
+            <strong>Available alternatives for Pattern-1:</strong>
+          </Box>
+          
+          <ul>
+            <li><strong>View/Edit Data</strong>: Use the "View/Edit Data" buttons to review and modify extracted information within each section</li>
+            <li><strong>Configuration</strong>: Adjust document classes and extraction rules in the Configuration tab</li>
+            <li><strong>Reprocess Document</strong>: Use the "Reprocess" button to run the document through the pipeline again with updated configuration</li>
+          </ul>
+          
+          <Box>
+            For fine-grained section control, consider using <strong>Pattern-2</strong> or <strong>Pattern-3</strong> for future documents.
           </Box>
         </SpaceBetween>
       </Modal>
