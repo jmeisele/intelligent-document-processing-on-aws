@@ -42,8 +42,45 @@ def handler(event, context):
     # Convert document data to Document object - handle compression
     working_bucket = os.environ.get('WORKING_BUCKET')
     document = Document.load_document(document_data, working_bucket, logger)
-    document.status = Status.ASSESSING
     logger.info(f"Processing assessment for document {document.id}, section {section_id}")
+
+    # Find the section we're processing
+    section = None
+    for s in document.sections:
+        if s.section_id == section_id:
+            section = s
+            break
+    
+    if not section:
+        raise ValueError(f"Section {section_id} not found in document")
+
+    # Intelligent Assessment Skip: Check if extraction results already contain explainability_info
+    if section.extraction_result_uri and section.extraction_result_uri.strip():
+        try:
+            from idp_common import s3
+            logger.info(f"Checking extraction results for existing assessment: {section.extraction_result_uri}")
+            extraction_data = s3.get_json_content(section.extraction_result_uri)
+            
+            # If explainability_info exists, assessment was already done
+            if extraction_data.get('explainability_info'):
+                logger.info(f"Skipping assessment for section {section_id} - extraction results already contain explainability_info")
+                
+                # Return consistent format for Map state collation
+                response = {
+                    "section_id": section_id, 
+                    "document": document.serialize_document(working_bucket, f"assessment_skip_{section_id}", logger)
+                }
+                
+                logger.info(f"Assessment skipped - Response: {json.dumps(response, default=str)}")
+                return response
+            else:
+                logger.info(f"Assessment needed for section {section_id} - no explainability_info found in extraction results")
+        except Exception as e:
+            logger.warning(f"Error checking extraction results for assessment skip: {e}")
+            # Continue with normal assessment if check fails
+
+    # Normal assessment processing
+    document.status = Status.ASSESSING
 
     # Update document status to ASSESSING for UI only
     # Create new 'shell' document since our input document has only 1 section. 
