@@ -6214,6 +6214,11 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
+                - appsync:GraphQL
+              Resource:
+                - !Sub "${GraphQLApi.Arn}/types/Mutation/*"
+            - Effect: Allow
+              Action:
                 - kms:Encrypt
                 - kms:Decrypt
                 - kms:ReEncrypt*
