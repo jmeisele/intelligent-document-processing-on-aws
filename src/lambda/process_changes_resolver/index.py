@@ -169,8 +169,7 @@ def handler(event, context):
         # Update document status and timing - reset for reprocessing
         current_time = datetime.now(timezone.utc).isoformat()
         document.status = Status.QUEUED
-        document.initial_event_time = current_time
-        document.queued_time = current_time
+        document.initial_event_time = document.queued_time or current_time
         document.start_time = None
         document.completion_time = None
         document.workflow_execution_arn = None
