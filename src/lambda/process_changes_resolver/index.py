@@ -52,10 +52,10 @@ def handler(event, context):
         logger.info(f"Processing changes for document: {object_key}")
         logger.info(f"Modified sections: {json.dumps(modified_sections)}")
 
-        # Use Document service to get the document
+        # Use DynamoDB service to get the document (only service that supports get_document)
         try:
-            doc_service = create_document_service()
-            document = doc_service.get_document(object_key)  # Returns Document object directly
+            dynamodb_service = create_document_service(mode='dynamodb')
+            document = dynamodb_service.get_document(object_key)  # Returns Document object directly
             
             if not document:
                 raise ValueError(f"Document {object_key} not found")
@@ -194,6 +194,16 @@ def handler(event, context):
         else:
             logger.warning("QUEUE_URL not configured, skipping SQS message")
             processing_job_id = None
+
+        # Use AppSync service for immediate UI status update
+        try:
+            appsync_service = create_document_service(mode='appsync')
+            document.status = Status.QUEUED  # Ensure status is QUEUED for UI
+            updated_document = appsync_service.update_document(document)
+            logger.info(f"Updated document status to QUEUED in AppSync for immediate UI feedback")
+        except Exception as e:
+            logger.warning(f"Failed to update document status in AppSync: {str(e)}")
+            # Don't fail the entire operation if AppSync update fails
 
         # Log successful completion
         logger.info(f"Successfully processed changes for {len(modified_sections)} sections")

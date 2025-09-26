@@ -6194,7 +6194,6 @@ Resources:
         Variables:
           LOG_LEVEL: !Ref LogLevel
           TRACKING_TABLE: !Ref TrackingTable
-          DOCUMENT_TRACKING_MODE: 'dynamodb'
           QUEUE_URL: !Ref DocumentQueue
           DATA_RETENTION_IN_DAYS: !Ref DataRetentionInDays
           WORKING_BUCKET: !Ref WorkingBucket
