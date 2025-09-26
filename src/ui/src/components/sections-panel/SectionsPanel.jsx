@@ -770,7 +770,9 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
             <li>Reprocess only the changed sections (skipping OCR and classification steps)</li>
           </ul>
           <Box>
-            <strong>Are you sure you want to continue?</strong>
+            {/* eslint-disable-next-line max-len */}
+            For fine-grained section control, consider using <strong>Pattern-2</strong> or <strong>Pattern-3</strong>{' '}
+            for future documents.
           </Box>
         </SpaceBetween>
       </Modal>
@@ -791,33 +793,43 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
         <SpaceBetween size="m">
           <Alert type="info" header="Feature Not Available for Pattern-1">
             <Box>
-              The Edit Sections feature is currently available for <strong>Pattern-2</strong> and <strong>Pattern-3</strong> only.
+              The Edit Sections feature is currently available for <strong>Pattern-2</strong> and{' '}
+              <strong>Pattern-3</strong> only.
             </Box>
           </Alert>
-          
+
           <Box>
             <strong>Why is this different for Pattern-1?</strong>
           </Box>
-          
+
           <Box>
-            Pattern-1 uses <strong>Bedrock Data Automation (BDA)</strong> which has its own section management approach 
-            that integrates directly with Amazon Bedrock's document processing blueprints. 
-            Section boundaries are automatically determined by the BDA service based on the document structure 
-            and configured blueprints.
+            Pattern-1 uses <strong>Bedrock Data Automation (BDA)</strong> which has its own section management approach
+            that integrates directly with Amazon Bedrock&apos;s document processing blueprints. Section boundaries are
+            automatically determined by the BDA service based on the document structure and configured blueprints.
           </Box>
-          
+
           <Box>
             <strong>Available alternatives for Pattern-1:</strong>
           </Box>
-          
+
           <ul>
-            <li><strong>View/Edit Data</strong>: Use the "View/Edit Data" buttons to review and modify extracted information within each section</li>
-            <li><strong>Configuration</strong>: Adjust document classes and extraction rules in the Configuration tab</li>
-            <li><strong>Reprocess Document</strong>: Use the "Reprocess" button to run the document through the pipeline again with updated configuration</li>
+            <li>
+              <strong>View/Edit Data</strong>: Use the &quot;View/Edit Data&quot; buttons to review and modify extracted
+              information within each section
+            </li>
+            <li>
+              <strong>Configuration</strong>: Adjust document classes and extraction rules in the Configuration tab
+            </li>
+            <li>
+              <strong>Reprocess Document</strong>: Use the &quot;Reprocess&quot; button to run the document through the
+              pipeline again with updated configuration
+            </li>
           </ul>
-          
+
           <Box>
-            For fine-grained section control, consider using <strong>Pattern-2</strong> or <strong>Pattern-3</strong> for future documents.
+            {/* eslint-disable-next-line max-len */}
+            For fine-grained section control, consider using <strong>Pattern-2</strong> or <strong>Pattern-3</strong>{' '}
+            for future documents.
           </Box>
         </SpaceBetween>
       </Modal>
