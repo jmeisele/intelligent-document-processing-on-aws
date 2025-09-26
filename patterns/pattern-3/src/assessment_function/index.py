@@ -65,10 +65,39 @@ def handler(event, context):
             if extraction_data.get('explainability_info'):
                 logger.info(f"Skipping assessment for section {section_id} - extraction results already contain explainability_info")
                 
+                # Create section-specific document (same as normal processing) to match output format
+                section_document = Document(
+                    id=document.id,
+                    input_bucket=document.input_bucket,
+                    input_key=document.input_key,
+                    output_bucket=document.output_bucket,
+                    status=Status.ASSESSING,  # Keep status consistent with normal flow
+                    initial_event_time=document.initial_event_time,
+                    queued_time=document.queued_time,
+                    start_time=document.start_time,
+                    completion_time=document.completion_time,
+                    workflow_execution_arn=document.workflow_execution_arn,
+                    num_pages=len(section.page_ids),
+                    summary_report_uri=document.summary_report_uri,
+                    evaluation_status=document.evaluation_status,
+                    evaluation_report_uri=document.evaluation_report_uri,
+                    evaluation_results_uri=document.evaluation_results_uri,
+                    errors=document.errors,
+                    metering={}  # Empty metering for skipped processing
+                )
+                
+                # Add only the pages needed for this section
+                for page_id in section.page_ids:
+                    if page_id in document.pages:
+                        section_document.pages[page_id] = document.pages[page_id]
+                
+                # Add only the section being processed (preserve existing data)
+                section_document.sections = [section]
+                
                 # Return consistent format for Map state collation
                 response = {
                     "section_id": section_id, 
-                    "document": document.serialize_document(working_bucket, f"assessment_skip_{section_id}", logger)
+                    "document": section_document.serialize_document(working_bucket, f"assessment_skip_{section_id}", logger)
                 }
                 
                 logger.info(f"Assessment skipped - Response: {json.dumps(response, default=str)}")
