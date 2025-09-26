@@ -118,10 +118,6 @@ class DocumentAppSyncService:
                     "ImageUri": page.image_uri or "",
                     "TextUri": page.parsed_text_uri or page.raw_text_uri or "",
                     "TextConfidenceUri": page.text_confidence_uri or "",
-                    # Convert confidence to float if it's a Decimal
-                    "Confidence": float(page.confidence)
-                    if page.confidence is not None
-                    else 0.0,
                 }
                 pages_data.append(page_data)
 
@@ -147,10 +143,6 @@ class DocumentAppSyncService:
                     "PageIds": page_ids,
                     "Class": section.classification,
                     "OutputJSONUri": section.extraction_result_uri or "",
-                    # Convert confidence to float if it's a Decimal
-                    "Confidence": float(section.confidence)
-                    if section.confidence is not None
-                    else 1.0,
                 }
 
                 # Convert confidence threshold alerts
