@@ -613,7 +613,7 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
       setEditedSections([]);
       setValidationErrors({});
 
-      alert('Changes processed successfully!');
+      alert('Section changes submitted!');
     } catch (error) {
       // Handle different types of errors
       let errorMessage = 'Failed to process changes';
