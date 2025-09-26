@@ -85,45 +85,29 @@ def handler(event, context):
             is_deleted = modified_section.get('isDeleted', False)
             
             if is_deleted:
-                # Remove the section from the document
-                logger.info(f"Deleting section: {section_id}")
-                
-                # Find and remove the section
-                document.sections = [s for s in document.sections if s.section_id != section_id]
-                
-                # Clear the extraction data from S3
-                for section in document.sections:
-                    if section.section_id == section_id and section.extraction_result_uri:
-                        clear_extraction_data(section.extraction_result_uri)
+                # Find section to delete BEFORE removing it
+                section_to_delete = None
+                for s in document.sections:
+                    if s.section_id == section_id:
+                        section_to_delete = s
                         break
+                
+                if section_to_delete:
+                    # Clear S3 extraction data before removing section
+                    if section_to_delete.extraction_result_uri:
+                        clear_extraction_data(section_to_delete.extraction_result_uri)
+                        logger.info(f"Cleared extraction data for deleted section: {section_id}")
+                    
+                    # Remove section from document
+                    document.sections = [s for s in document.sections if s.section_id != section_id]
+                    logger.info(f"Deleted section: {section_id}")
+                else:
+                    logger.warning(f"Section {section_id} marked for deletion but not found")
                         
                 continue
             
-            # Find existing section or create new one
-            existing_section = None
-            for i, section in enumerate(document.sections):
-                if section.section_id == section_id:
-                    existing_section = section
-                    break
-            
-            if existing_section:
-                # Update existing section
-                logger.info(f"Updating existing section: {section_id}")
-                existing_section.classification = classification
-                existing_section.page_ids = [str(pid) for pid in page_ids]
-                
-                # Clear extraction data for reprocessing
-                if existing_section.extraction_result_uri:
-                    clear_extraction_data(existing_section.extraction_result_uri)
-                    existing_section.extraction_result_uri = None
-                    existing_section.attributes = None
-                
-                # Clear confidence threshold alerts for modified sections
-                existing_section.confidence_threshold_alerts = []
-                logger.info(f"Cleared confidence alerts for modified section: {section_id}")
-                    
-            else:
-                # Create new section
+            elif is_new:
+                # Create new section (don't search for existing)
                 logger.info(f"Creating new section: {section_id}")
                 new_section = Section(
                     section_id=section_id,
@@ -131,13 +115,51 @@ def handler(event, context):
                     confidence=1.0,
                     page_ids=[str(pid) for pid in page_ids],
                     extraction_result_uri=None,
-                    attributes=None
+                    attributes=None,
+                    confidence_threshold_alerts=[]
                 )
                 document.sections.append(new_section)
+                
+            else:
+                # Update existing section
+                existing_section = None
+                for section in document.sections:
+                    if section.section_id == section_id:
+                        existing_section = section
+                        break
+                
+                if existing_section:
+                    logger.info(f"Updating existing section: {section_id}")
+                    existing_section.classification = classification
+                    existing_section.page_ids = [str(pid) for pid in page_ids]
+                    
+                    # Clear extraction data for reprocessing
+                    if existing_section.extraction_result_uri:
+                        clear_extraction_data(existing_section.extraction_result_uri)
+                        existing_section.extraction_result_uri = None
+                        existing_section.attributes = None
+                    
+                    # Clear confidence threshold alerts for modified sections
+                    existing_section.confidence_threshold_alerts = []
+                    logger.info(f"Cleared confidence alerts for modified section: {section_id}")
+                else:
+                    logger.warning(f"Section {section_id} marked as update but not found - treating as new")
+                    # Treat as new section if not found
+                    new_section = Section(
+                        section_id=section_id,
+                        classification=classification,
+                        confidence=1.0,
+                        page_ids=[str(pid) for pid in page_ids],
+                        extraction_result_uri=None,
+                        attributes=None,
+                        confidence_threshold_alerts=[]
+                    )
+                    document.sections.append(new_section)
             
+            # Only add to modified list if not deleted
             modified_section_ids.append(section_id)
             
-            # Update page classifications to match section classification
+            # Update page classifications to match section classification (only if not deleted)
             for page_id in page_ids:
                 page_id_str = str(page_id)
                 if page_id_str in document.pages:
