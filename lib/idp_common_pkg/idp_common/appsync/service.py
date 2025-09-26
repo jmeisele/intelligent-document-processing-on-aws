@@ -164,7 +164,7 @@ class DocumentAppSyncService:
 
         # Add metering data if available
         if document.metering:
-            input_data["Metering"] = json.dumps(document.metering)
+            input_data["Metering"] = json.dumps(document.metering, default=str)
 
         # Add evaluation status & report if available
         if document.evaluation_status:

@@ -6199,6 +6199,7 @@ Resources:
           WORKING_BUCKET: !Ref WorkingBucket
           INPUT_BUCKET: !Ref InputBucket
           OUTPUT_BUCKET: !Ref OutputBucket
+          APPSYNC_API_URL: !GetAtt GraphQLApi.GraphQLUrl
       LoggingConfig:
         LogGroup: !Ref ProcessChangesResolverFunctionLogGroup
       Policies:
