@@ -63,8 +63,8 @@ def calculate_lambda_metering(
         memory_gb = memory_mb / 1024.0
         gb_seconds_raw = memory_gb * duration_seconds
         
-        # Round GB-seconds to 2 decimal places for cleaner output
-        gb_seconds = round(gb_seconds_raw, 2)
+        # Round GB-seconds to 1 decimal places for cleaner output
+        gb_seconds = round(gb_seconds_raw, 1)
         
         # Log the calculated metrics for visibility
         logger.info(f"Lambda metering for {context_name}: "
