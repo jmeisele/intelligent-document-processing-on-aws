@@ -61,13 +61,16 @@ def calculate_lambda_metering(
         # Convert to GB-seconds (AWS pricing unit)
         # AWS charges based on allocated memory, not actual usage
         memory_gb = memory_mb / 1024.0
-        gb_seconds = memory_gb * duration_seconds
+        gb_seconds_raw = memory_gb * duration_seconds
+        
+        # Round GB-seconds to 2 decimal places for cleaner output
+        gb_seconds = round(gb_seconds_raw, 2)
         
         # Log the calculated metrics for visibility
         logger.info(f"Lambda metering for {context_name}: "
                    f"duration={duration_seconds:.3f}s, "
                    f"memory={memory_mb}MB, "
-                   f"gb_seconds={gb_seconds:.6f}")
+                   f"gb_seconds={gb_seconds}")
         
         # Return metering data in the standard format used by other services
         return {
