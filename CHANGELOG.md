@@ -8,16 +8,11 @@ SPDX-License-Identifier: MIT-0
 ### Added
 
 - **Lambda Function Execution Cost Metering for Complete Cost Visibility**
-  - Added comprehensive Lambda execution cost tracking to all core processing functions across all three processing patterns
-  - **Complete Coverage**: Enhanced 11 Lambda functions (OCR, Classification, Extraction, Assessment, Summarization) with execution cost metering
+  - Added Lambda execution cost tracking to all core processing functions across all three processing patterns
   - **Dual Metrics**: Tracks both invocation counts ($0.20 per 1M requests) and GB-seconds duration ($16.67 per 1M GB-seconds) aligned with official AWS Lambda pricing
   - **Context-Specific Tracking**: Separate cost attribution for each processing step enabling granular cost analysis per document processing context
   - **Automatic Integration**: Lambda costs automatically integrate with existing cost reporting infrastructure and appear alongside AWS service costs (Textract, Bedrock, SageMaker)
-  - **Production Quality**: Robust type handling, graceful error handling, and 2-decimal precision rounding for professional cost reporting
-  - **Pattern Coverage**: Full implementation across Pattern-1 (BDA), Pattern-2 (Textract + Bedrock), and Pattern-3 (Textract + SageMaker + Bedrock)
   - **Configuration Integration**: Added Lambda pricing entries to all 7 configuration files in `config_library/` using official US East pricing
-  - **Cost Optimization Value**: Enables Lambda memory right-sizing decisions using GB-seconds data and identifies performance optimization opportunities
-  - **Key Benefits**: Complete document processing cost transparency, accurate budget forecasting, data-driven Lambda optimization, and comprehensive cost analytics
 
 ## [0.3.17]
 
