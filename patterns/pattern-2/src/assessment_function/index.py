@@ -128,6 +128,12 @@ def handler(event, context):
     if not section:
         raise ValueError(f"Section {section_id} not found in document")
 
+    # Check if granular assessment is enabled (moved earlier for Lambda metering context)
+    granular_config = config.get('assessment', {}).get('granular', {})
+    granular_enabled = granular_config.get('enabled', False)
+    assessment_context = "GranularAssessment" if granular_enabled else "Assessment"
+    logger.info(f"Assessment mode: {'Granular' if granular_enabled else 'Regular'} (context: {assessment_context})")
+
     # Intelligent Assessment Skip: Check if extraction results already contain explainability_info
     if section.extraction_result_uri and section.extraction_result_uri.strip():
         try:
@@ -167,9 +173,9 @@ def handler(event, context):
                 # Add only the section being processed (preserve existing data)
                 section_document.sections = [section]
                 
-                # Add Lambda metering for assessment skip execution
+                # Add Lambda metering for assessment skip execution with dynamic context
                 try:
-                    lambda_metering = calculate_lambda_metering("Assessment", context, start_time)
+                    lambda_metering = calculate_lambda_metering(assessment_context, context, start_time)
                     section_document.metering = merge_metering_data(section_document.metering, lambda_metering)
                 except Exception as e:
                     logger.warning(f"Failed to add Lambda metering for assessment skip: {str(e)}")
@@ -301,9 +307,9 @@ def handler(event, context):
                     updated_document.errors.extend(validation_errors)
                     logger.error(f"Validation Error: {validation_errors}")
 
-    # Add Lambda metering for successful assessment execution
+    # Add Lambda metering for successful assessment execution with dynamic context
     try:
-        lambda_metering = calculate_lambda_metering("Assessment", context, start_time)
+        lambda_metering = calculate_lambda_metering(assessment_context, context, start_time)
         updated_document.metering = merge_metering_data(updated_document.metering, lambda_metering)
     except Exception as e:
         logger.warning(f"Failed to add Lambda metering for assessment: {str(e)}")
