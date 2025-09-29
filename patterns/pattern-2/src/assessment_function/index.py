@@ -10,7 +10,7 @@ from idp_common import get_config, assessment
 from idp_common.models import Document, Status
 from idp_common.docs_service import create_document_service
 from idp_common import s3
-from idp_common.utils import normalize_boolean_value
+from idp_common.utils import normalize_boolean_value, calculate_lambda_metering, merge_metering_data
 from assessment_validator import AssessmentValidator
 
 # Custom exception for throttling scenarios
@@ -94,6 +94,7 @@ def handler(event, context):
     This function assesses the confidence of extraction results for a document section
     using the Assessment service from the idp_common library.
     """
+    start_time = time.time()  # Capture start time for Lambda metering
     logger.info(f"Starting assessment processing for event: {json.dumps(event, default=str)}")
 
     # Load configuration
@@ -165,6 +166,13 @@ def handler(event, context):
                 
                 # Add only the section being processed (preserve existing data)
                 section_document.sections = [section]
+                
+                # Add Lambda metering for assessment skip execution
+                try:
+                    lambda_metering = calculate_lambda_metering("Assessment", context, start_time)
+                    section_document.metering = merge_metering_data(section_document.metering, lambda_metering)
+                except Exception as e:
+                    logger.warning(f"Failed to add Lambda metering for assessment skip: {str(e)}")
                 
                 # Return consistent format for Map state collation
                 response = {
@@ -292,6 +300,13 @@ def handler(event, context):
                     validation_errors = validation_results['validation_errors']
                     updated_document.errors.extend(validation_errors)
                     logger.error(f"Validation Error: {validation_errors}")
+
+    # Add Lambda metering for successful assessment execution
+    try:
+        lambda_metering = calculate_lambda_metering("Assessment", context, start_time)
+        updated_document.metering = merge_metering_data(updated_document.metering, lambda_metering)
+    except Exception as e:
+        logger.warning(f"Failed to add Lambda metering for assessment: {str(e)}")
 
     # Prepare output with automatic compression if needed
     result = {
