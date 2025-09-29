@@ -116,12 +116,14 @@ class IDPPublisher:
                 f"[red]❌ {component} build failed (use --verbose for details)[/red]"
             )
 
-    def run_subprocess_with_logging(self, cmd, component_name, cwd=None, realtime=False):
+    def run_subprocess_with_logging(
+        self, cmd, component_name, cwd=None, realtime=False
+    ):
         """Run subprocess with standardized logging"""
         if realtime:
             # Real-time output for long-running processes like npm install
             self.console.print(f"[cyan]Running: {' '.join(cmd)}[/cyan]")
-            
+
             try:
                 process = subprocess.Popen(
                     cmd,
@@ -130,28 +132,37 @@ class IDPPublisher:
                     text=True,
                     cwd=cwd,
                     bufsize=1,
-                    universal_newlines=True
+                    universal_newlines=True,
                 )
-                
+
                 output_lines = []
                 while True:
                     output = process.stdout.readline()
-                    if output == '' and process.poll() is not None:
+                    if output == "" and process.poll() is not None:
                         break
                     if output:
                         line = output.strip()
                         output_lines.append(line)
                         # Show progress for npm commands
-                        if 'npm' in ' '.join(cmd):
-                            if any(keyword in line.lower() for keyword in ['downloading', 'installing', 'added', 'updated', 'audited']):
+                        if "npm" in " ".join(cmd):
+                            if any(
+                                keyword in line.lower()
+                                for keyword in [
+                                    "downloading",
+                                    "installing",
+                                    "added",
+                                    "updated",
+                                    "audited",
+                                ]
+                            ):
                                 self.console.print(f"[dim]  {line}[/dim]")
-                            elif 'warn' in line.lower():
+                            elif "warn" in line.lower():
                                 self.console.print(f"[yellow]  {line}[/yellow]")
-                            elif 'error' in line.lower():
+                            elif "error" in line.lower():
                                 self.console.print(f"[red]  {line}[/red]")
-                
+
                 return_code = process.poll()
-                
+
                 if return_code != 0:
                     error_msg = f"""Command failed: {" ".join(cmd)}
 Working directory: {cwd or os.getcwd()}
@@ -162,11 +173,13 @@ OUTPUT:
                     print(error_msg)
                     self.log_error_details(component_name, error_msg)
                     return False, error_msg
-                
+
                 return True, None  # Success, no result object needed for real-time
-                
+
             except Exception as e:
-                error_msg = f"Failed to execute command: {' '.join(cmd)}\nError: {str(e)}"
+                error_msg = (
+                    f"Failed to execute command: {' '.join(cmd)}\nError: {str(e)}"
+                )
                 self.log_error_details(component_name, error_msg)
                 return False, error_msg
         else:
@@ -1176,7 +1189,9 @@ except Exception as e:
                 return
 
             # Run npm install first
-            self.console.print("[cyan]📦 Installing UI dependencies (this may take a while)...[/cyan]")
+            self.console.print(
+                "[cyan]📦 Installing UI dependencies (this may take a while)...[/cyan]"
+            )
             success, result = self.run_subprocess_with_logging(
                 ["npm", "install"], "UI npm install", ui_dir, realtime=True
             )
@@ -1185,7 +1200,9 @@ except Exception as e:
                 raise Exception("npm install failed")
 
             # Run npm run build to validate ESLint/Prettier
-            self.console.print("[cyan]🔨 Building UI (validating ESLint/Prettier)...[/cyan]")
+            self.console.print(
+                "[cyan]🔨 Building UI (validating ESLint/Prettier)...[/cyan]"
+            )
             success, result = self.run_subprocess_with_logging(
                 ["npm", "run", "build"], "UI build validation", ui_dir, realtime=True
             )
