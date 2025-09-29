@@ -10,6 +10,7 @@ import logging
 from idp_common import metrics, get_config, extraction
 from idp_common.models import Document, Section, Status
 from idp_common.docs_service import create_document_service
+from idp_common.utils import calculate_lambda_metering, merge_metering_data
 
 # Configuration will be loaded in handler function
 
@@ -24,6 +25,7 @@ def handler(event, context):
     """
     Process a single section of a document for information extraction
     """
+    start_time = time.time()  # Capture start time for Lambda metering
     logger.info(f"Event: {json.dumps(event)}")
 
     # Load configuration
@@ -64,6 +66,13 @@ def handler(event, context):
     # Intelligent Extraction detection: Skip if section already has extraction data
     if section.extraction_result_uri and section.extraction_result_uri.strip():
         logger.info(f"Skipping extraction for section {section_id} - already has extraction data: {section.extraction_result_uri}")
+        
+        # Add Lambda metering for extraction skip execution
+        try:
+            lambda_metering = calculate_lambda_metering("Extraction", context, start_time)
+            full_document.metering = merge_metering_data(full_document.metering, lambda_metering)
+        except Exception as e:
+            logger.warning(f"Failed to add Lambda metering for extraction skip: {str(e)}")
         
         # Return the section without processing
         response = {
@@ -116,6 +125,13 @@ def handler(event, context):
         error_message = f"Extraction failed for document {section_document.id}, section {section_id}"
         logger.error(error_message)
         raise Exception(error_message)
+    
+    # Add Lambda metering for successful extraction execution
+    try:
+        lambda_metering = calculate_lambda_metering("Extraction", context, start_time)
+        section_document.metering = merge_metering_data(section_document.metering, lambda_metering)
+    except Exception as e:
+        logger.warning(f"Failed to add Lambda metering for extraction: {str(e)}")
     
     # Prepare output with automatic compression if needed
     response = {

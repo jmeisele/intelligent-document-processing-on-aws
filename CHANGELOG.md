@@ -5,6 +5,15 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+### Added
+
+- **Lambda Function Execution Cost Metering for Complete Cost Visibility**
+  - Added Lambda execution cost tracking to all core processing functions across all three processing patterns
+  - **Dual Metrics**: Tracks both invocation counts ($0.20 per 1M requests) and GB-seconds duration ($16.67 per 1M GB-seconds) aligned with official AWS Lambda pricing
+  - **Context-Specific Tracking**: Separate cost attribution for each processing step enabling granular cost analysis per document processing context
+  - **Automatic Integration**: Lambda costs automatically integrate with existing cost reporting infrastructure and appear alongside AWS service costs (Textract, Bedrock, SageMaker)
+  - **Configuration Integration**: Added Lambda pricing entries to all 7 configuration files in `config_library/` using official US East pricing
+
 ## [0.3.17]
 
 ### Added
