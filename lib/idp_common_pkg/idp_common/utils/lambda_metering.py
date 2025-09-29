@@ -43,10 +43,20 @@ def calculate_lambda_metering(
     try:
         # Calculate execution duration
         end_time = time.time()
-        duration_seconds = end_time - start_time
+        duration_seconds = float(end_time - start_time)
         
-        # Get allocated memory in MB from Lambda context
-        memory_mb = lambda_context.memory_limit_in_mb
+        # Get allocated memory in MB from Lambda context - handle string/int types
+        memory_mb_raw = lambda_context.memory_limit_in_mb
+        
+        # Convert memory to float, handling both string and numeric types
+        if isinstance(memory_mb_raw, str):
+            try:
+                memory_mb = float(memory_mb_raw)
+            except (ValueError, TypeError):
+                logger.warning(f"Could not convert memory_limit_in_mb '{memory_mb_raw}' to float, using default 128MB")
+                memory_mb = 128.0  # Default Lambda memory allocation
+        else:
+            memory_mb = float(memory_mb_raw)
         
         # Convert to GB-seconds (AWS pricing unit)
         # AWS charges based on allocated memory, not actual usage
