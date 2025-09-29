@@ -23,9 +23,13 @@ SPDX-License-Identifier: MIT-0
   - **Enhanced SQL Guidance**: Comprehensive Athena/Trino function reference with explicit PostgreSQL operator warnings to prevent common query failures like `~` regex operator mistakes
   - **Faster Time-to-Query**: Agent has immediate access to table overview and can proceed directly to detailed schema loading for relevant tables
 
+### Changed
+- Add UI code lint/validation to publish.py script
+
 ### Fixed
 - Fix missing data in Glue tables when using a document class that contains a dash (-). 
-
+- Added optional Bedrock Guardrails support to (a) Agent Analytics and (b) Chat with Document
+- Fixed regressions on Permission Boundary support for all roles, and added autimated tests to prevent recurrance - fixes #70
 
 ## [0.3.16]
 
