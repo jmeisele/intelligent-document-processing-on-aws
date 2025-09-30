@@ -28,7 +28,7 @@ def handler(event, context):
 
     # Load configuration
     config = get_config()
-    logger.info(f"Config: {json.dumps(config)}")
+    logger.info(f"Config: {json.dumps(config, default=str)}")
     
     # Extract input from event - handle both compressed and uncompressed
     document_data = event.get('document', {})

@@ -288,6 +288,7 @@ discovery:
       and organizational structure. Focus on creating comprehensive blueprints
       for document processing without extracting actual values.
     max_tokens: '10000'
+
 agents:
   error_analyzer:
     model_id: anthropic.claude-3-sonnet-20240229-v1:0
@@ -355,6 +356,7 @@ agents:
     parameters:
       max_log_events: 100
       time_range_hours_default: 24
+
 # Pricing configuration for cost tracking
 pricing:
   - name: textract/detect_document_text
