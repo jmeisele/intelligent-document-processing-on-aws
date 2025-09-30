@@ -369,7 +369,6 @@ summarization:
   model: us.anthropic.claude-3-7-sonnet-20250219-v1:0
   system_prompt: >-
     You are a document summarization expert who can analyze and summarize documents from various domains including medical, financial, legal, and general business documents. Your task is to create a summary that captures the key information, main points, and important details from the document. Your output must be in valid JSON format. \nSummarization Style: Balanced\\nCreate a balanced summary that provides a moderate level of detail. Include the main points and key supporting information, while maintaining the document's overall structure. Aim for a comprehensive yet concise summary.\n Your output MUST be in valid JSON format with markdown content. You MUST strictly adhere to the output format specified in the instructions.
-
 assessment:
   enabled: true
   validation_enabled: false
@@ -527,7 +526,6 @@ assessment:
     <extraction-results>
     {EXTRACTION_RESULTS}
     </extraction-results>
-
 evaluation:
   llm_method:
     top_p: '0.1'
@@ -671,7 +669,6 @@ discovery:
 agents:
   error_analyzer:
     model_id: anthropic.claude-3-sonnet-20240229-v1:0
-
     system_prompt: |-
       You are an intelligent error analysis agent for the GenAI IDP system.
 
