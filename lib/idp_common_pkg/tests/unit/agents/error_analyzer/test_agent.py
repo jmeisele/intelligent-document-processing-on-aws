@@ -26,6 +26,7 @@ class TestErrorAnalyzerAgent:
         mock_config.return_value = {
             "AWS_STACK_NAME": "test-stack",
             "model_id": "anthropic.claude-3-sonnet-20240229-v1:0",
+            "system_prompt": "Test system prompt",
         }
         mock_session.return_value = MagicMock()
         mock_agent = MagicMock()
@@ -57,6 +58,7 @@ class TestErrorAnalyzerAgent:
         mock_config.return_value = {
             "AWS_STACK_NAME": "test-stack",
             "model_id": "anthropic.claude-3-sonnet-20240229-v1:0",
+            "system_prompt": "Test system prompt",
         }
         mock_session.return_value = MagicMock()
         mock_agent = MagicMock()
