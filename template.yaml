@@ -3697,6 +3697,8 @@ Resources:
               Resource:
                 - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/${AWS::StackName}*"
                 - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}*"
+                - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/${AWS::StackName}-*:*"
+                - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-*:*"
                 - "*"
             - Effect: Allow
               Action:
@@ -3709,6 +3711,8 @@ Resources:
                 - !GetAtt ConfigurationTable.Arn
                 - !Sub "${ConfigurationTable.Arn}/*"
                 - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}*"
+                - "*"
             - Effect: Allow
               Action:
                 - cloudformation:DescribeStackResources
