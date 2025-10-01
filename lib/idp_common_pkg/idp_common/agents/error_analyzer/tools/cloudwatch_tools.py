@@ -13,6 +13,7 @@ from typing import Any, Dict
 import boto3
 from strands import tool
 
+from ..config import get_error_analyzer_config
 from .lambda_tools import get_document_context
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,9 @@ def search_cloudwatch_logs(
 ) -> Dict[str, Any]:
     """Internal function: Search CloudWatch logs for error patterns."""
     try:
+        logger.debug(
+            f"Searching CloudWatch logs in {log_group_name} with filter '{filter_pattern}'"
+        )
         client = boto3.client("logs")
 
         # Use provided time window or default to hours_back from now
@@ -180,13 +184,17 @@ def search_document_logs(
     document_id: str,
     stack_name: str,
     filter_pattern: str = "ERROR",
-    max_events_per_group: int = 10,
-    max_log_groups: int = 5,
+    max_events_per_group: int = None,
+    max_log_groups: int = 15,
 ) -> Dict[str, Any]:
     """
     Search CloudWatch logs for a specific document using execution context.
     """
     try:
+        # Load configuration to get max_log_events parameter
+        config = get_error_analyzer_config()
+        if max_events_per_group is None:
+            max_events_per_group = config.get("max_log_events", 10)
         # Get document execution context
         context = get_document_context(document_id, stack_name)
 
@@ -246,12 +254,14 @@ def search_document_logs(
 
         for group in groups_to_search:
             log_group_name = group["name"]
+            logger.info(f"Searching log group: {log_group_name}")
 
             # Try each search pattern
             for pattern in search_patterns:
                 if not pattern:
                     continue
 
+                logger.info(f"  Using filter pattern: '{pattern}'")
                 search_result = search_cloudwatch_logs(
                     log_group_name=log_group_name,
                     filter_pattern=pattern,
@@ -261,6 +271,13 @@ def search_document_logs(
                 )
 
                 if search_result.get("events_found", 0) > 0:
+                    logger.info(
+                        f"  Found {search_result['events_found']} events in {log_group_name}"
+                    )
+                    # Log stream names for found events
+                    for event in search_result.get("events", []):
+                        logger.info(f"    Log stream: {event.get('log_stream', 'N/A')}")
+
                     all_results.append(
                         {
                             "log_group": log_group_name,
@@ -271,8 +288,12 @@ def search_document_logs(
                     )
                     total_events += search_result["events_found"]
 
-                    # Stop searching this group if we found events
-                    break
+                    # Continue searching other groups for more errors
+                    # break  # Removed to search ALL log groups
+                else:
+                    logger.info(
+                        f"  No events found in {log_group_name} with pattern '{pattern}'"
+                    )
 
         return {
             "analysis_type": "document_specific",
@@ -298,9 +319,9 @@ def search_document_logs(
 @tool
 def search_stack_logs(
     filter_pattern: str = "ERROR",
-    hours_back: int = 24,
-    max_events_per_group: int = 5,
-    max_log_groups: int = 10,
+    hours_back: int = None,
+    max_events_per_group: int = None,
+    max_log_groups: int = 15,
     start_time: datetime = None,
     end_time: datetime = None,
 ) -> Dict[str, Any]:
@@ -316,6 +337,12 @@ def search_stack_logs(
         }
 
     try:
+        # Load configuration to get parameters
+        config = get_error_analyzer_config()
+        if max_events_per_group is None:
+            max_events_per_group = config.get("max_log_events", 5)
+        if hours_back is None:
+            hours_back = config.get("time_range_hours_default", 24)
         logger.info(f"Starting log search for stack: {stack_name}")
         prefix_info = get_log_group_prefix(stack_name)
         logger.info(f"Prefix info result: {prefix_info}")
@@ -356,6 +383,9 @@ def search_stack_logs(
 
         for group in groups_to_search:
             log_group_name = group["name"]
+            logger.info(
+                f"Searching log group: {log_group_name} with pattern '{filter_pattern}'"
+            )
 
             search_result = search_cloudwatch_logs(
                 log_group_name=log_group_name,
@@ -367,6 +397,13 @@ def search_stack_logs(
             )
 
             if search_result.get("events_found", 0) > 0:
+                logger.info(
+                    f"Found {search_result['events_found']} events in {log_group_name}"
+                )
+                # Log stream names for found events
+                for event in search_result.get("events", []):
+                    logger.info(f"  Log stream: {event.get('log_stream', 'N/A')}")
+
                 all_results.append(
                     {
                         "log_group": log_group_name,
@@ -375,6 +412,8 @@ def search_stack_logs(
                     }
                 )
                 total_events += search_result["events_found"]
+            else:
+                logger.info(f"No events found in {log_group_name}")
 
         return {
             "stack_name": stack_name,

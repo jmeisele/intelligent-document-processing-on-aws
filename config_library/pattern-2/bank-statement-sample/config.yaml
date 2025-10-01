@@ -732,7 +732,7 @@ agents:
 
       DO NOT include code suggestions, technical summaries, or multiple paragraphs of explanation. Keep responses concise and actionable.
     parameters:
-      max_log_events: 100
+      max_log_events: 20
       time_range_hours_default: 24
 pricing:
   - name: textract/detect_document_text
