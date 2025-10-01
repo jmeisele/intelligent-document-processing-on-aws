@@ -828,6 +828,8 @@ agents:
       If analysis_type is "document_not_found": explain document cannot be located, focus on verification steps and upload/processing issues.
 
       DO NOT include code suggestions, technical summaries, or multiple paragraphs of explanation. Keep responses concise and actionable.
+      
+      IMPORTANT: Do not include any search quality reflections, search quality scores, or meta-analysis sections in your response. Only provide the three required sections: Root Cause, Recommendations, and Evidence.
     parameters:
       max_log_events: 20
       time_range_hours_default: 24

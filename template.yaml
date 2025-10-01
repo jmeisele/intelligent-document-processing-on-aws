@@ -3697,6 +3697,10 @@ Resources:
               Resource:
                 - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/${AWS::StackName}*"
                 - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}*"
+            - Effect: Allow
+              Action:
+                - logs:DescribeLogGroups
+              Resource:
                 - "*"
             - Effect: Allow
               Action:
