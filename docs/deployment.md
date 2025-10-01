@@ -35,7 +35,7 @@ You need to have the following packages installed on your computer:
 3. [sam (AWS SAM)](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
 4. python 3.11 or later
 5. A local Docker daemon
-6. Python packages for publish.py: `pip install boto3 rich typer PyYAML botocore setuptools`
+6. Python packages for publish.py: `pip install boto3 rich typer PyYAML botocore setuptools ruff`
 7. **Node.js 18+** and **npm** (required for UI validation in publish script)
 
 For guidance on setting up a development environment, see:

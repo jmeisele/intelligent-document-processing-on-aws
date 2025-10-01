@@ -127,6 +127,7 @@ check_and_install_packages() {
         "rich:rich"
         "boto3:boto3"
         "yaml:PyYAML"
+        "ruff:ruff"
     )
     missing_packages=()
     
@@ -138,6 +139,11 @@ check_and_install_packages() {
             missing_packages+=("$package_name")
         fi
     done
+    
+    # Check ruff separately (command-line tool)
+    if ! command -v ruff >/dev/null 2>&1; then
+        missing_packages+=("ruff")
+    fi
     
     # Install missing packages if any
     if [[ ${#missing_packages[@]} -gt 0 ]]; then
