@@ -61,13 +61,12 @@ class IDPPublisher:
         self.lint_enabled = True
 
     def clean_checksums(self):
-        """Delete all .checksum files in main, patterns, options, lib, and ui directories"""
+        """Delete all .checksum files in main, patterns, options, and lib directories"""
         self.console.print("[yellow]🧹 Cleaning all .checksum files...[/yellow]")
 
         checksum_paths = [
             ".checksum",  # main
             "lib/.checksum",  # lib
-            "src/ui/.checksum",  # ui
         ]
 
         # Add patterns checksum files
