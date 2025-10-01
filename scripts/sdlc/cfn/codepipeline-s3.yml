@@ -110,6 +110,10 @@ Resources:
             reason: "This is a temporary deployment artifact bucket; access logging not required"
           - id: W41
             reason: "Using default SSE encryption which is applied automatically by S3"
+      security-matrix:
+        rules_to_suppress:
+          - id: S3-001
+            reason: "This is a temporary deployment artifact bucket; access logging not required"
     Properties:
       VersioningConfiguration:
         Status: Enabled
