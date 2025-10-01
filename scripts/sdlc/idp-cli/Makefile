@@ -39,7 +39,7 @@ wait:
 	poetry run idpcli monitor-pipeline \
 	--pipeline-name=$(IDP_PIPELINE_NAME) \
 	--initial-wait=180 \
-	--max-wait=60
+	--max-wait=120
 
 put: zip
 	cd $(IDP_CWD) && \
