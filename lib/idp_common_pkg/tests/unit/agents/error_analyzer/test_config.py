@@ -62,11 +62,19 @@ class TestErrorAnalyzerConfig:
     )
     def test_get_error_analyzer_config(self):
         """Test error analyzer configuration loading."""
-        config = get_error_analyzer_config()
+        pattern_config = {
+            "agents": {
+                "error_analyzer": {
+                    "system_prompt": "Test system prompt for error analysis"
+                }
+            }
+        }
+        config = get_error_analyzer_config(pattern_config)
 
         assert config["cloudwatch_log_group_prefix"] == "/aws/lambda/test"
         assert config["aws_stack_name"] == "test-stack"
         assert config["max_log_events"] == 100
+        assert config["system_prompt"] == "Test system prompt for error analysis"
         assert isinstance(config["error_patterns"], list)
         assert "aws_capabilities" in config
         assert isinstance(config["aws_capabilities"], dict)
@@ -81,7 +89,15 @@ class TestErrorAnalyzerConfig:
     )
     def test_get_error_analyzer_config_with_log_level(self):
         """Test configuration with custom log level."""
-        config = get_error_analyzer_config()
+        pattern_config = {
+            "agents": {
+                "error_analyzer": {
+                    "system_prompt": "Test system prompt with debug logging"
+                }
+            }
+        }
+        config = get_error_analyzer_config(pattern_config)
 
         assert "error_patterns" in config
         assert len(config["error_patterns"]) > 0
+        assert config["system_prompt"] == "Test system prompt with debug logging"

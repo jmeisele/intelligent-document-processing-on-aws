@@ -564,8 +564,8 @@ Resources:
                   model_id:
                     type: string
                     description: Model ID for the error analysis agent
-                    enum: ["anthropic.claude-3-sonnet-20240229-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0"]
-                    default: "anthropic.claude-3-sonnet-20240229-v1:0"
+                    enum: ["anthropic.claude-3-sonnet-20240229-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0"]
+                    default: "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
                     order: 0
                   system_prompt:
                     type: string

@@ -274,9 +274,6 @@ def search_document_logs(
                     logger.info(
                         f"  Found {search_result['events_found']} events in {log_group_name}"
                     )
-                    # Log stream names for found events
-                    for event in search_result.get("events", []):
-                        logger.info(f"    Log stream: {event.get('log_stream', 'N/A')}")
 
                     all_results.append(
                         {
@@ -400,9 +397,6 @@ def search_stack_logs(
                 logger.info(
                     f"Found {search_result['events_found']} events in {log_group_name}"
                 )
-                # Log stream names for found events
-                for event in search_result.get("events", []):
-                    logger.info(f"  Log stream: {event.get('log_stream', 'N/A')}")
 
                 all_results.append(
                     {

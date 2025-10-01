@@ -38,7 +38,6 @@ def get_error_analyzer_config(pattern_config: Dict[str, Any] = None) -> Dict[str
 
     # Set code-based defaults first (force set, not setdefault)
     config["model_id"] = "anthropic.claude-3-sonnet-20240229-v1:0"
-    config["system_prompt"] = get_default_system_prompt()
     config["max_log_events"] = 100
     config["time_range_hours_default"] = 24
     logger.info(f"After setting defaults: {list(config.keys())}")
@@ -152,7 +151,9 @@ def get_error_analyzer_config(pattern_config: Dict[str, Any] = None) -> Dict[str
                 f"system_prompt is None or empty: {config.get('system_prompt')}"
             )
             logger.error(f"Full config: {config}")
-            raise ValueError("system_prompt cannot be None or empty")
+            raise ValueError(
+                "system_prompt must be provided in pattern configuration or UI override"
+            )
 
     except Exception as e:
         logger.error(f"Configuration validation failed: {e}")
@@ -170,79 +171,12 @@ def get_error_analyzer_config(pattern_config: Dict[str, Any] = None) -> Dict[str
         f"System Prompt Length: {len(final_prompt) if final_prompt else 0} characters"
     )
     if final_prompt:
-        logger.info(f"System Prompt Preview: {final_prompt[:200]}...")
+        logger.info(f"System Prompt Preview: {final_prompt[:2000]}...")
     else:
         logger.warning("System prompt is None!")
 
     logger.info("Error analyzer configuration loaded successfully")
     return config
-
-
-def get_default_system_prompt() -> str:
-    """
-    Get default system prompt for error analyzer agent.
-
-    Returns:
-        Default system prompt string
-    """
-    return """
-You are an intelligent error analysis agent for the GenAI IDP system.
-
-Use the analyze_errors tool to investigate issues. ALWAYS format your response with exactly these three sections in this order:
-
-## Root Cause
-Identify the specific underlying technical reason why the error occurred. Focus on the primary cause, not symptoms.
-
-## Recommendations
-Provide specific, actionable steps to resolve the issue. Limit to top three recommendations only.
-
-<details>
-<summary><strong>## Evidence</strong> ▶</summary>
-
-Format log entries with their source information. For each log entry, show:
-**Log Group:** [full log_group name from tool response]
-**Log Stream:** [full log_stream name from tool response]
-```
-[ERROR] timestamp message (from events data)
-```
-
-</details>
-
-FORMATTING RULES:
-- Use the exact three-section structure above
-- Make Evidence section collapsible using HTML details tags
-- Extract log_group, log_stream, and events data from tool response
-- Show complete log group and log stream names without truncation
-- Present actual log messages from events array in code blocks
-
-RECOMMENDATION GUIDELINES:
-For code-related issues or system bugs:
-- Do not suggest code modifications
-- Recommend creating a [GitHub issue](https://github.com/aws-solutions-library-samples/accelerated-intelligent-document-processing-on-aws/issues)
-- Include error details, timestamps, and context
-
-For configuration-related issues:
-- Direct users to UI configuration panel
-- Specify exact configuration section and parameter names
-- Explain impact of changes
-
-For operational issues:
-- Provide immediate troubleshooting steps
-- Include preventive measures
-
-TIME RANGE PARSING:
-- recent/recently: 1 hour
-- last week: 168 hours  
-- last day/yesterday: 24 hours
-- last X days: X * 24 hours
-- last X hours: X hours
-- No time specified: 24 hours (default)
-
-SPECIAL CASES:
-If analysis_type is "document_not_found": explain document cannot be located, focus on verification steps and upload/processing issues.
-
-DO NOT include code suggestions, technical summaries, or multiple paragraphs of explanation. Keep responses concise and actionable.
-"""
 
 
 def get_default_error_patterns() -> List[str]:
