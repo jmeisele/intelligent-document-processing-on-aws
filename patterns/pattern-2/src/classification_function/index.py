@@ -14,6 +14,7 @@ import time
 from idp_common import classification, metrics, get_config
 from idp_common.models import Document, Status
 from idp_common.docs_service import create_document_service
+from idp_common.utils import calculate_lambda_metering, merge_metering_data
 
 # Configuration will be loaded in handler function
 region = os.environ['AWS_REGION']
@@ -27,6 +28,7 @@ def handler(event, context):
     """
     Lambda handler for document classification.
     """
+    start_time = time.time()  # Capture start time for Lambda metering
     logger.info(f"Event: {json.dumps(event)}")
     
     # Load configuration
@@ -61,6 +63,13 @@ def handler(event, context):
         document_service = create_document_service()
         logger.info(f"Updating document execution ARN for classification skip")
         document_service.update_document(document)
+        
+        # Add Lambda metering for classification skip execution
+        try:
+            lambda_metering = calculate_lambda_metering("Classification", context, start_time)
+            document.metering = merge_metering_data(document.metering, lambda_metering)
+        except Exception as e:
+            logger.warning(f"Failed to add Lambda metering for classification skip: {str(e)}")
         
         # Prepare output with existing document data
         response = {
@@ -135,6 +144,13 @@ def handler(event, context):
     
     t1 = time.time()
     logger.info(f"Time taken for classification: {t1-t0:.2f} seconds")
+    
+    # Add Lambda metering for successful classification execution
+    try:
+        lambda_metering = calculate_lambda_metering("Classification", context, start_time)
+        document.metering = merge_metering_data(document.metering, lambda_metering)
+    except Exception as e:
+        logger.warning(f"Failed to add Lambda metering for classification: {str(e)}")
     
     # Prepare output with automatic compression if needed
     response = {
