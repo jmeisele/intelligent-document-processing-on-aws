@@ -5,6 +5,8 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+## [0.3.18]
+
 ### Added
 
 - **Lambda Function Execution Cost Metering for Complete Cost Visibility**
@@ -13,6 +15,10 @@ SPDX-License-Identifier: MIT-0
   - **Context-Specific Tracking**: Separate cost attribution for each processing step enabling granular cost analysis per document processing context
   - **Automatic Integration**: Lambda costs automatically integrate with existing cost reporting infrastructure and appear alongside AWS service costs (Textract, Bedrock, SageMaker)
   - **Configuration Integration**: Added Lambda pricing entries to all 7 configuration files in `config_library/` using official US East pricing
+
+### Fixed
+- Defect in v0.3.17 causing workflow tracker failure to (1) update status of failed workflows, and (2) update reporting database for all workflows #72
+
 
 ## [0.3.17]
 
