@@ -907,7 +907,7 @@ discovery:
     max_tokens: '10000'
 agents:
   error_analyzer:
-    model_id: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+    model_id: us.anthropic.claude-sonnet-4-20250514-v1:0
 
     system_prompt: |-
       You are an intelligent error analysis agent for the GenAI IDP system.
@@ -972,7 +972,7 @@ agents:
       
       IMPORTANT: Do not include any search quality reflections, search quality scores, or meta-analysis sections in your response. Only provide the three required sections: Root Cause, Recommendations, and Evidence.
     parameters:
-      max_log_events: 10
+      max_log_events: 5
       time_range_hours_default: 24
 pricing:
   - name: textract/detect_document_text

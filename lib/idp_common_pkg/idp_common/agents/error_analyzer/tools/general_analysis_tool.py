@@ -42,7 +42,7 @@ def analyze_recent_system_errors(
         )
 
         # Filter by time range
-        threshold_time = datetime.utcnow() - timedelta(hours=time_range_hours)
+        threshold_time = datetime.utcnow() - timedelta(hours=int(time_range_hours))
         recent_failures = []
 
         for item in error_records.get("items", []):
