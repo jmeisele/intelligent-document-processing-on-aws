@@ -131,9 +131,8 @@ class CodePipelineUtil:
                     logger.error(message)
                     raise Exception(message)
                 elif status == 'Superseded':
-                    message = f"Pipeline '{pipeline_name}' execution was superseded by a newer execution"
-                    logger.error(message)
-                    raise Exception(message)
+                    logger.info(f"Pipeline '{pipeline_name}' execution was superseded but continues running in parallel mode")
+                    # Continue monitoring - superseded executions still run to completion in parallel mode
                 else:
                     logger.warning(f"Unknown pipeline status: {status}")
                 
