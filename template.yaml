@@ -3713,6 +3713,10 @@ Resources:
                 - !GetAtt ConfigurationTable.Arn
                 - !Sub "${ConfigurationTable.Arn}/*"
                 - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}*"
+            - Effect: Allow
+              Action:
+                - dynamodb:ListTables
+              Resource:
                 - "*"
             - Effect: Allow
               Action:
