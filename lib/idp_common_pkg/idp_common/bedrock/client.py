@@ -271,17 +271,7 @@ class BedrockClient:
         # Initialize inference config with temperature
         inference_config = {"temperature": temperature}
         
-        # Handle top_p parameter
-        if top_p is not None:
-            # Convert top_p to float if it's a string
-            if isinstance(top_p, str):
-                try:
-                    top_p = float(top_p)
-                except ValueError:
-                    logger.warning(f"Failed to convert top_p value '{top_p}' to float. Not using top_p.")
-                    top_p = None
-            
-            inference_config["topP"] = top_p
+        # Skip top_p entirely to avoid conflicts with temperature
         
         # Handle max_tokens parameter
         if max_tokens is not None:
