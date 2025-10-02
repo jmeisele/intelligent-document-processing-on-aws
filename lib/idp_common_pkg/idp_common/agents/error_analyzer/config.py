@@ -50,15 +50,15 @@ def get_error_analyzer_config(pattern_config: Dict[str, Any] = None) -> Dict[str
         )
         config["system_prompt"] = agent_config.get("system_prompt")
 
-        # Load parameters
+        # Load parameters with proper type conversion
         if "parameters" in agent_config:
             params = agent_config["parameters"]
-            config["max_log_events"] = params.get("max_log_events", 10)
-            config["time_range_hours_default"] = params.get(
-                "time_range_hours_default", 24
+            config["max_log_events"] = int(float(params.get("max_log_events", 5)))
+            config["time_range_hours_default"] = int(
+                float(params.get("time_range_hours_default", 24))
             )
         else:
-            config["max_log_events"] = 10
+            config["max_log_events"] = 5
             config["time_range_hours_default"] = 24
     else:
         logger.info("No error_analyzer configuration found in agents section")

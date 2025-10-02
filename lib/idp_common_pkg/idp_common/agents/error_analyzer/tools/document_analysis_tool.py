@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 @tool
 def analyze_document_failure(
-    document_id: str, stack_name: str, max_log_events: int = 10
+    document_id: str, stack_name: str, max_log_events: int = 5
 ) -> Dict[str, Any]:
     """
     Analyze failure for a specific document using lookup function and enhanced log search.
@@ -55,6 +55,12 @@ def analyze_document_failure(
             max_log_events=int(max_log_events),
             max_log_groups=20,
         )
+
+        # Truncate long messages for context management
+        for result in log_results.get("results", []):
+            for event in result.get("events", []):
+                if len(event.get("message", "")) > 300:
+                    event["message"] = event["message"][:300] + "... [truncated]"
 
         # Extract document details from context
         document_status = context.get("document_status")
@@ -94,4 +100,4 @@ def analyze_document_failure(
 
     except Exception as e:
         logger.error(f"Error analyzing document failure: {e}")
-        return {"error": str(e), "document_id": document_id}
+        return {"error": str(e)}
