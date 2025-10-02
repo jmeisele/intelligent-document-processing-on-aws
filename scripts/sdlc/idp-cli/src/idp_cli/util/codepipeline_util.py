@@ -15,8 +15,9 @@ class CodePipelineUtil:
         
         # Record trigger time
         trigger_time = time.time()
+        retry_count = 5
         
-        for attempt in range(2):  # Try twice
+        for attempt in range(retry_count):
             # Wait for pipeline to start
             time.sleep(wait_seconds)
             
@@ -25,7 +26,7 @@ class CodePipelineUtil:
             executions = response.get('pipelineExecutionSummaries', [])
             
             if not executions:
-                if attempt == 0:
+                if attempt < retry_count - 1:
                     continue  # Try again
                 raise Exception(f"No executions found for pipeline '{pipeline_name}'")
             
@@ -47,7 +48,7 @@ class CodePipelineUtil:
             
             if best_execution:
                 return best_execution['pipelineExecutionId']
-            elif attempt == 0:
+            elif attempt < retry_count - 1:
                 continue  # Try again after another wait
         
         # No InProgress execution found after retries
