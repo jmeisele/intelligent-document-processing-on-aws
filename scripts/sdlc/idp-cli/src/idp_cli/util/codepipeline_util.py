@@ -8,7 +8,23 @@ from loguru import logger
 
 class CodePipelineUtil:
     @staticmethod
-    def wait_for_pipeline_execution(pipeline_name, initial_wait_seconds=10, poll_interval_seconds=30, max_wait_minutes=90):
+    def get_execution_id_after_trigger(pipeline_name, wait_seconds=30):
+        """Get the execution ID after S3 upload triggers the pipeline"""
+        import time
+        client = boto3.client('codepipeline')
+        
+        # Wait for pipeline to start
+        time.sleep(wait_seconds)
+        
+        response = client.list_pipeline_executions(pipelineName=pipeline_name, maxResults=1)
+        executions = response.get('pipelineExecutionSummaries', [])
+        if not executions:
+            raise Exception(f"No executions found for pipeline '{pipeline_name}'")
+        
+        return executions[0]['pipelineExecutionId']
+
+    @staticmethod
+    def wait_for_pipeline_execution(pipeline_name, execution_id=None, initial_wait_seconds=10, poll_interval_seconds=30, max_wait_minutes=90):
         """
         Monitors a CodePipeline execution until completion.
         
@@ -26,21 +42,26 @@ class CodePipelineUtil:
         """
         client = boto3.client('codepipeline')
         
-        # Wait initially to ensure the pipeline has started
-        logger.info(f"Waiting {initial_wait_seconds} seconds for pipeline '{pipeline_name}' to start...")
-        time.sleep(initial_wait_seconds)
-        
-        # Get the latest execution ID to track the correct execution
-        try:
-            response = client.list_pipeline_executions(pipelineName=pipeline_name, maxResults=1)
-            executions = response.get('pipelineExecutionSummaries', [])
-            if not executions:
-                raise Exception(f"No executions found for pipeline '{pipeline_name}'")
+        # Get the execution ID to track
+        if execution_id:
+            target_execution_id = execution_id
+            logger.info(f"Monitoring provided execution: {target_execution_id}")
+        else:
+            # Wait initially to ensure the pipeline has started
+            logger.info(f"Waiting {initial_wait_seconds} seconds for pipeline '{pipeline_name}' to start...")
+            time.sleep(initial_wait_seconds)
             
-            target_execution_id = executions[0]['pipelineExecutionId']
-            logger.info(f"Monitoring execution: {target_execution_id}")
-        except Exception as e:
-            raise Exception(f"Failed to get pipeline execution ID: {str(e)}")
+            # Get the latest execution ID to track the correct execution
+            try:
+                response = client.list_pipeline_executions(pipelineName=pipeline_name, maxResults=1)
+                executions = response.get('pipelineExecutionSummaries', [])
+                if not executions:
+                    raise Exception(f"No executions found for pipeline '{pipeline_name}'")
+                
+                target_execution_id = executions[0]['pipelineExecutionId']
+                logger.info(f"Monitoring execution: {target_execution_id}")
+            except Exception as e:
+                raise Exception(f"Failed to get pipeline execution ID: {str(e)}")
         
         start_time = time.time()
         max_wait_seconds = max_wait_minutes * 60

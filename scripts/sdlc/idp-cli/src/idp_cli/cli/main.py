@@ -103,6 +103,7 @@ def smoketest(
 @app.command()
 def monitor_pipeline(
     pipeline_name: str = typer.Option(..., "--pipeline-name", help="Name of the CodePipeline to monitor"),
+    execution_id: str = typer.Option(None, "--execution-id", help="Specific execution ID to monitor"),
     initial_wait: int = typer.Option(10, "--initial-wait", help="Initial wait time in seconds before monitoring"),
     poll_interval: int = typer.Option(30, "--poll-interval", help="Time in seconds between status checks"),
     max_wait: int = typer.Option(90, "--max-wait", help="Maximum wait time in minutes")
@@ -115,6 +116,7 @@ def monitor_pipeline(
         
         CodePipelineUtil.wait_for_pipeline_execution(
             pipeline_name=pipeline_name,
+            execution_id=execution_id,
             initial_wait_seconds=initial_wait,
             poll_interval_seconds=poll_interval,
             max_wait_minutes=max_wait
