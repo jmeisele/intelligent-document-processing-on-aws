@@ -195,6 +195,26 @@ pricing:
         price: '6.0E-7'
       - name: cacheWriteInputTokens
         price: '7.5E-6'
+  - name: bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0
+    units:
+      - name: inputTokens
+        price: '3.3E-03'
+      - name: outputTokens
+        price: '1.65E-02'
+      - name: cacheReadInputTokens
+        price: '3.30E-04'
+      - name: cacheWriteInputTokens
+        price: '4.125E-03'
+  - name: bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m
+    units:
+      - name: inputTokens
+        price: '6.60E-03'
+      - name: outputTokens
+        price: '2.475E-02'
+      - name: cacheReadInputTokens
+        price: '6.60E-04'
+      - name: cacheWriteInputTokens
+        price: '8.250E-03'
   - name: bedrock/us.anthropic.claude-opus-4-20250514-v1:0
     units:
       - name: inputTokens

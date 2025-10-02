@@ -43,6 +43,8 @@ CACHEPOINT_SUPPORTED_MODELS = [
     "us.anthropic.claude-opus-4-20250514-v1:0",
     "us.anthropic.claude-sonnet-4-20250514-v1:0",
     "us.anthropic.claude-sonnet-4-20250514-v1:0:1m",
+    "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m",
     "us.amazon.nova-lite-v1:0",
     "us.amazon.nova-pro-v1:0"
 ]
