@@ -973,6 +973,15 @@ Resources:
     DependsOn:
       - IsStacknameLengthOK
     Type: AWS::KMS::Key
+    Metadata:
+      security-matrix:
+        rules_to_suppress:
+          - id: IAM-005
+            reason: "No cross-account access - only same account root and AWS services"
+          - id: KMS-007
+            reason: "KMS monitoring not required for this IDP solution - comprehensive CloudWatch monitoring already in place"
+          - id: KMS-002
+            reason: "kms:* permission for account root is standard pattern for administrative access to KMS keys"
     Properties:
       Description: KMS key for DynamoDB encryption
       EnableKeyRotation: true
@@ -1053,6 +1062,10 @@ Resources:
         rules_to_suppress:
           - id: W35
             reason: "This is the logging destination bucket - does not require its own access logging"
+      security-matrix:
+        rules_to_suppress:
+          - id: S3-001
+            reason: "This is the logging destination bucket - does not require its own access logging"
     # checkov:skip=CKV_AWS_18: "This is the logging destination bucket - does not require its own access logging"
     DeletionPolicy: Retain
     Properties:
@@ -1083,6 +1096,11 @@ Resources:
 
   LoggingBucketPolicy:
     Type: AWS::S3::BucketPolicy
+    Metadata:
+      security-matrix:
+        rules_to_suppress:
+          - id: IAM-005
+            reason: "Already has aws:SourceAccount condition for confused deputy prevention"
     Properties:
       Bucket: !Ref LoggingBucket
       PolicyDocument:
@@ -1767,6 +1785,7 @@ Resources:
 
   DocumentSectionsCrawlerSecurityConfigurationV2:
     Type: AWS::Glue::SecurityConfiguration
+    # checkov:skip=CKV_AWS_99:Encryption is already enabled with SSE-KMS
     Properties:
       Name: !Sub "${AWS::StackName}-document-sections-crawler-security-config-v2"
       EncryptionConfiguration:
@@ -4771,7 +4790,7 @@ Resources:
       Description: IP ranges allowed to access the AppSync API
       Scope: REGIONAL
       IPAddressVersion: IPV4
-      Addresses: [!Ref WAFAllowedIPv4Ranges]
+      Addresses: !Split [", ", !Ref WAFAllowedIPv4Ranges]
       
   WAFLambdaServiceIPSet:
     Type: AWS::WAFv2::IPSet
@@ -6387,6 +6406,7 @@ Resources:
         Comment: !Sub "Web app cloudfront distribution ${AWS::StackName}"
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
+          MinimumProtocolVersion: TLSv1.2_2021
         Logging:
           Bucket: !Sub "${LoggingBucket}.s3.${AWS::URLSuffix}"
           Prefix: "cloudfront-logs"

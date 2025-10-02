@@ -5,6 +5,11 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+### Fixed
+- Problem with setting correctly formatted WAF IPv4 CIDR range - #73
+
+
+
 ## [0.3.18]
 
 ### Added
