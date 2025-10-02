@@ -73,7 +73,7 @@ class TestErrorAnalyzerConfig:
 
         assert config["cloudwatch_log_group_prefix"] == "/aws/lambda/test"
         assert config["aws_stack_name"] == "test-stack"
-        assert config["max_log_events"] == 100
+        assert config["max_log_events"] == 20
         assert config["system_prompt"] == "Test system prompt for error analysis"
         assert isinstance(config["error_patterns"], list)
         assert "aws_capabilities" in config

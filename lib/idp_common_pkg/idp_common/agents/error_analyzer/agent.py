@@ -33,8 +33,16 @@ def create_error_analyzer_agent(
         pattern_config: Pattern configuration containing agents section
         **kwargs: Additional arguments
     """
-    # Load configuration (all logic in config.py)
-    config = get_error_analyzer_config(pattern_config)
+    # Debug logging to see what's being passed
+    logger.info("create_error_analyzer_agent called with:")
+    logger.info(f"  pattern_config: {pattern_config is not None}")
+    logger.info(f"  config: {config is not None}")
+    logger.info(f"  kwargs: {list(kwargs.keys())}")
+
+    # Load configuration - try pattern_config first, then fall back to config parameter
+    effective_pattern_config = pattern_config or config
+    logger.info(f"  effective_pattern_config: {effective_pattern_config is not None}")
+    config = get_error_analyzer_config(effective_pattern_config)
 
     # Create session if not provided
     if session is None:

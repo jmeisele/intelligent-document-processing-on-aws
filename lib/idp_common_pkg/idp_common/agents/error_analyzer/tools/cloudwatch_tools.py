@@ -13,7 +13,6 @@ from typing import Any, Dict
 import boto3
 from strands import tool
 
-from ..config import get_error_analyzer_config
 from .lambda_tools import get_document_context
 
 logger = logging.getLogger(__name__)
@@ -191,10 +190,9 @@ def search_document_logs(
     Search CloudWatch logs for a specific document using execution context.
     """
     try:
-        # Load configuration to get max_log_events parameter
-        config = get_error_analyzer_config()
+        # Use default if max_events_per_group not provided
         if max_events_per_group is None:
-            max_events_per_group = config.get("max_log_events", 10)
+            max_events_per_group = 10
         # Get document execution context
         context = get_document_context(document_id, stack_name)
 
@@ -334,12 +332,11 @@ def search_stack_logs(
         }
 
     try:
-        # Load configuration to get parameters
-        config = get_error_analyzer_config()
+        # Use defaults if parameters not provided
         if max_events_per_group is None:
-            max_events_per_group = config.get("max_log_events", 5)
+            max_events_per_group = 5
         if hours_back is None:
-            hours_back = config.get("time_range_hours_default", 24)
+            hours_back = 24
         logger.info(f"Starting log search for stack: {stack_name}")
         prefix_info = get_log_group_prefix(stack_name)
         logger.info(f"Prefix info result: {prefix_info}")
