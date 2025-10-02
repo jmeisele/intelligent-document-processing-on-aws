@@ -168,7 +168,7 @@ Resources:
     Properties:
       Name: !Ref PipelineName
       RoleArn: !GetAtt CodePipelineRole.Arn
-      ExecutionMode: QUEUED
+      ExecutionMode: PARALLEL
       ArtifactStore:
         Type: S3
         Location: !Ref ArtifactBucket
