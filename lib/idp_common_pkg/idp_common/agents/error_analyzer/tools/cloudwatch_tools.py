@@ -45,7 +45,7 @@ def search_cloudwatch_logs(
             "logGroupName": log_group_name,
             "startTime": int(search_start.timestamp() * 1000),
             "endTime": int(search_end.timestamp() * 1000),
-            "limit": max_events,
+            "limit": int(max_events),
         }
 
         if filter_pattern:
@@ -190,9 +190,11 @@ def search_document_logs(
     Search CloudWatch logs for a specific document using execution context.
     """
     try:
-        # Use default if max_log_events not provided
+        # Use default if max_log_events not provided and ensure int type
         if max_log_events is None:
             max_log_events = 10
+        max_log_events = int(max_log_events)
+        max_log_groups = int(max_log_groups)
         # Get document execution context
         context = get_document_context(document_id, stack_name)
 
@@ -330,11 +332,14 @@ def search_stack_logs(
         }
 
     try:
-        # Use defaults if parameters not provided
+        # Use defaults if parameters not provided and ensure int types
         if max_log_events is None:
             max_log_events = 10
         if hours_back is None:
             hours_back = 24
+        max_log_events = int(max_log_events)
+        max_log_groups = int(max_log_groups)
+        hours_back = int(hours_back)
         logger.info(f"Starting log search for stack: {stack_name}")
         prefix_info = get_log_group_prefix(stack_name)
         logger.info(f"Prefix info result: {prefix_info}")
@@ -375,9 +380,6 @@ def search_stack_logs(
 
         for group in groups_to_search:
             log_group_name = group["name"]
-            logger.info(
-                f"Searching log group: {log_group_name} with pattern '{filter_pattern}'"
-            )
 
             search_result = search_cloudwatch_logs(
                 log_group_name=log_group_name,

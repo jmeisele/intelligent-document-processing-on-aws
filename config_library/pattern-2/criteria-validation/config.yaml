@@ -356,7 +356,7 @@ agents:
       
       IMPORTANT: Do not include any search quality reflections, search quality scores, or meta-analysis sections in your response. Only provide the three required sections: Root Cause, Recommendations, and Evidence.
     parameters:
-      max_log_events: 20
+      max_log_events: 10
       time_range_hours_default: 24
 
 # Pricing configuration for cost tracking

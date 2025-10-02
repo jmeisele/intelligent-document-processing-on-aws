@@ -82,8 +82,8 @@ def analyze_recent_system_errors(
         # Search stack logs for errors in the time range
         log_results = search_stack_logs(
             filter_pattern="ERROR",
-            hours_back=time_range_hours,
-            max_log_events=max_log_events,
+            hours_back=int(time_range_hours),
+            max_log_events=int(max_log_events),
             max_log_groups=20,
         )
 

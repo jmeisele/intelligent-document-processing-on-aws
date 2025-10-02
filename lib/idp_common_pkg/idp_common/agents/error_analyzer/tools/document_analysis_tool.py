@@ -52,7 +52,7 @@ def analyze_document_failure(
             document_id=document_id,
             stack_name=stack_name,
             filter_pattern="ERROR",
-            max_log_events=max_log_events,
+            max_log_events=int(max_log_events),
             max_log_groups=20,
         )
 
