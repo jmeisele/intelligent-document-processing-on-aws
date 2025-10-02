@@ -36,9 +36,11 @@ smoketest:
 	--stack-name=$(IDP_STACK_NAME)
 
 wait:
+	$(eval EXECUTION_ID := $(shell poetry run python -c "from idp_cli.util.codepipeline_util import CodePipelineUtil; print(CodePipelineUtil.get_execution_id_after_trigger('$(IDP_PIPELINE_NAME)'))"))
 	poetry run idpcli monitor-pipeline \
 	--pipeline-name=$(IDP_PIPELINE_NAME) \
-	--initial-wait=180 \
+	--execution-id=$(EXECUTION_ID) \
+	--initial-wait=0 \
 	--max-wait=120
 
 put: zip
