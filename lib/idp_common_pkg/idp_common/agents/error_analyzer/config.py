@@ -16,29 +16,24 @@ logger = logging.getLogger(__name__)
 def get_error_analyzer_config(pattern_config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Get error analyzer configuration from pattern config or DynamoDB.
-
     Args:
         pattern_config: Optional pattern configuration containing agents section
-
     Returns:
         Dict containing error analyzer configuration values
-
     Raises:
         ValueError: If required configuration is missing
     """
     # Get base environment configuration
     required_keys = ["CLOUDWATCH_LOG_GROUP_PREFIX", "AWS_STACK_NAME"]
     config = get_environment_config(required_keys)
+    from ... import get_config
 
-    # Load pattern configuration
-    if pattern_config:
-        logger.info("Using provided pattern configuration")
-        full_config = pattern_config
-    else:
-        logger.info("Loading configuration from DynamoDB (includes UI overrides)")
-        from ... import get_config
-
-        full_config = get_config()
+    # Call get_config() to load merged configuration
+    full_config = get_config()
+    logger.info(f"get_config() returned type: {type(full_config)}")
+    logger.info(
+        f"get_config() keys: {list(full_config.keys()) if full_config else 'None'}"
+    )
 
     # Extract error analyzer configuration
     if (
@@ -58,15 +53,15 @@ def get_error_analyzer_config(pattern_config: Dict[str, Any] = None) -> Dict[str
         # Load parameters
         if "parameters" in agent_config:
             params = agent_config["parameters"]
-            config["max_log_events"] = params.get("max_log_events", 20)
+            config["max_log_events"] = params.get("max_log_events", 10)
             config["time_range_hours_default"] = params.get(
                 "time_range_hours_default", 24
             )
         else:
-            config["max_log_events"] = 20
+            config["max_log_events"] = 10
             config["time_range_hours_default"] = 24
     else:
-        logger.error("No error_analyzer configuration found in agents section")
+        logger.info("No error_analyzer configuration found in agents section")
         raise ValueError(
             "error_analyzer configuration not found in pattern configuration"
         )
@@ -90,9 +85,11 @@ def get_error_analyzer_config(pattern_config: Dict[str, Any] = None) -> Dict[str
         logger.error("model_id is missing from error_analyzer configuration")
         raise ValueError("model_id is required in error_analyzer configuration")
 
-    logger.info("Error analyzer configuration loaded successfully")
     logger.info(f"Model: {config['model_id']}")
+    logger.info(f"Max log events: {config['max_log_events']}")
+    logger.info(f"Default time range: {config['time_range_hours_default']}")
     logger.info(f"System prompt length: {len(config['system_prompt'])} characters")
+    logger.info(f"System prompt preview: {config['system_prompt'][:100]}...")
 
     return config
 

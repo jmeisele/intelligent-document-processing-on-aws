@@ -22,7 +22,7 @@ def search_cloudwatch_logs(
     log_group_name: str,
     filter_pattern: str = "",
     hours_back: int = 24,
-    max_events: int = 5,
+    max_events: int = 10,
     start_time: datetime = None,
     end_time: datetime = None,
 ) -> Dict[str, Any]:
@@ -183,16 +183,16 @@ def search_document_logs(
     document_id: str,
     stack_name: str,
     filter_pattern: str = "ERROR",
-    max_events_per_group: int = None,
-    max_log_groups: int = 15,
+    max_log_events: int = None,
+    max_log_groups: int = 20,
 ) -> Dict[str, Any]:
     """
     Search CloudWatch logs for a specific document using execution context.
     """
     try:
-        # Use default if max_events_per_group not provided
-        if max_events_per_group is None:
-            max_events_per_group = 10
+        # Use default if max_log_events not provided
+        if max_log_events is None:
+            max_log_events = 10
         # Get document execution context
         context = get_document_context(document_id, stack_name)
 
@@ -252,18 +252,16 @@ def search_document_logs(
 
         for group in groups_to_search:
             log_group_name = group["name"]
-            logger.info(f"Searching log group: {log_group_name}")
 
             # Try each search pattern
             for pattern in search_patterns:
                 if not pattern:
                     continue
 
-                logger.info(f"  Using filter pattern: '{pattern}'")
                 search_result = search_cloudwatch_logs(
                     log_group_name=log_group_name,
                     filter_pattern=pattern,
-                    max_events=max_events_per_group,
+                    max_events=max_log_events,
                     start_time=start_time,
                     end_time=end_time,
                 )
@@ -315,8 +313,8 @@ def search_document_logs(
 def search_stack_logs(
     filter_pattern: str = "ERROR",
     hours_back: int = None,
-    max_events_per_group: int = None,
-    max_log_groups: int = 15,
+    max_log_events: int = None,
+    max_log_groups: int = 20,
     start_time: datetime = None,
     end_time: datetime = None,
 ) -> Dict[str, Any]:
@@ -333,8 +331,8 @@ def search_stack_logs(
 
     try:
         # Use defaults if parameters not provided
-        if max_events_per_group is None:
-            max_events_per_group = 5
+        if max_log_events is None:
+            max_log_events = 10
         if hours_back is None:
             hours_back = 24
         logger.info(f"Starting log search for stack: {stack_name}")
@@ -385,7 +383,7 @@ def search_stack_logs(
                 log_group_name=log_group_name,
                 filter_pattern=filter_pattern,
                 hours_back=hours_back,
-                max_events=max_events_per_group,
+                max_events=max_log_events,
                 start_time=start_time,
                 end_time=end_time,
             )
@@ -415,7 +413,7 @@ def search_stack_logs(
             "log_groups_searched": len(groups_to_search),
             "log_groups_with_events": len(all_results),
             "total_events_found": total_events,
-            "max_events_per_group": max_events_per_group,
+            "max_log_events": max_log_events,
             "results": all_results,
         }
 

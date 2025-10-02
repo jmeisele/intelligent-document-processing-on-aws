@@ -35,6 +35,21 @@ def analyze_errors(query: str, time_range_hours: int = 1) -> Dict[str, Any]:
                 "analysis_summary": "Configuration error",
             }
 
+        try:
+            from ..config import get_error_analyzer_config
+
+            config = get_error_analyzer_config()
+            max_log_events = config.get("max_log_events", 10)
+            time_range_default = config.get("time_range_hours_default", 24)
+        except Exception as e:
+            logger.warning(f"Failed to load config, using defaults: {e}")
+            max_log_events = 10
+            time_range_default = 24
+
+        # Use config default if time_range_hours not specified
+        if time_range_hours == 1:  # Default parameter value
+            time_range_hours = time_range_default
+
         # Extract document context from query
         doc_patterns = [
             r"document[:\s]+([^\s]+)",
@@ -51,10 +66,12 @@ def analyze_errors(query: str, time_range_hours: int = 1) -> Dict[str, Any]:
 
         if document_id:
             # Document-specific analysis
-            return analyze_document_failure(document_id, stack_name)
+            return analyze_document_failure(document_id, stack_name, max_log_events)
         else:
             # General system analysis
-            return analyze_recent_system_errors(time_range_hours, stack_name)
+            return analyze_recent_system_errors(
+                time_range_hours, stack_name, max_log_events
+            )
 
     except Exception as e:
         logger.error(f"Error in unified analysis: {e}")

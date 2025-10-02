@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 @tool
 def analyze_recent_system_errors(
-    time_range_hours: int, stack_name: str
+    time_range_hours: int, stack_name: str, max_log_events: int = 10
 ) -> Dict[str, Any]:
     """
     Analyze recent system errors by finding failed documents and correlating with logs.
@@ -83,8 +83,8 @@ def analyze_recent_system_errors(
         log_results = search_stack_logs(
             filter_pattern="ERROR",
             hours_back=time_range_hours,
-            max_events_per_group=3,
-            max_log_groups=5,
+            max_log_events=max_log_events,
+            max_log_groups=20,
         )
 
         return {

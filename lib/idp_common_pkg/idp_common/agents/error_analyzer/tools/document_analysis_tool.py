@@ -17,7 +17,9 @@ logger = logging.getLogger(__name__)
 
 
 @tool
-def analyze_document_failure(document_id: str, stack_name: str) -> Dict[str, Any]:
+def analyze_document_failure(
+    document_id: str, stack_name: str, max_log_events: int = 10
+) -> Dict[str, Any]:
     """
     Analyze failure for a specific document using lookup function and enhanced log search.
 
@@ -50,8 +52,8 @@ def analyze_document_failure(document_id: str, stack_name: str) -> Dict[str, Any
             document_id=document_id,
             stack_name=stack_name,
             filter_pattern="ERROR",
-            max_events_per_group=10,
-            max_log_groups=10,
+            max_log_events=max_log_events,
+            max_log_groups=20,
         )
 
         # Extract document details from context

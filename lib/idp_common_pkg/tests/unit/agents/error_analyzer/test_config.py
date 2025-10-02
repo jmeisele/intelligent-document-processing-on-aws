@@ -58,10 +58,19 @@ class TestErrorAnalyzerConfig:
         {
             "CLOUDWATCH_LOG_GROUP_PREFIX": "/aws/lambda/test",
             "AWS_STACK_NAME": "test-stack",
+            "CONFIGURATION_TABLE_NAME": "test-config-table",
         },
     )
-    def test_get_error_analyzer_config(self):
+    @patch("idp_common.get_config")
+    def test_get_error_analyzer_config(self, mock_get_config):
         """Test error analyzer configuration loading."""
+        mock_get_config.return_value = {
+            "agents": {
+                "error_analyzer": {
+                    "system_prompt": "Test system prompt for error analysis"
+                }
+            }
+        }
         pattern_config = {
             "agents": {
                 "error_analyzer": {
@@ -73,7 +82,7 @@ class TestErrorAnalyzerConfig:
 
         assert config["cloudwatch_log_group_prefix"] == "/aws/lambda/test"
         assert config["aws_stack_name"] == "test-stack"
-        assert config["max_log_events"] == 20
+        assert config["max_log_events"] == 10
         assert config["system_prompt"] == "Test system prompt for error analysis"
         assert isinstance(config["error_patterns"], list)
         assert "aws_capabilities" in config
@@ -85,10 +94,19 @@ class TestErrorAnalyzerConfig:
             "CLOUDWATCH_LOG_GROUP_PREFIX": "/aws/lambda/test",
             "AWS_STACK_NAME": "test-stack",
             "LOG_LEVEL": "DEBUG",
+            "CONFIGURATION_TABLE_NAME": "test-config-table",
         },
     )
-    def test_get_error_analyzer_config_with_log_level(self):
+    @patch("idp_common.get_config")
+    def test_get_error_analyzer_config_with_log_level(self, mock_get_config):
         """Test configuration with custom log level."""
+        mock_get_config.return_value = {
+            "agents": {
+                "error_analyzer": {
+                    "system_prompt": "Test system prompt with debug logging"
+                }
+            }
+        }
         pattern_config = {
             "agents": {
                 "error_analyzer": {
