@@ -23,13 +23,8 @@ def _is_valid_document_id(doc_id: str) -> bool:
     if not doc_id or len(doc_id) < 3:
         return False
 
-    # Reject common words that aren't document IDs
-    invalid_words = {"processing", "failure", "error", "analysis", "system", "recent"}
-    if doc_id.lower() in invalid_words:
-        return False
-
-    # Accept if it has file extension or looks like a path/key
-    if "." in doc_id or "/" in doc_id or len(doc_id) > 10:
+    # Accept if it has file extension or looks like a path
+    if "." in doc_id or "/" in doc_id or len(doc_id) > 4:
         return True
 
     return False
@@ -54,7 +49,7 @@ def _classify_query_intent(query: str) -> Tuple[str, str]:
                 return ("document_specific", document_id)
 
     # If no specific document pattern found, it's general analysis
-    return ("general_analysis", None)
+    return ("general_analysis", "")
 
 
 @tool
