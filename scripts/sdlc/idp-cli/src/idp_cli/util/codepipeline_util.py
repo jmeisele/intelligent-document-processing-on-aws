@@ -13,15 +13,45 @@ class CodePipelineUtil:
         import time
         client = boto3.client('codepipeline')
         
-        # Wait for pipeline to start
-        time.sleep(wait_seconds)
+        # Record trigger time
+        trigger_time = time.time()
         
-        response = client.list_pipeline_executions(pipelineName=pipeline_name, maxResults=1)
-        executions = response.get('pipelineExecutionSummaries', [])
-        if not executions:
-            raise Exception(f"No executions found for pipeline '{pipeline_name}'")
+        for attempt in range(2):  # Try twice
+            # Wait for pipeline to start
+            time.sleep(wait_seconds)
+            
+            # Get recent executions and find InProgress one closest to our trigger time
+            response = client.list_pipeline_executions(pipelineName=pipeline_name, maxResults=5)
+            executions = response.get('pipelineExecutionSummaries', [])
+            
+            if not executions:
+                if attempt == 0:
+                    continue  # Try again
+                raise Exception(f"No executions found for pipeline '{pipeline_name}'")
+            
+            # Find InProgress execution that started closest to our trigger time
+            best_execution = None
+            min_time_diff = float('inf')
+            
+            for execution in executions:
+                # Only consider InProgress executions
+                if execution['status'] != 'InProgress':
+                    continue
+                    
+                start_time = execution['startTime'].timestamp()
+                time_diff = abs(start_time - trigger_time)
+                
+                if time_diff < min_time_diff:
+                    min_time_diff = time_diff
+                    best_execution = execution
+            
+            if best_execution:
+                return best_execution['pipelineExecutionId']
+            elif attempt == 0:
+                continue  # Try again after another wait
         
-        return executions[0]['pipelineExecutionId']
+        # No InProgress execution found after retries
+        raise Exception(f"No InProgress execution found for pipeline '{pipeline_name}' after {trigger_time}")
 
     @staticmethod
     def wait_for_pipeline_execution(pipeline_name, execution_id=None, initial_wait_seconds=10, poll_interval_seconds=30, max_wait_minutes=90):
