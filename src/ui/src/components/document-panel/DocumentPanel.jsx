@@ -24,6 +24,7 @@ import useConfiguration from '../../hooks/use-configuration';
 import { getDocumentConfidenceAlertCount } from '../common/confidence-alerts-utils';
 import { renderHitlStatus } from '../common/hitl-status-renderer';
 import StepFunctionFlowViewer from '../step-function-flow/StepFunctionFlowViewer';
+import TroubleshootModal from './TroubleshootModal';
 // Uncomment the line below to enable debugging
 // import { debugDocumentStructure } from '../common/debug-utils';
 
@@ -457,6 +458,10 @@ export const DocumentPanel = ({ item, setToolsOpen, getDocumentDetailsFromIds, o
 
   // State for Step Function flow viewer
   const [isFlowViewerVisible, setIsFlowViewerVisible] = useState(false);
+  // State for Troubleshoot modal
+  const [isTroubleshootModalVisible, setIsTroubleshootModalVisible] = useState(false);
+  // State for tracking troubleshoot jobs per document
+  const [troubleshootJobs, setTroubleshootJobs] = useState({});
 
   // Fetch configuration for dynamic confidence threshold
   const { mergedConfig } = useConfiguration();
@@ -475,6 +480,18 @@ export const DocumentPanel = ({ item, setToolsOpen, getDocumentDetailsFromIds, o
             variant="h2"
             actions={
               <SpaceBetween direction="horizontal" size="xs">
+                {item?.objectStatus === 'FAILED' && (
+                  <Button
+                    iconName="gen-ai"
+                    variant="normal"
+                    onClick={() => {
+                      logger.info('Opening troubleshoot modal for failed document:', item.objectKey);
+                      setIsTroubleshootModalVisible(true);
+                    }}
+                  >
+                    Troubleshoot
+                  </Button>
+                )}
                 {item?.executionArn && (
                   <Button
                     iconName="status-positive"
@@ -536,6 +553,20 @@ export const DocumentPanel = ({ item, setToolsOpen, getDocumentDetailsFromIds, o
           onDismiss={() => setIsFlowViewerVisible(false)}
         />
       )}
+
+      {/* Troubleshoot Modal */}
+      <TroubleshootModal
+        visible={isTroubleshootModalVisible}
+        onDismiss={() => setIsTroubleshootModalVisible(false)}
+        documentItem={item}
+        existingJob={troubleshootJobs[item?.objectKey]}
+        onJobUpdate={(jobData) => {
+          setTroubleshootJobs((prev) => ({
+            ...prev,
+            [item.objectKey]: jobData,
+          }));
+        }}
+      />
     </SpaceBetween>
   );
 };

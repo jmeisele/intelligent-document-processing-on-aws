@@ -36,14 +36,18 @@ smoketest:
 	--stack-name=$(IDP_STACK_NAME)
 
 wait:
+	$(eval VERSION_ID := $(shell cat $(IDP_CWD)/.upload_version_id 2>/dev/null || echo ""))
+	$(eval EXECUTION_ID := $(shell poetry run python -c "from idp_cli.util.codepipeline_util import CodePipelineUtil; print(CodePipelineUtil.get_execution_id_by_version('$(IDP_PIPELINE_NAME)', '$(VERSION_ID)'))"))
 	poetry run idpcli monitor-pipeline \
 	--pipeline-name=$(IDP_PIPELINE_NAME) \
-	--initial-wait=180 \
+	--execution-id=$(EXECUTION_ID) \
+	--initial-wait=0 \
 	--max-wait=120
 
 put: zip
-	cd $(IDP_CWD) && \
-	aws s3 cp ./dist/code.zip s3://$(SDLC_SOURCE_CODE_BUCKET)/deploy/code.zip --force
+	$(eval VERSION_ID := $(shell cd $(IDP_CWD) && aws s3api put-object --bucket $(SDLC_SOURCE_CODE_BUCKET) --key deploy/code.zip --body ./dist/code.zip --query 'VersionId' --output text))
+	@echo "Uploaded with version ID: $(VERSION_ID)"
+	@echo "$(VERSION_ID)" > $(IDP_CWD)/.upload_version_id
 
 zip:
 	cd $(IDP_CWD) && \

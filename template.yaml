@@ -3632,6 +3632,7 @@ Resources:
           DOCUMENT_ANALYSIS_AGENT_MODEL_ID: !Ref DocumentAnalysisAgentModelId
           AWS_STACK_NAME: !Ref AWS::StackName
           GUARDRAIL_ID_AND_VERSION: !If [HasGuardrailConfig, !Sub "${BedrockGuardrailId}:${BedrockGuardrailVersion}", ""]
+          CLOUDWATCH_LOG_GROUP_PREFIX: !Sub "/aws/lambda/${AWS::StackName}"
       LoggingConfig:
         LogGroup: !Ref AgentProcessorLogGroup
       Policies:
@@ -3706,6 +3707,47 @@ Resources:
                 - secretsmanager:GetSecretValue
               Resource: 
                 - !Ref ExternalMCPAgentsSecret
+            - Effect: Allow
+              Action:
+                - logs:DescribeLogGroups
+                - logs:DescribeLogStreams
+                - logs:FilterLogEvents
+                - logs:GetLogEvents
+              Resource:
+                - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/${AWS::StackName}*"
+                - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}*"
+            - Effect: Allow
+              Action:
+                - logs:DescribeLogGroups
+              Resource:
+                - "*"
+            - Effect: Allow
+              Action:
+                - dynamodb:DescribeTable
+                - dynamodb:Scan
+                - dynamodb:Query
+                - dynamodb:GetItem
+                - dynamodb:ListTables
+              Resource:
+                - !GetAtt ConfigurationTable.Arn
+                - !Sub "${ConfigurationTable.Arn}/*"
+                - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}*"
+            - Effect: Allow
+              Action:
+                - dynamodb:ListTables
+              Resource:
+                - "*"
+            - Effect: Allow
+              Action:
+                - cloudformation:DescribeStackResources
+                - cloudformation:DescribeStacks
+              Resource:
+                - !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*"
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource:
+                - !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}*"
 
   AgentProcessorLogGroup:
     Type: AWS::Logs::LogGroup
@@ -4748,7 +4790,7 @@ Resources:
       Description: IP ranges allowed to access the AppSync API
       Scope: REGIONAL
       IPAddressVersion: IPV4
-      Addresses: [!Ref WAFAllowedIPv4Ranges]
+      Addresses: !Split [", ", !Ref WAFAllowedIPv4Ranges]
       
   WAFLambdaServiceIPSet:
     Type: AWS::WAFv2::IPSet

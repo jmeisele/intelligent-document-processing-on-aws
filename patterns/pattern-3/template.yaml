@@ -458,7 +458,7 @@ Resources:
                     # This controls the layout of the form fields inside each attribute item
                     columns: 2
           extraction:
-            order: 4
+            order: 3
             type: object
             format: section
             sectionLabel: Extraction Inference
@@ -538,7 +538,7 @@ Resources:
                 description: "(Optional) ARN of a Lambda function to generate custom extraction prompts. Function name must start with 'GENAIIDP-'. If not provided, default prompts will be used. The Lambda function receives the complete config, prompt placeholders, default task prompt content, and serialized document, and returns custom system_prompt and task_prompt_content. Example: arn:${AWS::Partition}:lambda:us-east-1:123456789012:function:GENAIIDP-my-extractor"
                 order: 8
           assessment:
-            order: 5
+            order: 4
             type: object
             sectionLabel: Assessment Inference
             properties:
@@ -647,7 +647,7 @@ Resources:
                 description: Task prompt - supports placeholders {DOCUMENT_TEXT} (markdown text), {OCR_TEXT_CONFIDENCE} (OCR text blocks with confidence), {DOCUMENT_CLASS}, {ATTRIBUTE_NAMES_AND_DESCRIPTIONS}, {EXTRACTION_RESULTS}, {GRANULAR_CONTEXT} and {DOCUMENT_IMAGE}. Use <<CACHEPOINT>> to separate static and dynamic elements of prompt for Bedrock prompt caching.
                 order: 9
           summarization:
-            order: 6
+            order: 5
             type: object
             sectionLabel: Summarization Inference
             properties:
@@ -688,7 +688,7 @@ Resources:
                 description: Task prompt - supports parameter {DOCUMENT_TEXT}. Optionally use <<CACHEPOINT>> to separate static and dynamic elements of prompt for Bedrock prompt caching.
                 order: 7
           evaluation:
-            order: 7
+            order: 6
             type: object
             sectionLabel: Evaluation Inference
             properties:
@@ -729,7 +729,7 @@ Resources:
                     description: Task prompt for LLM evaluation - supports placeholders {DOCUMENT_CLASS}, {ATTRIBUTE_NAME}, {ATTRIBUTE_DESCRIPTION}, {EXPECTED_VALUE} and {ACTUAL_VALUE}
                     order: 7
           discovery:
-            order: 5
+            order: 7
             type: object
             sectionLabel: Discovery Configuration
             description: Configuration for document class discovery functionality
@@ -836,8 +836,45 @@ Resources:
                     description: Sample JSON format for discovery output
                     default: "{\n  \"document_class\": \"Form-1040\",\n  \"document_description\": \"Brief summary of the document\",\n  \"groups\": [\n    {\n      \"name\": \"PersonalInformation\",\n      \"description\": \"Personal information of Tax payer\",\n      \"attributeType\": \"group\",\n      \"groupType\": \"normal\",\n      \"groupAttributes\": [\n        {\n          \"name\": \"FirstName\",\n          \"dataType\": \"string\",\n          \"description\": \"First Name of Taxpayer\"\n        },\n        {\n          \"name\": \"Age\",\n          \"dataType\": \"number\",\n          \"description\": \"Age of Taxpayer\"\n        }\n      ]\n    }\n  ]\n}"
                     order: 0
-          pricing:
+          agents:
             order: 8
+            type: object
+            sectionLabel: Agent Configuration
+            description: Configuration for AI agents used in the system
+            properties:
+              error_analyzer:
+                type: object
+                sectionLabel: Error Analysis Agent
+                description: Configuration for the error analysis agent
+                properties:
+                  model_id:
+                    type: string
+                    description: Model ID for the error analysis agent
+                    enum: ["anthropic.claude-3-sonnet-20240229-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0"]
+                    default: "us.anthropic.claude-sonnet-4-20250514-v1:0"
+                    order: 0
+                  system_prompt:
+                    type: string
+                    format: textarea
+                    description: System prompt for the error analysis agent
+                    order: 1
+                  parameters:
+                    type: object
+                    sectionLabel: Agent Parameters
+                    description: Configuration parameters for the agent
+                    properties:
+                      max_log_events:
+                        type: integer
+                        description: Maximum number of log events to analyze
+                        default: 100
+                        order: 0
+                      time_range_hours_default:
+                        type: integer
+                        description: Default time range in hours for analysis
+                        default: 24
+                        order: 2
+          pricing:
+            order: 9
             type: array
             sectionLabel: Pricing (Estimates only - check https://aws.amazon.com/bedrock/pricing/ & https://aws.amazon.com/textract/pricing/)
             listLabel: Services

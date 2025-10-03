@@ -5,6 +5,23 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+## [0.3.19]
+
+### Added
+
+- **Error Analyzer (Troubleshooting Tool) for AI-Powered Failure Diagnosis**
+  - Introduced intelligent AI-powered troubleshooting agent that automatically diagnoses document processing failures using Claude Sonnet 4 with the Strands agent framework
+  - **Key Capabilities**: Natural language query interface, intelligent routing between document-specific and system-wide analysis, multi-source data correlation (CloudWatch Logs, DynamoDB, Step Functions), root cause identification with actionable recommendations, evidence-based analysis with collapsible log details
+  - **Web UI Integration**: Accessible via "Troubleshoot" button on failed documents with real-time job status, progress tracking, automatic job resumption, and formatted results (Root Cause, Recommendations, Evidence sections)
+  - **Tool Ecosystem**: 8 specialized tools including analyze_errors (main router), analyze_document_failure, analyze_recent_system_errors, CloudWatch log search tools, DynamoDB integration tools, and Lambda context retrieval - additional tools will be added as the feature evolves.
+  - **Configuration**: Configurable via Web UI including model selection (Claude Sonnet 4 recommended), system prompt customization, max_log_events (default: 5), and time_range_hours_default (default: 24)
+  - **Documentation**: Comprehensive guide in `docs/error-analyzer.md` with architecture diagrams, usage examples, best practices, troubleshooting guide.
+
+### Fixed
+- Problem with setting correctly formatted WAF IPv4 CIDR range - #73
+
+
+
 ## [0.3.18]
 
 ### Added

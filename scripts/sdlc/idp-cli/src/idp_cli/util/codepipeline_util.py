@@ -8,7 +8,8 @@ from loguru import logger
 
 class CodePipelineUtil:
     @staticmethod
-    def wait_for_pipeline_execution(pipeline_name, initial_wait_seconds=10, poll_interval_seconds=30, max_wait_minutes=90):
+    @staticmethod
+    def wait_for_pipeline_execution(pipeline_name, execution_id=None, initial_wait_seconds=10, poll_interval_seconds=30, max_wait_minutes=90):
         """
         Monitors a CodePipeline execution until completion.
         
@@ -26,21 +27,26 @@ class CodePipelineUtil:
         """
         client = boto3.client('codepipeline')
         
-        # Wait initially to ensure the pipeline has started
-        logger.info(f"Waiting {initial_wait_seconds} seconds for pipeline '{pipeline_name}' to start...")
-        time.sleep(initial_wait_seconds)
-        
-        # Get the latest execution ID to track the correct execution
-        try:
-            response = client.list_pipeline_executions(pipelineName=pipeline_name, maxResults=1)
-            executions = response.get('pipelineExecutionSummaries', [])
-            if not executions:
-                raise Exception(f"No executions found for pipeline '{pipeline_name}'")
+        # Get the execution ID to track
+        if execution_id:
+            target_execution_id = execution_id
+            logger.info(f"Monitoring provided execution: {target_execution_id}")
+        else:
+            # Wait initially to ensure the pipeline has started
+            logger.info(f"Waiting {initial_wait_seconds} seconds for pipeline '{pipeline_name}' to start...")
+            time.sleep(initial_wait_seconds)
             
-            target_execution_id = executions[0]['pipelineExecutionId']
-            logger.info(f"Monitoring execution: {target_execution_id}")
-        except Exception as e:
-            raise Exception(f"Failed to get pipeline execution ID: {str(e)}")
+            # Get the latest execution ID to track the correct execution
+            try:
+                response = client.list_pipeline_executions(pipelineName=pipeline_name, maxResults=1)
+                executions = response.get('pipelineExecutionSummaries', [])
+                if not executions:
+                    raise Exception(f"No executions found for pipeline '{pipeline_name}'")
+                
+                target_execution_id = executions[0]['pipelineExecutionId']
+                logger.info(f"Monitoring execution: {target_execution_id}")
+            except Exception as e:
+                raise Exception(f"Failed to get pipeline execution ID: {str(e)}")
         
         start_time = time.time()
         max_wait_seconds = max_wait_minutes * 60
@@ -79,9 +85,8 @@ class CodePipelineUtil:
                     logger.error(message)
                     raise Exception(message)
                 elif status == 'Superseded':
-                    message = f"Pipeline '{pipeline_name}' execution was superseded by a newer execution"
-                    logger.error(message)
-                    raise Exception(message)
+                    logger.info(f"Pipeline '{pipeline_name}' execution was superseded but continues running in parallel mode")
+                    # Continue monitoring - superseded executions still run to completion in parallel mode
                 else:
                     logger.warning(f"Unknown pipeline status: {status}")
                 
@@ -272,3 +277,31 @@ class CodePipelineUtil:
             all_logs.append("")  # Add a blank line between actions
         
         return all_logs
+
+    @staticmethod
+    def get_execution_id_by_version(pipeline_name, version_id, wait_seconds=30):
+        """Get execution ID by matching S3 version ID"""
+        import time
+        client = boto3.client('codepipeline')
+        
+        if not version_id:
+            raise Exception("Version ID is required")
+        
+        retry_count = 5
+        
+        for attempt in range(retry_count):
+            time.sleep(wait_seconds)
+            
+            response = client.list_pipeline_executions(pipelineName=pipeline_name, maxResults=10)
+            executions = response.get('pipelineExecutionSummaries', [])
+            
+            for execution in executions:
+                source_revisions = execution.get('sourceRevisions', [])
+                if source_revisions and source_revisions[0].get('revisionId') == version_id:
+                    logger.info(f"Found execution {execution['pipelineExecutionId']} for version {version_id}")
+                    return execution['pipelineExecutionId']
+            
+            if attempt < retry_count - 1:
+                logger.info(f"Version {version_id} not found, retrying... (attempt {attempt + 1}/{retry_count})")
+        
+        raise Exception(f"No execution found for version ID {version_id}")
