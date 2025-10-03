@@ -43,6 +43,8 @@ CACHEPOINT_SUPPORTED_MODELS = [
     "us.anthropic.claude-opus-4-20250514-v1:0",
     "us.anthropic.claude-sonnet-4-20250514-v1:0",
     "us.anthropic.claude-sonnet-4-20250514-v1:0:1m",
+    "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m",
     "us.amazon.nova-lite-v1:0",
     "us.amazon.nova-pro-v1:0"
 ]
@@ -269,8 +271,9 @@ class BedrockClient:
         # Initialize inference config with temperature
         inference_config = {"temperature": temperature}
         
-        # Handle top_p parameter
-        if top_p is not None:
+        # Handle top_p parameter - only use if temperature is 0 or not specified
+        # Some models don't allow both temperature and top_p to be specified
+        if top_p is not None and temperature == 0.0:
             # Convert top_p to float if it's a string
             if isinstance(top_p, str):
                 try:
@@ -279,7 +282,10 @@ class BedrockClient:
                     logger.warning(f"Failed to convert top_p value '{top_p}' to float. Not using top_p.")
                     top_p = None
             
-            inference_config["topP"] = top_p
+            if top_p is not None:
+                inference_config["topP"] = top_p
+                # Remove temperature when using top_p to avoid conflicts
+                del inference_config["temperature"]
         
         # Handle max_tokens parameter
         if max_tokens is not None:
