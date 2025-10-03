@@ -24,10 +24,9 @@ SPDX-License-Identifier: MIT-0
 
 
 ### Fixed
-- Problem with setting correctly formatted WAF IPv4 CIDR range - #73
+- **Problem with setting correctly formatted WAF IPv4 CIDR range** - #73
 
-### Fixed
-- **Fixed Duplicate Step Functions Executions on Document Reprocess - [GitHub Issue #66](https://github.com/aws-solutions-library-samples/accelerated-intelligent-document-processing-on-aws/issues/66)**
+- **Duplicate Step Functions Executions on Document Reprocess - [GitHub Issue #66](https://github.com/aws-solutions-library-samples/accelerated-intelligent-document-processing-on-aws/issues/66)**
   - Eliminated duplicate workflow executions when reprocessing large documents (>40MB, 500+ pages)
   - **Root Cause**: S3 `copy_object` operations were triggering multiple "Object Created" events for large files, causing `queue_sender` to create duplicate document entries and workflow executions
   - **Solution**: Refactored `reprocess_document_resolver` to directly create fresh Document objects and queue to SQS, completely bypassing S3 event notifications
