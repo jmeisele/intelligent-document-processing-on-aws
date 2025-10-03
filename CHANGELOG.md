@@ -5,7 +5,73 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+
+## [0.3.19]
+
 ### Added
+
+- **Error Analyzer (Troubleshooting Tool) for AI-Powered Failure Diagnosis**
+  - Introduced intelligent AI-powered troubleshooting agent that automatically diagnoses document processing failures using Claude Sonnet 4 with the Strands agent framework
+  - **Key Capabilities**: Natural language query interface, intelligent routing between document-specific and system-wide analysis, multi-source data correlation (CloudWatch Logs, DynamoDB, Step Functions), root cause identification with actionable recommendations, evidence-based analysis with collapsible log details
+  - **Web UI Integration**: Accessible via "Troubleshoot" button on failed documents with real-time job status, progress tracking, automatic job resumption, and formatted results (Root Cause, Recommendations, Evidence sections)
+  - **Tool Ecosystem**: 8 specialized tools including analyze_errors (main router), analyze_document_failure, analyze_recent_system_errors, CloudWatch log search tools, DynamoDB integration tools, and Lambda context retrieval - additional tools will be added as the feature evolves.
+  - **Configuration**: Configurable via Web UI including model selection (Claude Sonnet 4 recommended), system prompt customization, max_log_events (default: 5), and time_range_hours_default (default: 24)
+  - **Documentation**: Comprehensive guide in `docs/error-analyzer.md` with architecture diagrams, usage examples, best practices, troubleshooting guide.
+
+- **Claude Sonnet 4.5 Model Support**
+  - Added support for Claude Sonnet 4.5 and Claude Sonnet 4.5 - Long Context models
+  - Available for configuration across all document processing steps
+
+
+### Fixed
+- **Problem with setting correctly formatted WAF IPv4 CIDR range** - #73
+
+- **Duplicate Step Functions Executions on Document Reprocess - [GitHub Issue #66](https://github.com/aws-solutions-library-samples/accelerated-intelligent-document-processing-on-aws/issues/66)**
+  - Eliminated duplicate workflow executions when reprocessing large documents (>40MB, 500+ pages)
+  - **Root Cause**: S3 `copy_object` operations were triggering multiple "Object Created" events for large files, causing `queue_sender` to create duplicate document entries and workflow executions
+  - **Solution**: Refactored `reprocess_document_resolver` to directly create fresh Document objects and queue to SQS, completely bypassing S3 event notifications
+  - **Benefits**: Eliminates unnecessary S3 copy operations (cost savings)
+
+## [0.3.18]
+
+### Added
+
+- **Lambda Function Execution Cost Metering for Complete Cost Visibility**
+  - Added Lambda execution cost tracking to all core processing functions across all three processing patterns
+  - **Dual Metrics**: Tracks both invocation counts ($0.20 per 1M requests) and GB-seconds duration ($16.67 per 1M GB-seconds) aligned with official AWS Lambda pricing
+  - **Context-Specific Tracking**: Separate cost attribution for each processing step enabling granular cost analysis per document processing context
+  - **Automatic Integration**: Lambda costs automatically integrate with existing cost reporting infrastructure and appear alongside AWS service costs (Textract, Bedrock, SageMaker)
+  - **Configuration Integration**: Added Lambda pricing entries to all 7 configuration files in `config_library/` using official US East pricing
+
+### Fixed
+- Defect in v0.3.17 causing workflow tracker failure to (1) update status of failed workflows, and (2) update reporting database for all workflows #72
+
+
+## [0.3.17]
+
+### Added
+
+- **Edit Sections Feature for Modifying Class/Type and Reprocessing Extraction**
+  - Added Edit Sections interface for Pattern-2 and Pattern-3 workflows with reprocessing optimization
+  - **Key Features**: Section management (create, update, delete), classification updates, page reassignment with overlap detection, real-time validation
+  - **Selective Reprocessing**: Only modified sections are reprocessed while preserving existing data for unmodified sections
+  - **Processing Pipeline**: All functions (OCR/Classification/Extraction/Assessment) automatically skip redundant operations based on data presence
+  - **Pattern Compatibility**: Full functionality for Pattern-2/Pattern-3, informative modal for Pattern-1 explaining BDA not yet supported
+
+- **Analytics Agent Schema Optimization for Improved Performance**
+  - **Embedded Database Overview**: Complete table listing and guidance embedded directly in system prompt (no tool call needed)
+  - **On-Demand Detailed Schemas**: `get_table_info(['specific_tables'])` loads detailed column information only for tables actually needed by the query
+  - **Significant Performance Gains**: Eliminates redundant tool calls on every query while maintaining token efficiency
+  - **Enhanced SQL Guidance**: Comprehensive Athena/Trino function reference with explicit PostgreSQL operator warnings to prevent common query failures like `~` regex operator mistakes
+  - **Faster Time-to-Query**: Agent has immediate access to table overview and can proceed directly to detailed schema loading for relevant tables
+
+### Changed
+- Add UI code lint/validation to publish.py script
+
+### Fixed
+- Fix missing data in Glue tables when using a document class that contains a dash (-). 
+- Added optional Bedrock Guardrails support to (a) Agent Analytics and (b) Chat with Document
+- Fixed regressions on Permission Boundary support for all roles, and added autimated tests to prevent recurrance - fixes #70
 
 ## [0.3.16]
 

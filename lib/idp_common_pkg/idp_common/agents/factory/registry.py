@@ -20,6 +20,7 @@ Example:
 import logging
 
 from ..analytics.agent import create_analytics_agent
+from ..error_analyzer.agent import create_error_analyzer_agent
 
 # from ..sample_calculator.agent import create_sample_calculator_agent  # Commented out - kept as reference for developers
 from .agent_factory import IDPAgentFactory
@@ -46,6 +47,25 @@ agent_factory.register_agent(
         "How many input and output tokens have I processed in each of the last 10 days?",
         "What are the most common document types processed?",
         "In extracted W2 forms, what is the average state tax paid?",
+    ],
+)
+
+# Register error analyzer agent
+agent_factory.register_agent(
+    agent_id="Error-Analyzer-Agent-v1",
+    agent_name="Error Analyzer Agent",
+    agent_description="""
+    Provides intelligent error analysis and troubleshooting capabilities for the GenAI IDP system.
+    This agent analyzes CloudWatch logs and DynamoDB operations to identify system issues,
+    performance bottlenecks, and provides actionable recommendations for resolution.
+    Capabilities include error pattern detection, and root cause analysis.
+    """,
+    creator_func=create_error_analyzer_agent,
+    sample_queries=[
+        "Analyze recent errors in document processing",
+        "Investigate CloudWatch errors in the last 6 hours",
+        "Find DynamoDB throttling issues",
+        "Validate system performance and identify bottlenecks",
     ],
 )
 

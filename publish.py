@@ -58,6 +58,7 @@ class IDPPublisher:
         self.cf_client = None
         self._is_lib_changed = False
         self.skip_validation = False
+        self.lint_enabled = True
 
     def clean_checksums(self):
         """Delete all .checksum files in main, patterns, options, and lib directories"""
@@ -116,11 +117,77 @@ class IDPPublisher:
                 f"[red]❌ {component} build failed (use --verbose for details)[/red]"
             )
 
-    def run_subprocess_with_logging(self, cmd, component_name, cwd=None):
+    def run_subprocess_with_logging(
+        self, cmd, component_name, cwd=None, realtime=False
+    ):
         """Run subprocess with standardized logging"""
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
-        if result.returncode != 0:
-            error_msg = f"""Command failed: {" ".join(cmd)}
+        if realtime:
+            # Real-time output for long-running processes like npm install
+            self.console.print(f"[cyan]Running: {' '.join(cmd)}[/cyan]")
+
+            try:
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    cwd=cwd,
+                    bufsize=1,
+                    universal_newlines=True,
+                )
+
+                output_lines = []
+                while True:
+                    output = process.stdout.readline()
+                    if output == "" and process.poll() is not None:
+                        break
+                    if output:
+                        line = output.strip()
+                        output_lines.append(line)
+                        # Show progress for npm commands
+                        if "npm" in " ".join(cmd):
+                            if any(
+                                keyword in line.lower()
+                                for keyword in [
+                                    "downloading",
+                                    "installing",
+                                    "added",
+                                    "updated",
+                                    "audited",
+                                ]
+                            ):
+                                self.console.print(f"[dim]  {line}[/dim]")
+                            elif "warn" in line.lower():
+                                self.console.print(f"[yellow]  {line}[/yellow]")
+                            elif "error" in line.lower():
+                                self.console.print(f"[red]  {line}[/red]")
+
+                return_code = process.poll()
+
+                if return_code != 0:
+                    error_msg = f"""Command failed: {" ".join(cmd)}
+Working directory: {cwd or os.getcwd()}
+Return code: {return_code}
+
+OUTPUT:
+{chr(10).join(output_lines)}"""
+                    print(error_msg)
+                    self.log_error_details(component_name, error_msg)
+                    return False, error_msg
+
+                return True, None  # Success, no result object needed for real-time
+
+            except Exception as e:
+                error_msg = (
+                    f"Failed to execute command: {' '.join(cmd)}\nError: {str(e)}"
+                )
+                self.log_error_details(component_name, error_msg)
+                return False, error_msg
+        else:
+            # Original behavior - capture all output
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+            if result.returncode != 0:
+                error_msg = f"""Command failed: {" ".join(cmd)}
 Working directory: {cwd or os.getcwd()}
 Return code: {result.returncode}
 
@@ -129,10 +196,10 @@ STDOUT:
 
 STDERR:
 {result.stderr}"""
-            print(error_msg)
-            self.log_error_details(component_name, error_msg)
-            return False, error_msg
-        return True, result
+                print(error_msg)
+                self.log_error_details(component_name, error_msg)
+                return False, error_msg
+            return True, result
 
     def print_error_summary(self):
         """Print summary of all build errors"""
@@ -159,7 +226,7 @@ STDERR:
         """Print usage information with Rich formatting"""
         self.console.print("\n[bold cyan]Usage:[/bold cyan]")
         self.console.print(
-            "  python3 publish.py <cfn_bucket_basename> <cfn_prefix> <region> [public] [--max-workers N] [--verbose] [--no-validate] [--clean-build]"
+            "  python3 publish.py <cfn_bucket_basename> <cfn_prefix> <region> [public] [--max-workers N] [--verbose] [--no-validate] [--clean-build] [--lint on|off]"
         )
 
         self.console.print("\n[bold cyan]Parameters:[/bold cyan]")
@@ -185,6 +252,9 @@ STDERR:
         )
         self.console.print(
             "  [yellow][--clean-build][/yellow]: Optional. Delete all .checksum files to force full rebuild"
+        )
+        self.console.print(
+            "  [yellow][--lint on|off][/yellow]: Optional. Enable/disable UI linting and build validation (default: on)"
         )
 
     def check_parameters(self, args):
@@ -248,6 +318,19 @@ STDERR:
                 self.console.print(
                     "[yellow]CloudFormation template validation will be skipped[/yellow]"
                 )
+            elif arg == "--lint":
+                if i + 1 >= len(remaining_args):
+                    self.console.print(
+                        "[red]Error: --lint requires 'on' or 'off'[/red]"
+                    )
+                    self.print_usage()
+                    sys.exit(1)
+                lint_value = remaining_args[i + 1].lower()
+                if lint_value not in ["on", "off"]:
+                    self.console.print("[red]Error: --lint must be 'on' or 'off'[/red]")
+                    self.print_usage()
+                    sys.exit(1)
+                self.lint_enabled = lint_value == "on"
             elif arg == "--clean-build":
                 self.clean_checksums()
             else:
@@ -1104,51 +1187,109 @@ except Exception as e:
             f"[green]Configuration library uploaded to s3://{self.bucket}/{self.prefix_and_version}/config_library[/green]"
         )
 
+    def ui_changed(self):
+        """Check if UI has changed based on zipfile hash, returns (changed, zipfile_path)"""
+        ui_hash = self.compute_ui_hash()
+        zipfile_name = f"src-{ui_hash[:16]}.zip"
+        zipfile_path = os.path.join(".aws-sam", zipfile_name)
+
+        existing_zipfiles = (
+            [
+                f
+                for f in os.listdir(".aws-sam")
+                if f.startswith("src-") and f.endswith(".zip")
+            ]
+            if os.path.exists(".aws-sam")
+            else []
+        )
+
+        if zipfile_name not in existing_zipfiles:
+            # Remove old zipfiles
+            for old_zip in existing_zipfiles:
+                old_path = os.path.join(".aws-sam", old_zip)
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+            return True, zipfile_path
+
+        return not os.path.exists(zipfile_path), zipfile_path
+
+    def start_ui_validation_parallel(self):
+        """Start UI validation in parallel if needed, returns (future, executor)"""
+        if not self.lint_enabled or not os.path.exists("src/ui"):
+            return None, None
+
+        changed, _ = self.ui_changed()
+        if not changed:
+            return None, None
+
+        import concurrent.futures
+
+        ui_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        ui_validation_future = ui_executor.submit(self.validate_ui_build)
+        self.console.print(
+            "[cyan]🔍 Starting UI validation in parallel with builds...[/cyan]"
+        )
+        return ui_validation_future, ui_executor
+
     def compute_ui_hash(self):
         """Compute hash of UI folder contents"""
         self.console.print("[cyan]Computing hash of ui folder contents[/cyan]")
         ui_dir = "src/ui"
         return self.get_directory_checksum(ui_dir)
 
+    def validate_ui_build(self):
+        """Validate UI build to catch ESLint/Prettier errors before packaging"""
+        try:
+            self.console.print("[bold cyan]🔍 VALIDATING UI build[/bold cyan]")
+            ui_dir = "src/ui"
+
+            if not os.path.exists(ui_dir):
+                self.console.print(
+                    "[yellow]No UI directory found, skipping UI validation[/yellow]"
+                )
+                return
+
+            # Run npm install first
+            self.console.print(
+                "[cyan]📦 Installing UI dependencies (this may take a while)...[/cyan]"
+            )
+            success, result = self.run_subprocess_with_logging(
+                ["npm", "install"], "UI npm install", ui_dir, realtime=True
+            )
+
+            if not success:
+                raise Exception("npm install failed")
+
+            # Run npm run build to validate ESLint/Prettier
+            self.console.print(
+                "[cyan]🔨 Building UI (validating ESLint/Prettier)...[/cyan]"
+            )
+            success, result = self.run_subprocess_with_logging(
+                ["npm", "run", "build"], "UI build validation", ui_dir, realtime=True
+            )
+
+            if not success:
+                raise Exception("UI build validation failed")
+
+            self.console.print("[green]✅ UI build validation passed[/green]")
+
+        except Exception as e:
+            self.console.print("[red]❌ UI build validation failed:[/red]")
+            self.console.print(str(e), style="red", markup=False)
+            sys.exit(1)
+
     def package_ui(self):
         """Package UI source code"""
-        ui_hash = self.compute_ui_hash()
-        zipfile_name = f"src-{ui_hash[:16]}.zip"
-
-        # Ensure .aws-sam directory exists
-        os.makedirs(".aws-sam", exist_ok=True)
-
-        # Check if we need to rebuild
-        existing_zipfiles = [
-            f
-            for f in os.listdir(".aws-sam")
-            if f.startswith("src-") and f.endswith(".zip")
-        ]
-
-        if existing_zipfiles and existing_zipfiles[0] != zipfile_name:
-            self.console.print(
-                f"[yellow]WebUI zipfile name changed from {existing_zipfiles[0]} to {zipfile_name}, forcing rebuild[/yellow]"
-            )
-            # Remove old zipfile
-            for old_zip in existing_zipfiles:
-                old_path = os.path.join(".aws-sam", old_zip)
-                if os.path.exists(old_path):
-                    os.remove(old_path)
-
-        zipfile_path = os.path.join(".aws-sam", zipfile_name)
+        _, zipfile_path = self.ui_changed()
 
         if not os.path.exists(zipfile_path):
-            self.console.print("[bold cyan]PACKAGING src/ui[/bold cyan]")
-            self.console.print(f"[cyan]Zipping source to {zipfile_path}[/cyan]")
-
+            os.makedirs(".aws-sam", exist_ok=True)
             with zipfile.ZipFile(zipfile_path, "w", zipfile.ZIP_DEFLATED) as zipf:
                 ui_dir = "src/ui"
                 exclude_dirs = {"node_modules", "build", ".aws-sam"}
                 for root, dirs, files in os.walk(ui_dir):
-                    # Exclude specified directories from zipping
                     dirs[:] = [d for d in dirs if d not in exclude_dirs]
                     for file in files:
-                        # Skip .env files
                         if file == ".env" or file.startswith(".env."):
                             continue
                         file_path = os.path.join(root, file)
@@ -1156,6 +1297,7 @@ except Exception as e:
                         zipf.write(file_path, arcname)
 
         # Check if file exists in S3 and upload if needed
+        zipfile_name = os.path.basename(zipfile_path)
         s3_key = f"{self.prefix_and_version}/{zipfile_name}"
         try:
             self.s3_client.head_object(Bucket=self.bucket, Key=s3_key)
@@ -1646,6 +1788,32 @@ except Exception as e:
                         return False
         return True
 
+    def _validate_python_linting(self):
+        """Validate Python linting"""
+        if not self.lint_enabled:
+            return True
+
+        self.console.print("[cyan]🔍 Running Python linting...[/cyan]")
+
+        # Run ruff check (same as GitLab CI lint-cicd)
+        result = subprocess.run(["ruff", "check"], capture_output=True, text=True)
+        if result.returncode != 0:
+            self.console.print("[red]❌ Ruff linting failed![/red]")
+            self.console.print(result.stdout, style="red", markup=False)
+            return False
+
+        # Run ruff format check (same as GitLab CI lint-cicd)
+        result = subprocess.run(
+            ["ruff", "format", "--check"], capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            self.console.print("[red]❌ Code formatting check failed![/red]")
+            self.console.print(result.stdout, style="red", markup=False)
+            return False
+
+        self.console.print("[green]✅ Python linting passed[/green]")
+        return True
+
     def build_lib_package(self):
         """Build lib package with syntax validation"""
         try:
@@ -1815,11 +1983,18 @@ except Exception as e:
             # Check prerequisites
             self.check_prerequisites()
 
+            # Validate Python linting if enabled
+            if not self._validate_python_linting():
+                raise Exception("Python linting validation failed")
+
             # Set up S3 bucket
             self.setup_artifacts_bucket()
 
             # Perform smart rebuild detection and cache management
             components_needing_rebuild = self.smart_rebuild_detection()
+
+            # Start UI validation early in parallel
+            ui_validation_future, ui_executor = self.start_ui_validation_parallel()
 
             # clear component cache
             for comp_info in components_needing_rebuild:
@@ -1893,7 +2068,24 @@ except Exception as e:
                 # Upload configuration library
                 self.upload_config_library()
 
-            # Package UI
+            # Wait for UI validation to complete if it was started
+            if ui_validation_future:
+                try:
+                    self.console.print(
+                        "[cyan]⏳ Waiting for UI validation to complete...[/cyan]"
+                    )
+                    ui_validation_future.result()
+                    self.console.print(
+                        "[green]✅ UI validation completed successfully[/green]"
+                    )
+                except Exception as e:
+                    self.console.print("[red]❌ UI validation failed:[/red]")
+                    self.console.print(str(e), style="red", markup=False)
+                    sys.exit(1)
+                finally:
+                    ui_executor.shutdown(wait=True)
+
+            # Package UI and start validation in parallel if needed
             webui_zipfile = self.package_ui()
 
             # Build main template

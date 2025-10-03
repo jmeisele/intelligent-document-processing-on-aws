@@ -110,6 +110,10 @@ Resources:
             reason: "This is a temporary deployment artifact bucket; access logging not required"
           - id: W41
             reason: "Using default SSE encryption which is applied automatically by S3"
+      security-matrix:
+        rules_to_suppress:
+          - id: S3-001
+            reason: "This is a temporary deployment artifact bucket; access logging not required"
     Properties:
       VersioningConfiguration:
         Status: Enabled
@@ -155,13 +159,16 @@ Resources:
                 - export IDP_CFN_PREFIX=$(make cfn-prefix) || { echo "CFN prefix generation failed"; exit 1; }
                 - make install -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX
                 - make smoketest -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX
-                - make uninstall -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX
+              finally:
+                - echo "Running cleanup regardless of build result..."
+                - make uninstall -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX || echo "Cleanup failed but continuing"
 
   DeploymentPipeline:
     Type: 'AWS::CodePipeline::Pipeline'
     Properties:
       Name: !Ref PipelineName
       RoleArn: !GetAtt CodePipelineRole.Arn
+      ExecutionMode: PARALLEL
       ArtifactStore:
         Type: S3
         Location: !Ref ArtifactBucket
@@ -177,6 +184,7 @@ Resources:
               Configuration:
                 S3Bucket: !Ref BucketName
                 S3ObjectKey: !Ref FileKey
+                PollForSourceChanges: true
               OutputArtifacts:
                 - Name: SourceOutput
               RunOrder: 1

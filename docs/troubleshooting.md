@@ -5,6 +5,34 @@ SPDX-License-Identifier: MIT-0
 
 This guide provides solutions for common issues and optimization techniques for the GenAIIDP solution.
 
+## AI-Powered Error Analysis
+
+For automated troubleshooting, use the **Error Analyzer** tool:
+
+- **What it is**: AI-powered agent that automatically diagnoses document processing failures
+- **When to use**: Document-specific failures, system-wide error patterns, performance issues
+- **How to access**: Web UI → Failed document → Troubleshoot button
+- **Documentation**: See [Error Analyzer](error-analyzer.md) for complete guide
+
+**Quick Start**:
+```
+# Document-specific analysis
+Query: "document: filename.pdf"
+
+# System-wide analysis  
+Query: "Show recent processing errors"
+```
+
+The Error Analyzer automatically:
+- Searches CloudWatch Logs across all Lambda functions
+- Correlates errors with DynamoDB tracking data
+- Identifies root causes with AI reasoning
+- Provides actionable recommendations
+
+For issues not covered by the Error Analyzer, use the manual troubleshooting steps below.
+
+---
+
 ## Common Issues and Resolutions
 
 ### Document Processing Failures

@@ -973,6 +973,15 @@ Resources:
     DependsOn:
       - IsStacknameLengthOK
     Type: AWS::KMS::Key
+    Metadata:
+      security-matrix:
+        rules_to_suppress:
+          - id: IAM-005
+            reason: "No cross-account access - only same account root and AWS services"
+          - id: KMS-007
+            reason: "KMS monitoring not required for this IDP solution - comprehensive CloudWatch monitoring already in place"
+          - id: KMS-002
+            reason: "kms:* permission for account root is standard pattern for administrative access to KMS keys"
     Properties:
       Description: KMS key for DynamoDB encryption
       EnableKeyRotation: true
@@ -1053,6 +1062,10 @@ Resources:
         rules_to_suppress:
           - id: W35
             reason: "This is the logging destination bucket - does not require its own access logging"
+      security-matrix:
+        rules_to_suppress:
+          - id: S3-001
+            reason: "This is the logging destination bucket - does not require its own access logging"
     # checkov:skip=CKV_AWS_18: "This is the logging destination bucket - does not require its own access logging"
     DeletionPolicy: Retain
     Properties:
@@ -1083,6 +1096,11 @@ Resources:
 
   LoggingBucketPolicy:
     Type: AWS::S3::BucketPolicy
+    Metadata:
+      security-matrix:
+        rules_to_suppress:
+          - id: IAM-005
+            reason: "Already has aws:SourceAccount condition for confused deputy prevention"
     Properties:
       Bucket: !Ref LoggingBucket
       PolicyDocument:
@@ -1767,6 +1785,7 @@ Resources:
 
   DocumentSectionsCrawlerSecurityConfigurationV2:
     Type: AWS::Glue::SecurityConfiguration
+    # checkov:skip=CKV_AWS_99:Encryption is already enabled with SSE-KMS
     Properties:
       Name: !Sub "${AWS::StackName}-document-sections-crawler-security-config-v2"
       EncryptionConfiguration:
@@ -2487,6 +2506,7 @@ Resources:
           APPSYNC_API_URL: !GetAtt GraphQLApi.GraphQLUrl
           CONCURRENCY_TABLE: !Ref ConcurrencyTable
           MAX_CONCURRENT: !Ref MaxConcurrentWorkflows
+          WORKING_BUCKET: !Ref WorkingBucket
       Policies:
         - SQSPollerPolicy:
             QueueName: !GetAtt DocumentQueue.QueueName
@@ -2502,6 +2522,8 @@ Resources:
             TableName: !Ref TrackingTable
         - DynamoDBCrudPolicy:
             TableName: !Ref ConcurrencyTable
+        - S3CrudPolicy:
+            BucketName: !Ref WorkingBucket
         - Statement:
             - Effect: Allow
               Action:
@@ -3596,6 +3618,7 @@ Resources:
       Environment:
         Variables:
           LOG_LEVEL: !Ref LogLevel
+          CONFIGURATION_TABLE_NAME: !Ref ConfigurationTable
           STRANDS_LOG_LEVEL: !Ref LogLevel
           AGENT_TABLE: !Ref AgentTable
           APPSYNC_API_URL: !GetAtt GraphQLApi.GraphQLUrl
@@ -3608,11 +3631,15 @@ Resources:
                 - !Ref ReportingBucketName
           DOCUMENT_ANALYSIS_AGENT_MODEL_ID: !Ref DocumentAnalysisAgentModelId
           AWS_STACK_NAME: !Ref AWS::StackName
+          GUARDRAIL_ID_AND_VERSION: !If [HasGuardrailConfig, !Sub "${BedrockGuardrailId}:${BedrockGuardrailVersion}", ""]
+          CLOUDWATCH_LOG_GROUP_PREFIX: !Sub "/aws/lambda/${AWS::StackName}"
       LoggingConfig:
         LogGroup: !Ref AgentProcessorLogGroup
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref AgentTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ConfigurationTable
         - S3CrudPolicy:
             BucketName: !If
               - ShouldCreateReportingBucket
@@ -3645,6 +3672,14 @@ Resources:
               Resource: 
                 - !Sub "arn:${AWS::Partition}:bedrock:*::foundation-model/*"
                 - !Sub "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*"
+            - !If
+              - HasGuardrailConfig
+              - Effect: Allow
+                Action:
+                  - "bedrock:ApplyGuardrail"
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:guardrail/${BedrockGuardrailId}"
+              - !Ref AWS::NoValue
             - Effect: Allow
               Action:
                 - appsync:GraphQL
@@ -3672,6 +3707,47 @@ Resources:
                 - secretsmanager:GetSecretValue
               Resource: 
                 - !Ref ExternalMCPAgentsSecret
+            - Effect: Allow
+              Action:
+                - logs:DescribeLogGroups
+                - logs:DescribeLogStreams
+                - logs:FilterLogEvents
+                - logs:GetLogEvents
+              Resource:
+                - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/${AWS::StackName}*"
+                - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}*"
+            - Effect: Allow
+              Action:
+                - logs:DescribeLogGroups
+              Resource:
+                - "*"
+            - Effect: Allow
+              Action:
+                - dynamodb:DescribeTable
+                - dynamodb:Scan
+                - dynamodb:Query
+                - dynamodb:GetItem
+                - dynamodb:ListTables
+              Resource:
+                - !GetAtt ConfigurationTable.Arn
+                - !Sub "${ConfigurationTable.Arn}/*"
+                - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}*"
+            - Effect: Allow
+              Action:
+                - dynamodb:ListTables
+              Resource:
+                - "*"
+            - Effect: Allow
+              Action:
+                - cloudformation:DescribeStackResources
+                - cloudformation:DescribeStacks
+              Resource:
+                - !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*"
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource:
+                - !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}*"
 
   AgentProcessorLogGroup:
     Type: AWS::Logs::LogGroup
@@ -3905,7 +3981,16 @@ Resources:
           }
         }
       ResponseMappingTemplate: |-
-        true
+        #if($ctx.error)
+          $util.error($ctx.error.message, $ctx.error.type)
+        #end
+        
+        ## Return false if no item was updated (item not found)
+        #if(!$ctx.result)
+          false
+        #else
+          true
+        #end
 
   DeleteAgentJobResolver:
     Type: AWS::AppSync::Resolver
@@ -4705,7 +4790,7 @@ Resources:
       Description: IP ranges allowed to access the AppSync API
       Scope: REGIONAL
       IPAddressVersion: IPV4
-      Addresses: [!Ref WAFAllowedIPv4Ranges]
+      Addresses: !Split [", ", !Ref WAFAllowedIPv4Ranges]
       
   WAFLambdaServiceIPSet:
     Type: AWS::WAFv2::IPSet
@@ -4899,6 +4984,7 @@ Resources:
                   - !GetAtt DeleteDocumentResolverFunction.Arn
                   - !GetAtt QueryKnowledgeBaseResolverFunction.Arn
                   - !GetAtt ReprocessDocumentResolverFunction.Arn
+                  - !GetAtt ProcessChangesResolverFunction.Arn
                   - !GetAtt AgentRequestHandlerFunction.Arn
                   - !GetAtt ListAvailableAgentsFunction.Arn
                   - !GetAtt ChatWithDocumentResolverFunction.Arn
@@ -5603,12 +5689,25 @@ Resources:
         Variables:
           LOG_LEVEL: !Ref LogLevel
           INPUT_BUCKET: !Ref InputBucket
+          OUTPUT_BUCKET: !Ref OutputBucket
+          QUEUE_URL: !Ref DocumentQueue
+          APPSYNC_API_URL: !GetAtt GraphQLApi.GraphQLUrl
+          DATA_RETENTION_IN_DAYS: !Ref DataRetentionInDays
       LoggingConfig:
         LogGroup: !Ref ReprocessDocumentResolverFunctionLogGroup
       Policies:
-        - S3CrudPolicy:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TrackingTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt DocumentQueue.QueueName
+        - S3ReadPolicy:
             BucketName: !Ref InputBucket
         - Statement:
+            - Effect: Allow
+              Action:
+                - appsync:GraphQL
+              Resource:
+                - !Sub "${GraphQLApi.Arn}/types/Mutation/*"
             - Effect: Allow
               Action:
                 - kms:Encrypt
@@ -5744,6 +5843,7 @@ Resources:
     # checkov:skip=CKV_AWS_117: "Function does not require VPC access as it only interacts with AWS services via APIs"
     # checkov:skip=CKV_AWS_173: "Environment variables do not contain sensitive data - only configuration values like feature flags and non-sensitive settings"
     Properties:
+      PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref AWS::NoValue]
       Handler: index.handler
       Runtime: python3.12
       CodeUri: ./src/lambda/discovery_upload_resolver
@@ -5907,6 +6007,7 @@ Resources:
     # checkov:skip=CKV_AWS_115: "Function does not require reserved concurrency as it scales based on demand"
     # checkov:skip=CKV_AWS_173: "Environment variables do not contain sensitive data - only configuration values like feature flags and non-sensitive settings"
     Properties:
+      PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref AWS::NoValue]
       Handler: index.handler
       Runtime: python3.12
       CodeUri: ./src/lambda/discovery_processor
@@ -6107,6 +6208,7 @@ Resources:
           OUTPUT_BUCKET: !Ref OutputBucket
           CONFIGURATION_TABLE_NAME: !Ref ConfigurationTable
           TRACKING_TABLE_NAME: !Ref TrackingTable
+          GUARDRAIL_ID_AND_VERSION: !If [HasGuardrailConfig, !Sub "${BedrockGuardrailId}:${BedrockGuardrailVersion}", ""]
       LoggingConfig:
         LogGroup: !Ref ChatWithDocumentResolverFunctionLogGroup
       Policies:
@@ -6162,6 +6264,91 @@ Resources:
     Properties:
       KmsKeyId: !GetAtt CustomerManagedEncryptionKey.Arn
       RetentionInDays: !Ref LogRetentionDays
+
+  ProcessChangesResolverFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: "Function does not require VPC access as it only interacts with AWS services via APIs"
+          - id: W92
+            reason: "Function does not require reserved concurrency as it scales based on demand"
+          - id: W12
+            reason: "Lambda requires CloudWatch logs permissions"
+    # checkov:skip=CKV_AWS_116: "DLQ not required for AppSync resolver function"
+    # checkov:skip=CKV_AWS_117: "Function does not require VPC access as it only interacts with AWS services via APIs"
+    # checkov:skip=CKV_AWS_115: "Function does not require reserved concurrency as it scales based on demand"
+    # checkov:skip=CKV_AWS_173: "Environment variables do not contain sensitive data - only configuration values like feature flags and non-sensitive settings"
+    Properties:
+      PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref AWS::NoValue]
+      Handler: index.handler
+      Runtime: python3.12
+      CodeUri: ./src/lambda/process_changes_resolver
+      Description: Lambda function to process section changes via GraphQL API
+      MemorySize: 512
+      Timeout: 60
+      Environment:
+        Variables:
+          LOG_LEVEL: !Ref LogLevel
+          TRACKING_TABLE: !Ref TrackingTable
+          QUEUE_URL: !Ref DocumentQueue
+          DATA_RETENTION_IN_DAYS: !Ref DataRetentionInDays
+          WORKING_BUCKET: !Ref WorkingBucket
+          INPUT_BUCKET: !Ref InputBucket
+          OUTPUT_BUCKET: !Ref OutputBucket
+          APPSYNC_API_URL: !GetAtt GraphQLApi.GraphQLUrl
+      LoggingConfig:
+        LogGroup: !Ref ProcessChangesResolverFunctionLogGroup
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TrackingTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt DocumentQueue.QueueName
+        - S3CrudPolicy:
+            BucketName: !Ref OutputBucket
+        - S3CrudPolicy:
+            BucketName: !Ref WorkingBucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - appsync:GraphQL
+              Resource:
+                - !Sub "${GraphQLApi.Arn}/types/Mutation/*"
+            - Effect: Allow
+              Action:
+                - kms:Encrypt
+                - kms:Decrypt
+                - kms:ReEncrypt*
+                - kms:GenerateDataKey*
+                - kms:DescribeKey
+              Resource: !GetAtt CustomerManagedEncryptionKey.Arn
+
+  ProcessChangesResolverFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      KmsKeyId: !GetAtt CustomerManagedEncryptionKey.Arn
+      RetentionInDays: !Ref LogRetentionDays
+
+  ProcessChangesDataSource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: ProcessChangesDataSource
+      Description: Lambda function for processing section changes
+      Type: AWS_LAMBDA
+      ServiceRoleArn: !GetAtt AppSyncServiceRole.Arn
+      LambdaConfig:
+        LambdaFunctionArn: !GetAtt ProcessChangesResolverFunction.Arn
+
+  ProcessChangesResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      DataSourceName: !GetAtt ProcessChangesDataSource.Name
+      TypeName: Mutation
+      FieldName: processChanges
 
   ChatWithDocumentDataSource:
     Type: AWS::AppSync::DataSource
@@ -6232,6 +6419,7 @@ Resources:
         Comment: !Sub "Web app cloudfront distribution ${AWS::StackName}"
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
+          MinimumProtocolVersion: TLSv1.2_2021
         Logging:
           Bucket: !Sub "${LoggingBucket}.s3.${AWS::URLSuffix}"
           Prefix: "cloudfront-logs"
