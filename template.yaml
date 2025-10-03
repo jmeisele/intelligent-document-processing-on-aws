@@ -5689,12 +5689,25 @@ Resources:
         Variables:
           LOG_LEVEL: !Ref LogLevel
           INPUT_BUCKET: !Ref InputBucket
+          OUTPUT_BUCKET: !Ref OutputBucket
+          QUEUE_URL: !Ref DocumentQueue
+          APPSYNC_API_URL: !GetAtt GraphQLApi.GraphQLUrl
+          DATA_RETENTION_IN_DAYS: !Ref DataRetentionInDays
       LoggingConfig:
         LogGroup: !Ref ReprocessDocumentResolverFunctionLogGroup
       Policies:
-        - S3CrudPolicy:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TrackingTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt DocumentQueue.QueueName
+        - S3ReadPolicy:
             BucketName: !Ref InputBucket
         - Statement:
+            - Effect: Allow
+              Action:
+                - appsync:GraphQL
+              Resource:
+                - !Sub "${GraphQLApi.Arn}/types/Mutation/*"
             - Effect: Allow
               Action:
                 - kms:Encrypt
