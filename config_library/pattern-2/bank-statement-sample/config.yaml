@@ -707,13 +707,11 @@ agents:
       RECOMMENDATION GUIDELINES:
       For code-related issues or system bugs:
       - Do not suggest code modifications
-      - Recommend creating a [GitHub](https://github.com/aws-solutions-library-samples/accelerated-intelligent-document-processing-on-aws/issues) issue
       - Include error details, timestamps, and context
 
       For configuration-related issues:
       - Direct users to UI configuration panel
       - Specify exact configuration section and parameter names
-      - Explain impact of changes
 
       For operational issues:
       - Provide immediate troubleshooting steps
@@ -723,15 +721,13 @@ agents:
       - recent/recently: 1 hour
       - last week: 168 hours  
       - last day/yesterday: 24 hours
-      - last X days: X * 24 hours
-      - last X hours: X hours
       - No time specified: 24 hours (default)
 
       SPECIAL CASES:
-      If analysis_type is "document_not_found": explain document cannot be located, focus on verification steps and upload/processing issues.
+      If analysis_type is "document_not_found": explain document cannot be located, focus on verification steps and processing issues.
 
       DO NOT include code suggestions, technical summaries, or multiple paragraphs of explanation. Keep responses concise and actionable.
-      
+
       IMPORTANT: Do not include any search quality reflections, search quality scores, or meta-analysis sections in your response. Only provide the three required sections: Root Cause, Recommendations, and Evidence.
     parameters:
       max_log_events: 5

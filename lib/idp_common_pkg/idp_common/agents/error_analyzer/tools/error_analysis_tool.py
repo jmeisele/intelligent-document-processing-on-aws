@@ -18,14 +18,6 @@ from .general_analysis_tool import analyze_recent_system_errors
 logger = logging.getLogger(__name__)
 
 
-def _is_valid_document_id(doc_id: str) -> bool:
-    """Validate that extracted text looks like a real document identifier."""
-    if not doc_id or len(doc_id) < 3:
-        return False
-
-    return True
-
-
 def _classify_query_intent(query: str) -> Tuple[str, str]:
     """Classify query as document-specific vs general system analysis."""
     # Document-specific patterns - require colon immediately after keyword
@@ -40,9 +32,7 @@ def _classify_query_intent(query: str) -> Tuple[str, str]:
         match = re.search(pattern, query, re.IGNORECASE)
         if match:
             document_id = match.group(1).strip()
-            # Additional validation - ensure it looks like a document identifier
-            if _is_valid_document_id(document_id):
-                return ("document_specific", document_id)
+            return ("document_specific", document_id)
 
     # If no specific document pattern found, it's general analysis
     return ("general_analysis", "")
