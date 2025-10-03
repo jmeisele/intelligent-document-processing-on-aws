@@ -828,7 +828,7 @@ Resources:
                     description: Task prompt for LLM evaluation - supports placeholders {DOCUMENT_CLASS}, {ATTRIBUTE_NAME}, {ATTRIBUTE_DESCRIPTION}, {EXPECTED_VALUE} and {ACTUAL_VALUE}
                     order: 7
           discovery:
-            order: 5
+            order: 8
             type: object
             sectionLabel: Discovery Configuration
             description: Configuration for document class discovery functionality
@@ -935,8 +935,45 @@ Resources:
                     description: Sample JSON format for discovery output
                     default: "{\n  \"document_class\": \"Form-1040\",\n  \"document_description\": \"Brief summary of the document\",\n  \"groups\": [\n    {\n      \"name\": \"PersonalInformation\",\n      \"description\": \"Personal information of Tax payer\",\n      \"attributeType\": \"group\",\n      \"groupType\": \"normal\",\n      \"groupAttributes\": [\n        {\n          \"name\": \"FirstName\",\n          \"dataType\": \"string\",\n          \"description\": \"First Name of Taxpayer\"\n        },\n        {\n          \"name\": \"Age\",\n          \"dataType\": \"number\",\n          \"description\": \"Age of Taxpayer\"\n        }\n      ]\n    }\n  ]\n}"
                     order: 0
+          agents:
+            order: 9
+            type: object
+            sectionLabel: Agent Configuration
+            description: Configuration for AI agents used in the system
+            properties:
+              error_analyzer:
+                type: object
+                sectionLabel: Error Analysis Agent
+                description: Configuration for the error analysis agent
+                properties:
+                  model_id:
+                    type: string
+                    description: Model ID for the error analysis agent
+                    enum: ["anthropic.claude-3-sonnet-20240229-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0"]
+                    default: "us.anthropic.claude-sonnet-4-20250514-v1:0"
+                    order: 0
+                  system_prompt:
+                    type: string
+                    format: textarea
+                    description: System prompt for the error analysis agent
+                    order: 1
+                  parameters:
+                    type: object
+                    sectionLabel: Agent Parameters
+                    description: Configuration parameters for the agent
+                    properties:
+                      max_log_events:
+                        type: integer
+                        description: Maximum number of log events to analyze
+                        default: 100
+                        order: 0
+                      time_range_hours_default:
+                        type: integer
+                        description: Default time range in hours for analysis
+                        default: 24
+                        order: 2
           pricing:
-            order: 8
+            order: 10
             type: array
             sectionLabel: Pricing (Estimates only - check https://aws.amazon.com/bedrock/pricing/ & https://aws.amazon.com/textract/pricing/)
             listLabel: Services

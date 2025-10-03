@@ -30,7 +30,7 @@ def handler(event, context):
 
     # Load configuration
     config = get_config()
-    logger.info(f"Config: {json.dumps(config)}")
+    logger.info(f"Config: {json.dumps(config, default=str)}")
     
     # For Map state, we get just one section from the document
     # Extract the document and section from the event - handle both compressed and uncompressed

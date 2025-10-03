@@ -799,133 +799,6 @@ extraction:
     7. Think step by step before finalizing your answer
 
     </final-instructions>
-pricing:
-  - name: textract/detect_document_text
-    units:
-      - name: pages
-        price: '0.0015'
-  - name: textract/analyze_document-Layout
-    units:
-      - name: pages
-        price: '0.004'
-  - name: textract/analyze_document-Signatures
-    units:
-      - name: pages
-        price: '0.0035'
-  - name: textract/analyze_document-Forms
-    units:
-      - name: pages
-        price: '0.05'
-  - name: textract/analyze_document-Tables
-    units:
-      - name: pages
-        price: '0.015'
-  - name: textract/analyze_document-Tables+Forms
-    units:
-      - name: pages
-        price: '0.065'
-  - name: bedrock/us.amazon.nova-lite-v1:0
-    units:
-      - name: inputTokens
-        price: '6.0E-8'
-      - name: outputTokens
-        price: '2.4E-7'
-      - name: cacheReadInputTokens
-        price: '1.5E-8'
-      - name: cacheWriteInputTokens
-        price: '6.0E-8'
-  - name: bedrock/us.amazon.nova-pro-v1:0
-    units:
-      - name: inputTokens
-        price: '8.0E-7'
-      - name: outputTokens
-        price: '3.2E-6'
-      - name: cacheReadInputTokens
-        price: '2.0E-7'
-      - name: cacheWriteInputTokens
-        price: '8.0E-7'
-  - name: bedrock/us.amazon.nova-premier-v1:0
-    units:
-      - name: inputTokens
-        price: '2.5E-6'
-      - name: outputTokens
-        price: '1.25E-5'
-  - name: bedrock/us.anthropic.claude-3-haiku-20240307-v1:0
-    units:
-      - name: inputTokens
-        price: '2.5E-7'
-      - name: outputTokens
-        price: '1.25E-6'
-  - name: bedrock/us.anthropic.claude-3-5-haiku-20241022-v1:0
-    units:
-      - name: inputTokens
-        price: '8.0E-7'
-      - name: outputTokens
-        price: '4.0E-6'
-      - name: cacheReadInputTokens
-        price: '8.0E-8'
-      - name: cacheWriteInputTokens
-        price: '1.0E-6'
-  - name: bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
-    units:
-      - name: inputTokens
-        price: '3.0E-6'
-      - name: outputTokens
-        price: '1.5E-5'
-      - name: cacheReadInputTokens
-        price: '3.0E-7'
-      - name: cacheWriteInputTokens
-        price: '3.75E-6'
-  - name: bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0
-    units:
-      - name: inputTokens
-        price: '3.0E-6'
-      - name: outputTokens
-        price: '1.5E-5'
-      - name: cacheReadInputTokens
-        price: '3.0E-7'
-      - name: cacheWriteInputTokens
-        price: '3.75E-6'
-  - name: bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0
-    units:
-      - name: inputTokens
-        price: '3.0E-6'
-      - name: outputTokens
-        price: '1.5E-5'
-      - name: cacheReadInputTokens
-        price: '3.0E-7'
-      - name: cacheWriteInputTokens
-        price: '3.75E-6'
-  - name: bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0:1m
-    units:
-      - name: inputTokens
-        price: '6.0E-6'
-      - name: outputTokens
-        price: '2.25E-5'
-      - name: cacheReadInputTokens
-        price: '6.0E-7'
-      - name: cacheWriteInputTokens
-        price: '7.5E-6'
-  - name: bedrock/us.anthropic.claude-opus-4-20250514-v1:0
-    units:
-      - name: inputTokens
-        price: '1.5E-5'
-      - name: outputTokens
-        price: '7.5E-5'
-      - name: cacheReadInputTokens
-        price: '1.5E-6'
-      - name: cacheWriteInputTokens
-        price: '1.875E-5'
-  - name: bedrock/us.anthropic.claude-opus-4-1-20250805-v1:0
-    units:
-      - name: inputTokens
-        price: '1.5E-5'
-      - name: outputTokens
-        price: '7.5E-5'
-      - name: cacheReadInputTokens
-        price: '1.5E-6'
-      - name: cacheWriteInputTokens
-        price: '1.875E-5'
 assessment:
   enabled: true
   validation_enabled: false
@@ -1307,6 +1180,71 @@ discovery:
       and organizational structure. Focus on creating comprehensive blueprints
       for document processing without extracting actual values.
     max_tokens: '10000'
+agents:
+  error_analyzer:
+    model_id: us.anthropic.claude-sonnet-4-20250514-v1:0
+
+    system_prompt: |-
+      You are an intelligent error analysis agent for the GenAI IDP system.
+
+      Use the analyze_errors tool to investigate issues. ALWAYS format your response with exactly these three sections in this order:
+
+      ## Root Cause
+      Identify the specific underlying technical reason why the error occurred. Focus on the primary cause, not symptoms.
+
+      ## Recommendations
+      Provide specific, actionable steps to resolve the issue. Limit to top three recommendations only.
+
+      <details>
+      <summary><strong>Evidence</strong></summary>
+
+      Format log entries with their source information. For each log entry, show:
+      **Log Group:**  
+      [full log_group name from tool response]
+
+      **Log Stream:**  
+      [full log_stream name from tool response]
+      ```
+      [ERROR] timestamp message (from events data)
+      ```
+
+      </details>
+
+      FORMATTING RULES:
+      - Use the exact three-section structure above
+      - Make Evidence section collapsible using HTML details tags
+      - Extract log_group, log_stream, and events data from tool response
+      - Show complete log group and log stream names without truncation
+      - Present actual log messages from events array in code blocks
+
+      RECOMMENDATION GUIDELINES:
+      For code-related issues or system bugs:
+      - Do not suggest code modifications
+      - Include error details, timestamps, and context
+
+      For configuration-related issues:
+      - Direct users to UI configuration panel
+      - Specify exact configuration section and parameter names
+
+      For operational issues:
+      - Provide immediate troubleshooting steps
+      - Include preventive measures
+
+      TIME RANGE PARSING:
+      - recent/recently: 1 hour
+      - last week: 168 hours  
+      - last day/yesterday: 24 hours
+      - No time specified: 24 hours (default)
+
+      SPECIAL CASES:
+      If analysis_type is "document_not_found": explain document cannot be located, focus on verification steps and processing issues.
+
+      DO NOT include code suggestions, technical summaries, or multiple paragraphs of explanation. Keep responses concise and actionable.
+
+      IMPORTANT: Do not include any search quality reflections, search quality scores, or meta-analysis sections in your response. Only provide the three required sections: Root Cause, Recommendations, and Evidence.
+    parameters:
+      max_log_events: 5
+      time_range_hours_default: 24
 pricing:
   - name: textract/detect_document_text
     units:
