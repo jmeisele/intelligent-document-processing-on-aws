@@ -8,52 +8,6 @@ from loguru import logger
 
 class CodePipelineUtil:
     @staticmethod
-    def get_execution_id_after_trigger(pipeline_name, wait_seconds=30):
-        """Get the execution ID after S3 upload triggers the pipeline"""
-        import time
-        client = boto3.client('codepipeline')
-        
-        # Record trigger time
-        trigger_time = time.time()
-        retry_count = 5
-        
-        for attempt in range(retry_count):
-            # Wait for pipeline to start
-            time.sleep(wait_seconds)
-            
-            # Get recent executions and find InProgress one closest to our trigger time
-            response = client.list_pipeline_executions(pipelineName=pipeline_name, maxResults=5)
-            executions = response.get('pipelineExecutionSummaries', [])
-            
-            if not executions:
-                if attempt < retry_count - 1:
-                    continue  # Try again
-                raise Exception(f"No executions found for pipeline '{pipeline_name}'")
-            
-            # Find InProgress execution that started closest to our trigger time
-            best_execution = None
-            min_time_diff = float('inf')
-            
-            for execution in executions:
-                # Only consider InProgress executions
-                if execution['status'] != 'InProgress':
-                    continue
-                    
-                start_time = execution['startTime'].timestamp()
-                time_diff = abs(start_time - trigger_time)
-                
-                if time_diff < min_time_diff:
-                    min_time_diff = time_diff
-                    best_execution = execution
-            
-            if best_execution:
-                return best_execution['pipelineExecutionId']
-            elif attempt < retry_count - 1:
-                continue  # Try again after another wait
-        
-        # No InProgress execution found after retries
-        raise Exception(f"No InProgress execution found for pipeline '{pipeline_name}' after {trigger_time}")
-
     @staticmethod
     def wait_for_pipeline_execution(pipeline_name, execution_id=None, initial_wait_seconds=10, poll_interval_seconds=30, max_wait_minutes=90):
         """
@@ -323,3 +277,31 @@ class CodePipelineUtil:
             all_logs.append("")  # Add a blank line between actions
         
         return all_logs
+
+    @staticmethod
+    def get_execution_id_by_version(pipeline_name, version_id, wait_seconds=30):
+        """Get execution ID by matching S3 version ID"""
+        import time
+        client = boto3.client('codepipeline')
+        
+        if not version_id:
+            raise Exception("Version ID is required")
+        
+        retry_count = 5
+        
+        for attempt in range(retry_count):
+            time.sleep(wait_seconds)
+            
+            response = client.list_pipeline_executions(pipelineName=pipeline_name, maxResults=10)
+            executions = response.get('pipelineExecutionSummaries', [])
+            
+            for execution in executions:
+                source_revisions = execution.get('sourceRevisions', [])
+                if source_revisions and source_revisions[0].get('revisionId') == version_id:
+                    logger.info(f"Found execution {execution['pipelineExecutionId']} for version {version_id}")
+                    return execution['pipelineExecutionId']
+            
+            if attempt < retry_count - 1:
+                logger.info(f"Version {version_id} not found, retrying... (attempt {attempt + 1}/{retry_count})")
+        
+        raise Exception(f"No execution found for version ID {version_id}")
