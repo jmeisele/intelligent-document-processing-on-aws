@@ -4,6 +4,11 @@
 
 The Error Analyzer is an intelligent AI-powered troubleshooting tool that helps diagnose and resolve document processing failures in the GenAI IDP Accelerator. It uses Amazon Bedrock's Claude Sonnet 4 model with the Strands agent framework to automatically analyze CloudWatch logs, DynamoDB tracking data, and Step Functions execution history to identify root causes and provide actionable recommendations.
 
+
+https://github.com/user-attachments/assets/78764207-0fcf-4523-ad12-f428581a685f
+
+
+
 ### Key Capabilities
 
 - **Automatic Failure Diagnosis**: AI agent automatically investigates document processing failures
