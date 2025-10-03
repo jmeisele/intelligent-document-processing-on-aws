@@ -5,6 +5,7 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+
 ## [0.3.19]
 
 ### Added
@@ -16,6 +17,11 @@ SPDX-License-Identifier: MIT-0
   - **Tool Ecosystem**: 8 specialized tools including analyze_errors (main router), analyze_document_failure, analyze_recent_system_errors, CloudWatch log search tools, DynamoDB integration tools, and Lambda context retrieval - additional tools will be added as the feature evolves.
   - **Configuration**: Configurable via Web UI including model selection (Claude Sonnet 4 recommended), system prompt customization, max_log_events (default: 5), and time_range_hours_default (default: 24)
   - **Documentation**: Comprehensive guide in `docs/error-analyzer.md` with architecture diagrams, usage examples, best practices, troubleshooting guide.
+
+- **Claude Sonnet 4.5 Model Support**
+  - Added support for Claude Sonnet 4.5 and Claude Sonnet 4.5 - Long Context models
+  - Available for configuration across all document processing steps
+
 
 ### Fixed
 - Problem with setting correctly formatted WAF IPv4 CIDR range - #73

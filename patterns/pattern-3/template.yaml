@@ -510,7 +510,7 @@ Resources:
                 type: number
                 minimum: 0
                 maximum: 1
-                description: Sampling temperature
+                description: "Sampling temperature (0.0-1.0). When > 0.0, this parameter is used and top_p is ignored. Set to 0.0 to use top_p instead."
                 order: 2
               top_k:
                 type: integer
@@ -519,7 +519,7 @@ Resources:
                 order: 3
               top_p:
                 type: number
-                description: Sampling Top P
+                description: "Sampling Top P (nucleus sampling). Only used when temperature is 0.0. Ignored otherwise."
                 order: 4
               max_tokens:
                 type: number
@@ -622,7 +622,7 @@ Resources:
                 order: 3
               temperature:
                 type: number
-                description: Sampling temperature
+                description: "Sampling temperature (0.0-1.0). When > 0.0, this parameter is used and top_p is ignored. Set to 0.0 to use top_p instead."
                 order: 4
               top_k:
                 type: number
@@ -630,7 +630,7 @@ Resources:
                 order: 5
               top_p:
                 type: number
-                description: Sampling Top P
+                description: "Sampling Top P (nucleus sampling). Only used when temperature is 0.0. Ignored otherwise."
                 order: 6
               max_tokens:
                 type: number
@@ -663,7 +663,7 @@ Resources:
                 order: 1
               temperature:
                 type: number
-                description: Sampling temperature
+                description: "Sampling temperature (0.0-1.0). When > 0.0, this parameter is used and top_p is ignored. Set to 0.0 to use top_p instead."
                 order: 2
               top_k:
                 type: number
@@ -671,7 +671,7 @@ Resources:
                 order: 3
               top_p:
                 type: number
-                description: Sampling Top P
+                description: "Sampling Top P (nucleus sampling). Only used when temperature is 0.0. Ignored otherwise."
                 order: 4
               max_tokens:
                 type: number
