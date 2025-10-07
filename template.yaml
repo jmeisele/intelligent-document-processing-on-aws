@@ -6544,6 +6544,7 @@ Resources:
                 - echo Installing Web UI dependencies
                 - rm -rf node_modules
                 - npm cache clean --force
+                - npm install --package-lock-only
                 - npm ci
                 - echo Checking for and fixing security vulnerabilities
                 - npm audit fix || echo "Some vulnerabilities could not be automatically fixed"
