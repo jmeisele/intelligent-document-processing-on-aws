@@ -7,6 +7,7 @@ Lambda tools for document context extraction.
 
 import json
 import logging
+import os
 from datetime import datetime
 from typing import Any, Dict, List
 
@@ -16,16 +17,18 @@ from strands import tool
 logger = logging.getLogger(__name__)
 
 
-def get_lookup_function_name(stack_name: str) -> str:
-    """Get lookup function name from stack."""
-    try:
-        cf_client = boto3.client("cloudformation")
-        response = cf_client.describe_stack_resources(
-            StackName=stack_name, LogicalResourceId="LookupFunction"
-        )
-        return response["StackResources"][0]["PhysicalResourceId"]
-    except Exception:
+def get_lookup_function_name() -> str:
+    """Get lookup function name from environment variable."""
+    function_name = os.environ.get("LOOKUP_FUNCTION_NAME")
+    if function_name:
+        return function_name
+
+    # Fallback to AWS_STACK_NAME if available
+    stack_name = os.environ.get("AWS_STACK_NAME")
+    if stack_name:
         return f"{stack_name}-LookupFunction"
+
+    raise ValueError("LOOKUP_FUNCTION_NAME environment variable not set")
 
 
 def extract_lambda_request_ids(execution_events: List[Dict[str, Any]]) -> List[str]:
@@ -63,17 +66,17 @@ def extract_lambda_request_ids(execution_events: List[Dict[str, Any]]) -> List[s
 
 
 @tool
-def get_document_context(document_id: str, stack_name: str) -> Dict[str, Any]:
+def get_document_context(document_id: str, stack_name: str = "") -> Dict[str, Any]:
     """
     Get document execution context via lookup_function Lambda.
 
     Args:
         document_id: Document ObjectKey to analyze
-        stack_name: CloudFormation stack name
+        stack_name: CloudFormation stack name (optional, for backward compatibility)
     """
     try:
         lambda_client = boto3.client("lambda")
-        function_name = get_lookup_function_name(stack_name)
+        function_name = get_lookup_function_name()
 
         logger.info(
             f"Invoking lookup function: {function_name} for document: {document_id}"

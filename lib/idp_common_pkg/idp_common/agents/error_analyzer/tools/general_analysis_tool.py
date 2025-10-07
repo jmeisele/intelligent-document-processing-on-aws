@@ -6,13 +6,12 @@ System-wide analysis tool.
 """
 
 import logging
-from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
 from strands import tool
 
 from .cloudwatch_tools import search_stack_logs
-from .dynamodb_tools import find_tracking_table, scan_dynamodb_table
+from .dynamodb_tools import get_tracking_table_name, query_tracking_table
 
 logger = logging.getLogger(__name__)
 
@@ -119,55 +118,28 @@ def analyze_recent_system_errors(
         time_range_hours = int(float(time_range_hours))
         max_log_events = int(float(max_log_events))
 
-        # Find recent failed documents
-        tracking_info = find_tracking_table(stack_name)
+        # Get tracking table name
+        tracking_info = get_tracking_table_name()
         if not tracking_info.get("tracking_table_found"):
             return {"error": "TrackingTable not found"}
 
-        table_name = tracking_info.get("table_name")
+        # Query for recent documents and filter for failures
+        error_records = query_tracking_table(hours_back=time_range_hours, limit=50)
 
-        # Scan for recent failed documents using correct field names
-        error_records = scan_dynamodb_table(
-            table_name, filter_expression="ObjectStatus = 'FAILED'", limit=20
-        )
-
-        # Filter by time range
-        threshold_time = datetime.utcnow() - timedelta(hours=int(time_range_hours))
         recent_failures = []
 
+        # Filter for failed documents from the query results
         for item in error_records.get("items", []):
-            # Use CompletionTime if available, otherwise fall back to LastModified
-            completion_time = item.get("CompletionTime") or item.get("LastModified")
-            if completion_time:
-                try:
-                    if isinstance(completion_time, str):
-                        # Handle different timestamp formats
-                        if completion_time.endswith("Z"):
-                            completion_dt = datetime.fromisoformat(
-                                completion_time.replace("Z", "+00:00")
-                            )
-                        elif "+00:00" in completion_time:
-                            completion_dt = datetime.fromisoformat(completion_time)
-                        else:
-                            completion_dt = datetime.fromisoformat(
-                                completion_time + "+00:00"
-                            )
-                    else:
-                        continue
-
-                    if completion_dt > threshold_time:
-                        recent_failures.append(
-                            {
-                                "document_id": item.get("ObjectKey"),
-                                "status": item.get("ObjectStatus")
-                                or item.get("Status"),
-                                "completion_time": completion_time,
-                                "error_message": item.get("ErrorMessage"),
-                            }
-                        )
-                except (ValueError, TypeError) as e:
-                    logger.debug(f"Could not parse timestamp {completion_time}: {e}")
-                    continue
+            status = item.get("Status") or item.get("ObjectStatus")
+            if status == "FAILED":
+                recent_failures.append(
+                    {
+                        "document_id": item.get("ObjectKey"),
+                        "status": status,
+                        "completion_time": item.get("CompletionTime"),
+                        "error_message": item.get("ErrorMessage"),
+                    }
+                )
 
         # Step 1: Quick scan to estimate error volume
         initial_scan = search_stack_logs(
@@ -239,17 +211,16 @@ def analyze_recent_system_errors(
             "analysis_summary": analysis_summary,
             "context_management": {
                 "events_collected": total_events_collected,
-                "events_limit": int(max_log_events),
-                "strategy": "adaptive_sampling",
+                "max_events_limit": max_log_events,
             },
             "recommendations": [
-                "Review error categories for patterns",
-                "Check validation errors for data quality issues",
-                "Monitor timeout errors for performance problems",
-                "Consider adjusting retry policies if errors are transient",
+                "Review error categories to identify patterns",
+                "Check recent failed documents for common issues",
+                "Monitor system-wide error trends over time",
+                "Consider scaling resources if timeout errors are frequent",
             ],
         }
 
     except Exception as e:
-        logger.error(f"Error analyzing recent system errors: {e}")
+        logger.error(f"Error in system-wide analysis: {e}")
         return {"error": str(e)}
