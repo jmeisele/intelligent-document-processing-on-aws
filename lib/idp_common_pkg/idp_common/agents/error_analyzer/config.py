@@ -70,6 +70,9 @@ def get_error_analyzer_config(pattern_config: Dict[str, Any] = None) -> Dict[str
     config["error_patterns"] = get_default_error_patterns()
     config["aws_capabilities"] = get_aws_service_capabilities()
 
+    # Apply context limits with UI overrides
+    config = _apply_context_limits(config)
+
     # Configure logging
     configure_logging(
         log_level=config.get("log_level"),
@@ -113,6 +116,58 @@ def get_default_error_patterns() -> List[str]:
         "ThrottlingException",
         "ServiceException",
     ]
+
+
+def _apply_context_limits(config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Apply context limits to configuration.
+
+    Args:
+        config: Base configuration dictionary
+
+    Returns:
+        Updated config with all limits applied directly to config object
+    """
+    # Get base context limits
+    base_limits = get_context_limits()
+
+    # Apply UI overrides
+    if config.get("max_log_events"):
+        # Override max_events_per_log_group with configured value, respecting minimum
+        base_limits["max_events_per_log_group"] = min(
+            config["max_log_events"], base_limits["max_events_per_log_group"]
+        )
+
+    # Add all limits directly to config for easy access
+    for key, value in base_limits.items():
+        config[key] = value
+
+    return config
+
+
+def get_context_limits() -> Dict[str, int]:
+    """
+    Get default context size limits to prevent Bedrock token overflow.
+
+    Returns:
+        Dict containing default truncation limits:
+        - max_log_message_length: Maximum characters per log message (200)
+        - max_events_per_log_group: Maximum events kept per log group during processing (5)
+        - max_lambda_request_ids: Maximum Lambda request IDs to include in response (3)
+        - max_stepfunction_timeline_events: Maximum Step Function timeline events (3)
+        - max_stepfunction_error_length: Maximum characters for Step Function error details (150)
+        - max_response_log_groups: Maximum log groups included in response sample (2)
+        - max_response_events_per_group: Maximum events per group in final response (1)
+    """
+    return {
+        "max_log_message_length": 200,
+        "max_events_per_log_group": 5,
+        "max_lambda_request_ids": 3,
+        "max_stepfunction_timeline_events": 3,
+        "max_stepfunction_error_length": 150,
+        "max_response_log_groups": 2,
+        "max_response_events_per_group": 1,
+    }
 
 
 def get_aws_service_capabilities() -> Dict[str, Any]:

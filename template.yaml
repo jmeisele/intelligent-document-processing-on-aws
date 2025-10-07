@@ -3743,6 +3743,12 @@ Resources:
                 - lambda:InvokeFunction
               Resource:
                 - !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}*"
+            - Effect: Allow
+              Action:
+                - states:DescribeExecution
+                - states:GetExecutionHistory
+              Resource:
+                - !Sub "arn:${AWS::Partition}:states:${AWS::Region}:${AWS::AccountId}:execution:${AWS::StackName}*"
 
   AgentProcessorLogGroup:
     Type: AWS::Logs::LogGroup

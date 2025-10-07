@@ -16,6 +16,7 @@ from .dynamodb_tools import (
 from .error_analysis_tool import analyze_errors
 from .general_analysis_tool import analyze_recent_system_errors
 from .lambda_tools import get_document_context
+from .stepfunction_tools import analyze_stepfunction_execution
 
 __all__ = [
     "analyze_errors",
@@ -28,4 +29,5 @@ __all__ = [
     "get_document_status",
     "get_tracking_table_name",
     "query_tracking_table",
+    "analyze_stepfunction_execution",
 ]

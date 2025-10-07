@@ -27,7 +27,9 @@ def _get_prioritized_error_patterns() -> List[tuple[str, int]]:
     ]
 
 
-def _filter_and_deduplicate_events(events: List[Dict]) -> List[Dict]:
+def _filter_and_deduplicate_events(
+    events: List[Dict], config: Dict[str, Any]
+) -> List[Dict]:
     """Keep only unique, meaningful error events."""
     import re
 
@@ -42,10 +44,16 @@ def _filter_and_deduplicate_events(events: List[Dict]) -> List[Dict]:
 
         if error_signature not in seen_messages and len(filtered) < 10:
             seen_messages.add(error_signature)
+            # Use configured message length limit
+            max_length = config.get("max_log_message_length", 200)
+            truncated_message = (
+                message[:max_length] + "..." if len(message) > max_length else message
+            )
+
             filtered.append(
                 {
                     "timestamp": event["timestamp"],
-                    "message": message[:200] + "..." if len(message) > 200 else message,
+                    "message": truncated_message,
                     "log_stream": event.get("log_stream", "")[:50],
                 }
             )
@@ -114,9 +122,21 @@ def analyze_recent_system_errors(
         max_log_events: Maximum log events to include in response
     """
     try:
+        # Get configuration with all limits applied
+        try:
+            from ..config import get_error_analyzer_config
+
+            config = get_error_analyzer_config()
+        except Exception:
+            # Fallback to defaults if config unavailable
+            config = {
+                "max_log_events": max_log_events,
+                "max_log_message_length": 200,
+            }
+
         # Ensure parameters are integers
         time_range_hours = int(float(time_range_hours))
-        max_log_events = int(float(max_log_events))
+        max_log_events = int(float(config.get("max_log_events", max_log_events)))
 
         # Get tracking table name
         tracking_info = get_tracking_table_name()
@@ -176,11 +196,13 @@ def analyze_recent_system_errors(
                     pattern_events.extend(result.get("events", []))
 
                 # Filter and deduplicate
-                filtered_events = _filter_and_deduplicate_events(pattern_events)
+                filtered_events = _filter_and_deduplicate_events(pattern_events, config)
 
                 error_summary[pattern] = {
                     "count": results.get("total_events_found", 0),
-                    "sample_events": filtered_events[:2],  # Only keep 2 sample events
+                    "sample_events": filtered_events[
+                        : config.get("max_response_events_per_group", 1) * 2
+                    ],
                 }
                 all_log_events.extend(filtered_events)
                 total_events_collected += len(filtered_events)
@@ -198,11 +220,18 @@ def analyze_recent_system_errors(
             "time_range_hours": time_range_hours,
             "total_errors_estimate": total_errors_estimate,
             "recent_failures_count": len(recent_failures),
-            "recent_failures": recent_failures[:3],  # Show top 3
+            "recent_failures": recent_failures[
+                : config.get("max_stepfunction_timeline_events", 3)
+            ],
             "error_categories": {
                 category: {
                     "count": len(errors),
-                    "sample": errors[0]["message"][:100] + "..." if errors else None,
+                    "sample": errors[0]["message"][
+                        : config.get("max_log_message_length", 200)
+                    ]
+                    + "..."
+                    if errors
+                    else None,
                 }
                 for category, errors in categorized_errors.items()
                 if errors
