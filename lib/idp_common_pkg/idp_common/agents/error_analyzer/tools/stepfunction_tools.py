@@ -11,11 +11,30 @@ from typing import Any, Dict, List, Optional
 import boto3
 from strands import tool
 
+from ..config import (
+    create_error_response,
+    create_success_response,
+    get_config_with_fallback,
+)
+
 logger = logging.getLogger(__name__)
 
 
 def _extract_failure_details(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Extract failure details from Step Function execution event."""
+    """
+    Failure parser: Extracts detailed error information from Step Function events.
+
+    Extract detailed failure information from Step Function execution events.
+
+    Parses different types of failure events to extract error messages, causes,
+    and resource information for comprehensive failure analysis.
+
+    Args:
+        event: Step Function execution event dictionary
+
+    Returns:
+        Dict containing failure details or None if event is not a failure
+    """
     event_type = event.get("type", "")
 
     failure_events = [
@@ -64,9 +83,23 @@ def _extract_failure_details(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def _analyze_execution_timeline(events: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Analyze execution timeline to identify failure patterns."""
+    """
+    Analyze Step Function execution timeline to identify failure patterns and state transitions.
+    Processes execution events chronologically to build a timeline of state transitions
+    and identify the exact point of failure with context.
+
+    Args:
+        events: List of Step Function execution events
+
+    Returns:
+        Dict containing timeline analysis, failure point, and state information
+    """
     if not events:
         return {"error": "No execution events available"}
+
+    # Cache config values once
+    config = get_config_with_fallback()
+    max_timeline_events = config.get("max_stepfunction_timeline_events", 3)
 
     timeline = []
     failure_point = None
@@ -110,15 +143,6 @@ def _analyze_execution_timeline(events: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "details": failure_details,
             }
 
-    # Use configured limit for timeline events
-    try:
-        from ..config import get_error_analyzer_config
-
-        config = get_error_analyzer_config()
-        max_timeline_events = config.get("max_stepfunction_timeline_events", 3)
-    except Exception:
-        max_timeline_events = 3
-
     return {
         "timeline": timeline[-max_timeline_events:],
         "failure_point": failure_point,
@@ -129,14 +153,19 @@ def _analyze_execution_timeline(events: List[Dict[str, Any]]) -> Dict[str, Any]:
 @tool
 def analyze_stepfunction_execution(execution_arn: str) -> Dict[str, Any]:
     """
-    Analyze Step Function execution for document-specific workflow failures.
+    Analyze Step Function execution to identify workflow failures and state transitions.
+    Retrieves execution history and performs comprehensive analysis to identify failure points,
+    state transitions, and execution patterns for document processing workflows.
 
     Args:
         execution_arn: Step Function execution ARN from document context
+
+    Returns:
+        Dict containing execution analysis, timeline, and failure details
     """
     try:
         if not execution_arn:
-            return {"error": "No execution ARN provided"}
+            return create_error_response("No execution ARN provided")
 
         stepfunctions_client = boto3.client("stepfunctions")
 
@@ -175,19 +204,21 @@ def analyze_stepfunction_execution(execution_arn: str) -> Dict[str, Any]:
             if failure_point.get("details", {}).get("error"):
                 analysis_summary += f": {failure_point['details']['error']}"
 
-        return {
-            "execution_status": execution_status,
-            "duration_seconds": duration_seconds,
-            "timeline_analysis": timeline_analysis,
-            "analysis_summary": analysis_summary,
-            "recommendations": [
-                "Check the failure point state for specific error details",
-                "Review Lambda function logs if failure occurred in Lambda task",
-                "Verify input data format if failure occurred early in workflow",
-                "Consider timeout adjustments if execution timed out",
-            ],
-        }
+        return create_success_response(
+            {
+                "execution_status": execution_status,
+                "duration_seconds": duration_seconds,
+                "timeline_analysis": timeline_analysis,
+                "analysis_summary": analysis_summary,
+                "recommendations": [
+                    "Check the failure point state for specific error details",
+                    "Review Lambda function logs if failure occurred in Lambda task",
+                    "Verify input data format if failure occurred early in workflow",
+                    "Consider timeout adjustments if execution timed out",
+                ],
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error analyzing Step Function execution {execution_arn}: {e}")
-        return {"error": str(e)}
+        return create_error_response(str(e))

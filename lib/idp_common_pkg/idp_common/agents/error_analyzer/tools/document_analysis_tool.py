@@ -10,6 +10,11 @@ from typing import Any, Dict
 
 from strands import tool
 
+from ..config import (
+    create_error_response,
+    get_config_with_fallback,
+    truncate_message,
+)
 from .cloudwatch_tools import search_document_logs
 from .lambda_tools import get_document_context
 from .stepfunction_tools import analyze_stepfunction_execution
@@ -18,50 +23,76 @@ logger = logging.getLogger(__name__)
 
 
 def _truncate_log_results(log_results: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Truncate log results to prevent context overflow."""
+    """
+    Applies size constraints to log results to prevent context overflow.
+    Applies configured limits to log events and message lengths to ensure
+    the response stays within context size constraints.
+
+    Args:
+        log_results: Log search results dictionary to truncate
+        config: Configuration dictionary with truncation limits
+    """
     if not log_results or not log_results.get("results"):
         return
 
+    # Cache config values once
+    max_events_per_group = config.get("max_events_per_log_group", 3)
+    max_message_length = config.get("max_log_message_length", 200)
+
     for result in log_results["results"]:
         events = result.get("events", [])
-        result["events"] = events[: config.get("max_events_per_log_group", 3)]
+        result["events"] = events[:max_events_per_group]
 
         for event in result["events"]:
             message = event.get("message", "")
-            max_length = config.get("max_log_message_length", 200)
-            if len(message) > max_length:
-                event["message"] = message[:max_length] + "... [truncated]"
+            event["message"] = truncate_message(message, max_message_length)
 
 
 def _truncate_stepfunction_analysis(
     sf_analysis: Dict[str, Any], config: Dict[str, Any]
 ) -> None:
-    """Truncate Step Function analysis data to prevent context overflow."""
+    """
+    Applies size constraints to Step Function analysis to prevent overflow.
+    Applies configured limits to timeline events and error message lengths
+    to keep Step Function analysis within context constraints.
+
+    Args:
+        sf_analysis: Step Function analysis results to truncate
+        config: Configuration dictionary with truncation limits
+    """
     if not sf_analysis or sf_analysis.get("error"):
         return
 
+    # Cache config values once
+    max_timeline_events = config.get("max_stepfunction_timeline_events", 3)
+    max_error_length = config.get("max_stepfunction_error_length", 150)
+
     timeline_analysis = sf_analysis.get("timeline_analysis", {})
     if "timeline" in timeline_analysis:
-        max_events = config.get("max_stepfunction_timeline_events", 3)
-        timeline_analysis["timeline"] = timeline_analysis["timeline"][:max_events]
+        timeline_analysis["timeline"] = timeline_analysis["timeline"][
+            :max_timeline_events
+        ]
 
     failure_point = timeline_analysis.get("failure_point")
     if failure_point and "details" in failure_point:
         details = failure_point["details"]
-        max_length = config.get("max_stepfunction_error_length", 150)
         for key in ["error", "cause"]:
-            if key in details and len(str(details[key])) > max_length:
-                details[key] = str(details[key])[:max_length] + "... [truncated]"
+            if key in details:
+                details[key] = truncate_message(str(details[key]), max_error_length)
 
 
 def _truncate_context_data(context: Dict[str, Any], config: Dict[str, Any]) -> None:
-    """Truncate context data to prevent overflow."""
+    """
+    Truncate document context data to prevent overflow.
+    Removes large response objects and applies limits to context data
+    to optimize memory usage and response size.
+
+    Args:
+        context: Document context dictionary to truncate
+        config: Configuration dictionary with limits
+    """
     if "lookup_function_response" in context:
         del context["lookup_function_response"]
-
-    if "lambda_request_ids" in context:
-        max_ids = config.get("max_lambda_request_ids", 3)
-        context["lambda_request_ids"] = context["lambda_request_ids"][:max_ids]
 
 
 @tool
@@ -69,31 +100,37 @@ def analyze_document_failure(
     document_id: str, stack_name: str, max_log_events: int = 5
 ) -> Dict[str, Any]:
     """
-    Analyze failure for a specific document using lookup function and enhanced log search.
+    Perform comprehensive failure analysis for a specific document.
+    Combines document context lookup, Step Function execution analysis, and targeted
+    log searching to provide detailed insights into document processing failures.
 
     Args:
         document_id: Document ObjectKey to analyze
         stack_name: CloudFormation stack name
+        max_log_events: Maximum log events to include (default: 5)
+
+    Returns:
+        Dict containing comprehensive document failure analysis
     """
     try:
         # Get document context via lookup function
         context = get_document_context(document_id, stack_name)
 
         if not context.get("document_found"):
-            return {
-                "analysis_type": "document_not_found",
-                "document_id": document_id,
-                "document_found": False,
-                "error": context.get("error", "Document not found"),
-                "analysis_summary": f"Document '{document_id}' was not found in the tracking database",
-                "root_cause": "The specified document could not be located in the system's tracking database",
-                "recommendations": [
+            return create_error_response(
+                context.get("error", "Document not found"),
+                analysis_type="document_not_found",
+                document_id=document_id,
+                document_found=False,
+                analysis_summary=f"Document '{document_id}' was not found in the tracking database",
+                root_cause="The specified document could not be located in the system's tracking database",
+                recommendations=[
                     "Verify the document filename is correct and matches exactly",
                     "Check if the document was successfully uploaded to the system",
                     "Ensure the document processing was initiated",
                     "Contact support if the document should exist in the system",
                 ],
-            }
+            )
 
         # Extract document details from context
         document_status = context.get("document_status")
@@ -107,25 +144,20 @@ def analyze_document_failure(
             stepfunction_analysis = analyze_stepfunction_execution(execution_arn)
 
         # Get configuration with all limits applied
-        try:
-            from ..config import get_error_analyzer_config
+        config = get_config_with_fallback()
+        config.setdefault("max_log_events", max_log_events)
 
-            config = get_error_analyzer_config()
-        except Exception:
-            # Fallback to defaults if config unavailable
-            config = {
-                "max_log_events": max_log_events,
-                "max_log_message_length": 200,
-                "max_events_per_log_group": 3,
-                "max_lambda_request_ids": 3,
-            }
+        # Cache frequently used config values
+        base_log_events = int(config.get("max_log_events", max_log_events))
+        max_response_log_groups = config.get("max_response_log_groups", 4)
+        max_response_events_per_group = config.get("max_response_events_per_group", 3)
 
-        # Search document-specific logs
+        # Search document-specific logs with increased allocation
         log_results = search_document_logs(
             document_id=document_id,
             stack_name=stack_name,
             filter_pattern="ERROR",
-            max_log_events=int(config.get("max_log_events", max_log_events)),
+            max_log_events=base_log_events * 2,  # Double allocation for logs
             max_log_groups=20,
         )
 
@@ -174,30 +206,24 @@ def analyze_document_failure(
         if context.get("lambda_request_ids"):
             response["lambda_request_ids"] = context["lambda_request_ids"]
 
+        # Include minimal Step Function data to prioritize logs
         if stepfunction_analysis and not stepfunction_analysis.get("error"):
-            # Include only essential Step Function data
             response["stepfunction_summary"] = {
                 "status": stepfunction_analysis.get("execution_status"),
                 "duration_seconds": stepfunction_analysis.get("duration_seconds"),
-                "failure_point": stepfunction_analysis.get("timeline_analysis", {}).get(
-                    "failure_point"
-                ),
             }
 
         if log_results.get("results") and any(
             r.get("events") for r in log_results["results"]
         ):
+            # Prioritize logs with expanded context allocation
             response["log_summary"] = {
                 "total_groups_searched": len(log_results.get("results", [])),
                 "total_events_found": log_results.get("total_events_found", 0),
                 "sample_errors": [
                     e["message"]
-                    for r in log_results["results"][
-                        : config.get("max_response_log_groups", 2)
-                    ]
-                    for e in r.get("events", [])[
-                        : config.get("max_response_events_per_group", 1)
-                    ]
+                    for r in log_results["results"][:max_response_log_groups]
+                    for e in r.get("events", [])[:max_response_events_per_group]
                 ],
             }
 
@@ -205,4 +231,4 @@ def analyze_document_failure(
 
     except Exception as e:
         logger.error(f"Error analyzing document failure: {e}")
-        return {"error": str(e)}
+        return create_error_response(str(e))

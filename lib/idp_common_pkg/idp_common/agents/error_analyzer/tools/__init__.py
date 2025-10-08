@@ -3,6 +3,14 @@
 
 """
 Error Analyzer tools for Strands agents.
+
+Provides comprehensive error analysis capabilities including:
+- Document-specific failure analysis
+- System-wide error pattern detection
+- CloudWatch log searching and filtering
+- DynamoDB tracking table queries
+- Step Function execution analysis
+- Lambda function context extraction
 """
 
 from .cloudwatch_tools import search_document_logs, search_stack_logs

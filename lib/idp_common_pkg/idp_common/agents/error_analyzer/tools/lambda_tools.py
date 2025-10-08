@@ -14,25 +14,42 @@ from typing import Any, Dict, List
 import boto3
 from strands import tool
 
+from ..config import create_error_response, create_success_response
+
 logger = logging.getLogger(__name__)
 
 
 def get_lookup_function_name() -> str:
-    """Get lookup function name from environment variable."""
+    """
+    Retrieve the Lambda lookup function name from environment configuration.
+    Checks for LOOKUP_FUNCTION_NAME environment variable with fallback to
+    AWS_STACK_NAME-based naming convention.
+
+    Returns:
+        Lambda function name string
+
+    Raises:
+        ValueError: If neither environment variable is configured
+    """
     function_name = os.environ.get("LOOKUP_FUNCTION_NAME")
     if function_name:
         return function_name
-
-    # Fallback to AWS_STACK_NAME if available
-    stack_name = os.environ.get("AWS_STACK_NAME")
-    if stack_name:
-        return f"{stack_name}-LookupFunction"
 
     raise ValueError("LOOKUP_FUNCTION_NAME environment variable not set")
 
 
 def extract_lambda_request_ids(execution_events: List[Dict[str, Any]]) -> List[str]:
-    """Extract Lambda request IDs from Step Function execution events."""
+    """
+    Extract Lambda request IDs from Step Functions execution event history.
+    Parses Step Function execution events to find Lambda function invocation request IDs
+    for targeted CloudWatch log filtering.
+
+    Args:
+        execution_events: List of Step Function execution events
+
+    Returns:
+        List of unique Lambda request ID strings
+    """
     request_ids = []
 
     for event in execution_events:
@@ -68,11 +85,17 @@ def extract_lambda_request_ids(execution_events: List[Dict[str, Any]]) -> List[s
 @tool
 def get_document_context(document_id: str, stack_name: str = "") -> Dict[str, Any]:
     """
-    Get document execution context via lookup_function Lambda.
+    Retrieve comprehensive document processing context via Lambda lookup function.
+    Invokes the lookup Lambda function to gather execution context, timing information,
+    and Step Function details for a specific document. Provides essential data for
+    targeted error analysis and log searching.
 
     Args:
         document_id: Document ObjectKey to analyze
         stack_name: CloudFormation stack name (optional, for backward compatibility)
+
+    Returns:
+        Dict containing document context, execution details, and timing information
     """
     try:
         lambda_client = boto3.client("lambda")
@@ -93,18 +116,18 @@ def get_document_context(document_id: str, stack_name: str = "") -> Dict[str, An
         payload = json.loads(response["Payload"].read().decode("utf-8"))
 
         if payload.get("status") == "NOT_FOUND":
-            return {
-                "document_found": False,
-                "document_id": document_id,
-                "error": "Document not found in tracking database",
-            }
+            return create_error_response(
+                "Document not found in tracking database",
+                document_found=False,
+                document_id=document_id,
+            )
 
         if payload.get("status") == "ERROR":
-            return {
-                "document_found": False,
-                "document_id": document_id,
-                "error": payload.get("message", "Unknown error from lookup function"),
-            }
+            return create_error_response(
+                payload.get("message", "Unknown error from lookup function"),
+                document_found=False,
+                document_id=document_id,
+            )
 
         # Extract execution context
         processing_detail = payload.get("processingDetail", {})
@@ -131,19 +154,23 @@ def get_document_context(document_id: str, stack_name: str = "") -> Dict[str, An
                 timestamps["CompletionTime"].replace("Z", "+00:00")
             )
 
-        return {
-            "document_found": True,
-            "document_id": document_id,
-            "document_status": payload.get("status"),
-            "execution_arn": execution_arn,
-            "lambda_request_ids": request_ids,
-            "timestamps": timestamps,
-            "processing_start_time": start_time,
-            "processing_end_time": end_time,
-            "execution_events_count": len(execution_events),
-            "lookup_function_response": payload,
-        }
+        return create_success_response(
+            {
+                "document_found": True,
+                "document_id": document_id,
+                "document_status": payload.get("status"),
+                "execution_arn": execution_arn,
+                "lambda_request_ids": request_ids,
+                "timestamps": timestamps,
+                "processing_start_time": start_time,
+                "processing_end_time": end_time,
+                "execution_events_count": len(execution_events),
+                "lookup_function_response": payload,
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error getting document context for {document_id}: {e}")
-        return {"document_found": False, "document_id": document_id, "error": str(e)}
+        return create_error_response(
+            str(e), document_found=False, document_id=document_id
+        )
