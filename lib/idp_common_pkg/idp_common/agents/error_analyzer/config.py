@@ -90,11 +90,11 @@ def get_context_limits() -> Dict[str, int]:
     """Returns default resource and context size constraints."""
     return {
         "max_log_events": 5,
-        "max_log_message_length": 200,
+        "max_log_message_length": 400,
         "max_events_per_log_group": 5,
         "max_log_groups": 20,
         "max_stepfunction_timeline_events": 3,
-        "max_stepfunction_error_length": 150,
+        "max_stepfunction_error_length": 200,
         "time_range_hours_default": 24,
     }
 
