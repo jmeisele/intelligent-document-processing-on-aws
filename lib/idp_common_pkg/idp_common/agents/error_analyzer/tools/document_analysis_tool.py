@@ -145,20 +145,18 @@ def analyze_document_failure(
 
         # Get configuration with all limits applied
         config = get_config_with_fallback()
-        config.setdefault("max_log_events", max_log_events)
 
-        # Cache frequently used config values
-        base_log_events = int(config.get("max_log_events", max_log_events))
-        max_response_log_groups = config.get("max_response_log_groups", 4)
-        max_response_events_per_group = config.get("max_response_events_per_group", 3)
+        # Use configured values, fallback to parameter if not in config
+        configured_log_events = int(config.get("max_log_events", max_log_events))
+        configured_log_groups = int(config.get("max_log_groups", 20))
 
-        # Search document-specific logs with increased allocation
+        # Search document-specific logs using configured values
         log_results = search_document_logs(
             document_id=document_id,
             stack_name=stack_name,
             filter_pattern="ERROR",
-            max_log_events=base_log_events * 2,  # Double allocation for logs
-            max_log_groups=20,
+            max_log_events=configured_log_events,
+            max_log_groups=configured_log_groups,
         )
 
         # Truncate and limit data for context management
@@ -216,14 +214,14 @@ def analyze_document_failure(
         if log_results.get("results") and any(
             r.get("events") for r in log_results["results"]
         ):
-            # Prioritize logs with expanded context allocation
+            # Include all collected log data for comprehensive analysis
             response["log_summary"] = {
                 "total_groups_searched": len(log_results.get("results", [])),
                 "total_events_found": log_results.get("total_events_found", 0),
                 "sample_errors": [
                     e["message"]
-                    for r in log_results["results"][:max_response_log_groups]
-                    for e in r.get("events", [])[:max_response_events_per_group]
+                    for r in log_results["results"]
+                    for e in r.get("events", [])
                 ],
             }
 

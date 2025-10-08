@@ -53,10 +53,10 @@ def get_error_analyzer_config(pattern_config: Dict[str, Any] = None) -> Dict[str
         params.get("time_range_hours_default"), 24
     )
 
-    # Apply UI overrides for context limits
-    if config["max_log_events"]:
-        config["max_events_per_log_group"] = min(
-            config["max_log_events"], config["max_events_per_log_group"]
+    # Apply UI overrides for context limits - UI config takes precedence
+    if pattern_config and "max_log_events" in pattern_config:
+        config["max_log_events"] = safe_int_conversion(
+            pattern_config["max_log_events"], config["max_log_events"]
         )
 
     # Validate required fields
@@ -92,10 +92,9 @@ def get_context_limits() -> Dict[str, int]:
         "max_log_events": 5,
         "max_log_message_length": 200,
         "max_events_per_log_group": 5,
+        "max_log_groups": 20,
         "max_stepfunction_timeline_events": 3,
         "max_stepfunction_error_length": 150,
-        "max_response_log_groups": 2,
-        "max_response_events_per_group": 1,
         "time_range_hours_default": 24,
     }
 

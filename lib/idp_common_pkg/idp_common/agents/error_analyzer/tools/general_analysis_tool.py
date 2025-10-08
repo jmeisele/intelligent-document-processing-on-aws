@@ -177,10 +177,10 @@ def analyze_recent_system_errors(
         # Cache frequently used config values
         max_timeline_events = config.get("max_stepfunction_timeline_events", 3)
         max_message_length = config.get("max_log_message_length", 200)
-        max_events_per_group = config.get("max_response_events_per_group", 1)
 
         # Ensure parameters are integers using safe conversion
         time_range_hours = safe_int_conversion(time_range_hours)
+        # Use configured max_log_events, fallback to parameter if not in config
         max_log_events = safe_int_conversion(
             config.get("max_log_events", max_log_events)
         )
@@ -247,7 +247,7 @@ def analyze_recent_system_errors(
 
                 error_summary[pattern] = {
                     "count": results.get("total_events_found", 0),
-                    "sample_events": filtered_events[: max_events_per_group * 2],
+                    "sample_events": filtered_events,
                 }
                 all_log_events.extend(filtered_events)
                 total_events_collected += len(filtered_events)
