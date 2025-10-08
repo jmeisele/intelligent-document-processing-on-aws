@@ -5,6 +5,9 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+### Fixed
+- **Discovery function times out when processing large documents.**
+  - increase lambda discovery processor timeout to 900s 
 
 ## [0.3.19]
 

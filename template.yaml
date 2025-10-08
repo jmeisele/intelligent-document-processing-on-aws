@@ -6014,7 +6014,7 @@ Resources:
       CodeUri: ./src/lambda/discovery_processor
       Description: Lambda function to process discovery jobs from SQS queue
       MemorySize: 1024
-      Timeout: 120
+      Timeout: 900
       Environment:
         Variables:
           LOG_LEVEL: !Ref LogLevel
