@@ -18,9 +18,11 @@ STACK_NAME="idp-cli-demo-w2-$(date +%Y%m%d-%H%M%S)"
 ADMIN_EMAIL="${ADMIN_EMAIL:-user@example.com}"
 PATTERN="pattern-2"
 MAX_CONCURRENT=5
-W2_SAMPLES_DIR="../../samples/w2"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+W2_SAMPLES_DIR="$PROJECT_ROOT/samples/w2"
 MANIFEST_FILE="/tmp/w2-manifest.csv"
-RESULTS_DIR="./w2-results"
+RESULTS_DIR="$SCRIPT_DIR/w2-results"
 
 echo "=========================================="
 echo "IDP CLI Demo - W2 Document Processing"
@@ -49,6 +51,7 @@ fi
 echo "Step 1: Deploying IDP Stack"
 echo "----------------------------"
 echo "This will take 10-15 minutes..."
+echo "Using public template from S3 (us-west-2 region)"
 echo ""
 
 idp-cli deploy \
@@ -56,6 +59,7 @@ idp-cli deploy \
     --pattern "$PATTERN" \
     --admin-email "$ADMIN_EMAIL" \
     --max-concurrent "$MAX_CONCURRENT" \
+    --region us-west-2 \
     --wait
 
 echo ""

@@ -54,8 +54,11 @@ def cli():
               type=click.Choice(['pattern-1', 'pattern-2', 'pattern-3']),
               help='IDP pattern to deploy')
 @click.option('--admin-email', required=True, help='Admin user email address')
-@click.option('--template-path', default='../../template.yaml',
-              help='Path to CloudFormation template (default: ../../template.yaml)')
+@click.option('--template-path', 
+              help='Path to local CloudFormation template')
+@click.option('--template-url', 
+              default='https://s3.us-west-2.amazonaws.com/aws-ml-blog-us-west-2/artifacts/genai-idp/idp-main.yaml',
+              help='URL to CloudFormation template in S3 (default: public template)')
 @click.option('--max-concurrent', default=100, type=int,
               help='Maximum concurrent workflows (default: 100)')
 @click.option('--log-level', default='INFO',
@@ -73,7 +76,8 @@ def deploy(
     stack_name: str,
     pattern: str,
     admin_email: str,
-    template_path: str,
+    template_path: Optional[str],
+    template_url: str,
     max_concurrent: int,
     log_level: str,
     enable_hitl: str,
@@ -134,6 +138,7 @@ def deploy(
             result = deployer.deploy_stack(
                 stack_name=stack_name,
                 template_path=template_path,
+                template_url=template_url if not template_path else None,
                 parameters=cfn_parameters,
                 wait=wait
             )

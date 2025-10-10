@@ -32,8 +32,9 @@ class StackDeployer:
     def deploy_stack(
         self,
         stack_name: str,
-        template_path: str,
-        parameters: Dict[str, str],
+        template_path: Optional[str] = None,
+        template_url: Optional[str] = None,
+        parameters: Dict[str, str] = None,
         wait: bool = False
     ) -> Dict:
         """
@@ -41,7 +42,8 @@ class StackDeployer:
         
         Args:
             stack_name: Name for the stack
-            template_path: Path to CloudFormation template
+            template_path: Path to local CloudFormation template (optional)
+            template_url: URL to CloudFormation template in S3 (optional)
             parameters: Stack parameters
             wait: Whether to wait for stack creation to complete
         
@@ -50,13 +52,22 @@ class StackDeployer:
         """
         logger.info(f"Deploying stack: {stack_name}")
         
-        # Read template
-        template_body = self._read_template(template_path)
+        if not template_path and not template_url:
+            raise ValueError("Either template_path or template_url must be provided")
+        
+        # Determine template source
+        if template_url:
+            logger.info(f"Using template URL: {template_url}")
+            template_param = {'TemplateURL': template_url}
+        else:
+            # Read template from local file
+            template_body = self._read_template(template_path)
+            template_param = {'TemplateBody': template_body}
         
         # Convert parameters dict to CloudFormation format
         cfn_parameters = [
             {'ParameterKey': k, 'ParameterValue': v}
-            for k, v in parameters.items()
+            for k, v in (parameters or {}).items()
         ]
         
         # Check if stack exists
@@ -67,7 +78,7 @@ class StackDeployer:
                 logger.info(f"Stack {stack_name} exists - updating")
                 response = self.cfn.update_stack(
                     StackName=stack_name,
-                    TemplateBody=template_body,
+                    **template_param,
                     Parameters=cfn_parameters,
                     Capabilities=['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM', 'CAPABILITY_AUTO_EXPAND']
                 )
@@ -76,7 +87,7 @@ class StackDeployer:
                 logger.info(f"Creating new stack: {stack_name}")
                 response = self.cfn.create_stack(
                     StackName=stack_name,
-                    TemplateBody=template_body,
+                    **template_param,
                     Parameters=cfn_parameters,
                     Capabilities=['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM', 'CAPABILITY_AUTO_EXPAND'],
                     OnFailure='ROLLBACK'
