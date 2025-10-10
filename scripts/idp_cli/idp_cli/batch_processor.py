@@ -41,7 +41,6 @@ class BatchProcessor:
         
         # Initialize AWS clients
         self.s3 = boto3.client('s3', region_name=region)
-        self.sqs = boto3.client('sqs', region_name=region)
         self.dynamodb = boto3.resource('dynamodb', region_name=region)
         
         # Get stack resources
@@ -100,17 +99,10 @@ class BatchProcessor:
         for doc in documents:
             try:
                 # Handle document upload/reference
+                # S3 upload automatically triggers EventBridge -> QueueSender -> SQS
                 s3_key = self._process_document(doc, batch_id)
                 
-                # Send to SQS queue
-                self._send_to_queue(
-                    s3_key=s3_key,
-                    document_id=doc['document_id'],
-                    steps=steps,
-                    baseline_key=doc.get('baseline_key')
-                )
-                
-                results['document_ids'].append(doc['document_id'])
+                results['document_ids'].append(s3_key)  # Use s3_key as document_id for tracking
                 results['queued'] += 1
                 
                 if doc['type'] == 'local':
@@ -186,51 +178,6 @@ class BatchProcessor:
             if e.response['Error']['Code'] == '404':
                 raise ValueError(f"Document not found in InputBucket: {s3_key}")
             raise
-    
-    def _send_to_queue(
-        self,
-        s3_key: str,
-        document_id: str,
-        steps: str,
-        baseline_key: Optional[str] = None
-    ):
-        """
-        Send message to SQS queue for processing
-        
-        Args:
-            s3_key: S3 key of the document
-            document_id: Document identifier
-            steps: Steps to execute
-            baseline_key: Optional baseline key for evaluation
-        """
-        # Create message mimicking EventBridge format
-        message = {
-            'detail-type': 'Object Created',
-            'detail': {
-                'bucket': {
-                    'name': self.resources['InputBucket']
-                },
-                'object': {
-                    'key': s3_key
-                }
-            },
-            # Add CLI metadata for step filtering
-            'cli_metadata': {
-                'source': 'cli',
-                'document_id': document_id,
-                'steps': steps.split(',') if steps != 'all' else 'all',
-                'baseline_key': baseline_key
-            }
-        }
-        
-        # Send to SQS
-        queue_url = self.resources['DocumentQueueUrl']
-        self.sqs.send_message(
-            QueueUrl=queue_url,
-            MessageBody=json.dumps(message)
-        )
-        
-        logger.debug(f"Sent message to queue for {document_id}")
     
     def _store_batch_metadata(self, batch_id: str, results: Dict):
         """Store batch metadata for later retrieval"""
