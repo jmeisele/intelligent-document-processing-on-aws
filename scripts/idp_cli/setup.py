@@ -27,7 +27,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'idp-cli=cli:main',
+            'idp-cli=idp_cli.cli:main',
         ],
     },
     python_requires='>=3.9',
