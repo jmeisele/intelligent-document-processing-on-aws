@@ -176,6 +176,7 @@ class StackDeployer:
                     
                     result = {
                         'stack_name': stack_name,
+                        'operation': operation,
                         'status': status,
                         'success': is_success,
                         'outputs': self._get_stack_outputs(stack)
