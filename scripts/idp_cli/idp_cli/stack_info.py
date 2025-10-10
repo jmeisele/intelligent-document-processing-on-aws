@@ -102,15 +102,8 @@ class StackInfo:
             for page in paginator.paginate(StackName=self.stack_name):
                 for resource in page.get('StackResourceSummaries', []):
                     if resource.get('LogicalResourceId') == 'DocumentQueue':
-                        # Get queue URL from physical resource ID
-                        queue_name = resource.get('PhysicalResourceId', '')
-                        sqs = boto3.client('sqs', region_name=self.region)
-                        
-                        # Queue URL format: https://sqs.{region}.amazonaws.com/{account}/{queue-name}
-                        account_id = boto3.client('sts').get_caller_identity()['Account']
-                        region = self.region or boto3.Session().region_name
-                        queue_url = f"https://sqs.{region}.amazonaws.com/{account_id}/{queue_name}"
-                        
+                        # PhysicalResourceId IS the queue URL for SQS queues
+                        queue_url = resource.get('PhysicalResourceId', '')
                         return queue_url
             
             raise ValueError("DocumentQueue not found in stack resources")
