@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 import json
 
-from ..stack_info import StackInfo, get_stack_resources
+from idp_cli.stack_info import StackInfo, get_stack_resources
 
 
 class TestStackInfo:

@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch, MagicMock, call
 import json
 from datetime import datetime
 
-from ..batch_processor import BatchProcessor
+from idp_cli.batch_processor import BatchProcessor
 
 
 class TestBatchProcessor:
@@ -57,8 +57,7 @@ class TestBatchProcessor:
         mock_stack_info.validate_stack.return_value = True
         mock_stack_info.get_resources.return_value = {
             'InputBucket': 'input-bucket',
-            'OutputBucket': 'output-bucket',
-            'DocumentQueueUrl': 'https://sqs.us-east-1.amazonaws.com/123456789012/queue'
+            'OutputBucket': 'output-bucket'
         }
         mock_stack_info_class.return_value = mock_stack_info
         
@@ -73,19 +72,11 @@ class TestBatchProcessor:
             }
         ]
         
-        # Mock S3 and SQS clients
+        # Mock S3 client
         mock_s3 = MagicMock()
-        mock_sqs = MagicMock()
-        mock_sqs.send_message.return_value = {'MessageId': 'msg-123'}
+        mock_s3.head_object.return_value = {'ContentLength': 1024}  # Validate exists
         
-        def client_factory(service, **kwargs):
-            if service == 's3':
-                return mock_s3
-            elif service == 'sqs':
-                return mock_sqs
-            return MagicMock()
-        
-        mock_client.side_effect = client_factory
+        mock_client.return_value = mock_s3
         
         processor = BatchProcessor('test-stack')
         
@@ -98,12 +89,12 @@ class TestBatchProcessor:
         # Verify results
         assert 'batch_id' in result
         assert len(result['document_ids']) == 1
-        assert result['document_ids'][0] == 'doc1'
+        assert result['document_ids'][0] == 'doc1.pdf'  # Returns S3 key
         assert result['queued'] == 1
         assert result['failed'] == 0
         
-        # Verify SQS message was sent
-        mock_sqs.send_message.assert_called_once()
+        # Verify S3 head_object was called to validate file
+        mock_s3.head_object.assert_called_once()
     
     @patch('idp_cli.batch_processor.StackInfo')
     @patch('boto3.client')
@@ -187,43 +178,6 @@ class TestBatchProcessor:
         
         with pytest.raises(ValueError, match="Document not found"):
             processor._validate_s3_key('nonexistent.pdf')
-    
-    @patch('idp_cli.batch_processor.StackInfo')
-    @patch('boto3.client')
-    @patch('boto3.resource')
-    def test_send_to_queue(self, mock_resource, mock_client, mock_stack_info_class):
-        """Test sending message to SQS queue"""
-        mock_stack_info = MagicMock()
-        mock_stack_info.validate_stack.return_value = True
-        mock_stack_info.get_resources.return_value = {
-            'InputBucket': 'input-bucket',
-            'DocumentQueueUrl': 'https://sqs.us-east-1.amazonaws.com/123456789012/queue'
-        }
-        mock_stack_info_class.return_value = mock_stack_info
-        
-        mock_sqs = MagicMock()
-        mock_client.return_value = mock_sqs
-        
-        processor = BatchProcessor('test-stack')
-        
-        processor._send_to_queue(
-            s3_key='doc1.pdf',
-            document_id='doc1',
-            steps='extraction,assessment',
-            baseline_key='baselines/doc1.json'
-        )
-        
-        # Verify message was sent
-        mock_sqs.send_message.assert_called_once()
-        
-        # Verify message structure
-        call_args = mock_sqs.send_message.call_args
-        message_body = json.loads(call_args[1]['MessageBody'])
-        
-        assert message_body['detail']['object']['key'] == 'doc1.pdf'
-        assert message_body['cli_metadata']['document_id'] == 'doc1'
-        assert message_body['cli_metadata']['steps'] == ['extraction', 'assessment']
-        assert message_body['cli_metadata']['baseline_key'] == 'baselines/doc1.json'
     
     @patch('idp_cli.batch_processor.StackInfo')
     @patch('boto3.client')

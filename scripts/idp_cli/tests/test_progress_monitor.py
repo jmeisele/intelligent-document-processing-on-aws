@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 import json
 
-from ..progress_monitor import ProgressMonitor
+from idp_cli.progress_monitor import ProgressMonitor
 
 
 class TestProgressMonitor:

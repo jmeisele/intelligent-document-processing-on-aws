@@ -12,7 +12,7 @@ from pathlib import Path
 import json
 import csv
 
-from ..manifest_parser import ManifestParser, parse_manifest, validate_manifest
+from idp_cli.manifest_parser import ManifestParser, parse_manifest, validate_manifest
 
 
 class TestManifestParser:
