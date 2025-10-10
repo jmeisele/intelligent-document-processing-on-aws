@@ -121,20 +121,25 @@ idp-cli run-inference \
     --output-prefix "w2-demo" \
     --region us-west-2 2>&1 | tee /tmp/idp-cli-output.log
 
-# Extract batch ID
-BATCH_ID=$(grep "Batch ID:" /tmp/idp-cli-output.log | head -1 | awk '{print $3}')
+# Extract batch ID - look for line "Batch ID: xxx"
+BATCH_ID=$(grep -oP 'Batch ID: \K[^\s]+' /tmp/idp-cli-output.log | head -1)
+
+if [ -z "$BATCH_ID" ]; then
+    echo "ERROR: Could not extract batch ID from output"
+    exit 1
+fi
 
 echo ""
 echo "Batch submitted: $BATCH_ID"
-echo "Waiting for processing to complete..."
+echo "Documents uploaded successfully. S3 EventBridge will trigger processing."
+echo "Note: It may take 1-2 minutes for EventBridge to trigger QueueSender Lambda."
 echo ""
-
-# Now monitor the batch until completion
-idp-cli status \
-    --stack-name "$STACK_NAME" \
-    --batch-id "$BATCH_ID" \
-    --region us-west-2 \
-    --wait
+echo "You can monitor processing in the Web UI:"
+echo "  https://d2y5k61mxvfsga.cloudfront.net/"
+echo ""
+echo "Or download results directly when ready:"
+echo "  aws s3 cp s3://$OUTPUT_BUCKET/w2-demo/ ./w2-results/ --recursive --region us-west-2"
+echo ""
 
 echo ""
 echo "✓ Batch processing complete!"
