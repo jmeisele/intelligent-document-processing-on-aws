@@ -14,7 +14,7 @@
 set -e  # Exit on error
 
 # Configuration
-STACK_NAME="idp-cli-w2-$(date +%H%M%S)"
+STACK_NAME="idp-cli-w2-211755"
 ADMIN_EMAIL="${ADMIN_EMAIL:-user@example.com}"
 PATTERN="pattern-2"
 MAX_CONCURRENT=5
@@ -114,20 +114,30 @@ echo "--------------------------------"
 echo "Processing $DOC_COUNT documents with concurrency=$MAX_CONCURRENT"
 echo ""
 
-BATCH_ID=$(idp-cli run-inference \
+# Submit batch and get batch ID (don't monitor initially)
+idp-cli run-inference \
     --stack-name "$STACK_NAME" \
     --manifest "$MANIFEST_FILE" \
     --output-prefix "w2-demo" \
-    --monitor 2>&1 | tee /tmp/idp-cli-output.log | grep "Batch ID:" | awk '{print $3}')
+    --region us-west-2 2>&1 | tee /tmp/idp-cli-output.log
 
-# If monitoring was interrupted, extract batch ID from output
-if [ -z "$BATCH_ID" ]; then
-    BATCH_ID=$(grep "Batch ID:" /tmp/idp-cli-output.log | head -1 | awk '{print $3}')
-fi
+# Extract batch ID
+BATCH_ID=$(grep "Batch ID:" /tmp/idp-cli-output.log | head -1 | awk '{print $3}')
+
+echo ""
+echo "Batch submitted: $BATCH_ID"
+echo "Waiting for processing to complete..."
+echo ""
+
+# Now monitor the batch until completion
+idp-cli status \
+    --stack-name "$STACK_NAME" \
+    --batch-id "$BATCH_ID" \
+    --region us-west-2 \
+    --wait
 
 echo ""
 echo "✓ Batch processing complete!"
-echo "Batch ID: $BATCH_ID"
 echo ""
 
 # Download results
