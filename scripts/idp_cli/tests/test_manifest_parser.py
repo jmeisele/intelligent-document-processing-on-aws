@@ -24,9 +24,9 @@ class TestManifestParser:
         
         with open(manifest_file, 'w', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow(['document_path', 'document_id', 'type', 'expected_class', 'baseline_key'])
-            writer.writerow(['doc1.pdf', 'doc1', 's3-key', 'W2', 'baselines/doc1.json'])
-            writer.writerow(['doc2.pdf', 'doc2', 's3-key', 'Paystub', ''])
+            writer.writerow(['document_path', 'document_id', 'type'])
+            writer.writerow(['doc1.pdf', 'doc1', 's3-key'])
+            writer.writerow(['doc2.pdf', 'doc2', 's3-key'])
         
         parser = ManifestParser(str(manifest_file))
         documents = parser.parse()
@@ -35,8 +35,6 @@ class TestManifestParser:
         assert documents[0]['document_id'] == 'doc1'
         assert documents[0]['path'] == 'doc1.pdf'
         assert documents[0]['type'] == 's3-key'
-        assert documents[0]['expected_class'] == 'W2'
-        assert documents[0]['baseline_key'] == 'baselines/doc1.json'
     
     def test_csv_auto_generate_id(self, tmp_path):
         """Test auto-generation of document ID from filename"""
@@ -80,8 +78,7 @@ class TestManifestParser:
             {
                 "document_id": "doc1",
                 "path": "doc1.pdf",
-                "type": "s3-key",
-                "expected_class": "W2"
+                "type": "s3-key"
             },
             {
                 "document_id": "doc2",
@@ -126,20 +123,6 @@ class TestManifestParser:
         assert len(documents) == 1
         assert documents[0]['document_id'] == 'doc1'
     
-    def test_baseline_s3_uri_conversion(self, tmp_path):
-        """Test conversion of S3 URI baseline to key"""
-        manifest_file = tmp_path / "test.csv"
-        
-        with open(manifest_file, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['document_path', 'document_id', 'type', 'baseline_key'])
-            writer.writerow(['doc1.pdf', 'doc1', 's3-key', 's3://bucket/baselines/doc1.json'])
-        
-        parser = ManifestParser(str(manifest_file))
-        documents = parser.parse()
-        
-        # Should strip s3:// and bucket name
-        assert documents[0]['baseline_key'] == 'baselines/doc1.json'
     
     def test_missing_document_path(self, tmp_path):
         """Test error handling for missing document path"""

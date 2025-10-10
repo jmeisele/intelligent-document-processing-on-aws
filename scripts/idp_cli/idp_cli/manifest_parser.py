@@ -50,8 +50,6 @@ class ManifestParser:
                 - document_id: Unique identifier
                 - path: Local file path or S3 key
                 - type: 'local' or 's3-key'
-                - expected_class: Optional expected document class
-                - baseline_key: Optional baseline key in EvaluationBaselineBucket
         """
         logger.info(f"Parsing {self.format.upper()} manifest: {self.manifest_path}")
         
@@ -147,26 +145,10 @@ class ManifestParser:
         if doc_type == 'local' and not os.path.exists(document_path):
             raise ValueError(f"Local file not found: {document_path}")
         
-        # Optional fields
-        expected_class = row.get('expected_class', '').strip()
-        baseline_key = row.get('baseline_key') or row.get('baseline_path', '').strip()
-        
-        # Remove 's3://' prefix from baseline if present (should be key only)
-        if baseline_key and baseline_key.startswith('s3://'):
-            # Extract just the key part
-            parts = baseline_key.replace('s3://', '').split('/', 1)
-            if len(parts) > 1:
-                baseline_key = parts[1]
-                logger.debug(f"Converted baseline S3 URI to key: {baseline_key}")
-            else:
-                baseline_key = ''
-        
         return {
             'document_id': document_id,
             'path': document_path,
-            'type': doc_type,
-            'expected_class': expected_class,
-            'baseline_key': baseline_key
+            'type': doc_type
         }
 
 

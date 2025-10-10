@@ -86,14 +86,14 @@ echo "-------------------------------------------"
 W2_ABS_PATH=$(cd "$W2_SAMPLES_DIR" && pwd)
 
 # Create CSV manifest header
-echo "document_path,document_id,type,expected_class" > "$MANIFEST_FILE"
+echo "document_path,document_id,type" > "$MANIFEST_FILE"
 
 # Add all W2 PDFs
 for pdf in "$W2_ABS_PATH"/*.pdf; do
     if [ -f "$pdf" ]; then
         filename=$(basename "$pdf")
         doc_id="${filename%.*}"  # Remove .pdf extension
-        echo "$pdf,$doc_id,local,W2" >> "$MANIFEST_FILE"
+        echo "$pdf,$doc_id,local" >> "$MANIFEST_FILE"
     fi
 done
 

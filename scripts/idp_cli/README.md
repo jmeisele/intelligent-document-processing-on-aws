@@ -40,9 +40,9 @@ pip install -e ".[test]"
 
 **CSV Format (sample-manifest.csv):**
 ```csv
-document_path,document_id,type,expected_class,baseline_key
-samples/lending_package.pdf,lending-001,s3-key,Lending Package,baselines/lending-001.json
-samples/bank-statement-multipage.pdf,bank-statement-001,s3-key,Bank Statement,
+document_path,document_id,type
+samples/lending_package.pdf,lending-001,s3-key
+samples/bank-statement-multipage.pdf,bank-statement-001,s3-key
 ```
 
 **JSON Format (sample-manifest.json):**
@@ -52,9 +52,7 @@ samples/bank-statement-multipage.pdf,bank-statement-001,s3-key,Bank Statement,
     {
       "document_id": "lending-001",
       "path": "samples/lending_package.pdf",
-      "type": "s3-key",
-      "expected_class": "Lending Package",
-      "baseline_key": "baselines/lending-001.json"
+      "type": "s3-key"
     }
   ]
 }
@@ -155,10 +153,10 @@ cp /path/to/your/paystub.pdf ~/idp-test-documents/
 ```bash
 # Create manifest file
 cat > ~/my-documents.csv << EOF
-document_path,document_id,type,expected_class
-/home/user/idp-test-documents/invoice.pdf,invoice-001,local,Invoice
-/home/user/idp-test-documents/w2-form.pdf,w2-2024,local,W2
-/home/user/idp-test-documents/paystub.pdf,paystub-jan,local,Paystub
+document_path,document_id,type
+/home/user/idp-test-documents/invoice.pdf,invoice-001,local
+/home/user/idp-test-documents/w2-form.pdf,w2-2024,local
+/home/user/idp-test-documents/paystub.pdf,paystub-jan,local
 EOF
 ```
 
@@ -166,7 +164,6 @@ EOF
 - `document_path` - Full path to your local PDF file
 - `document_id` - Unique identifier for each document
 - `type` - `local` means CLI will upload it (vs `s3-key` for files already in S3)
-- `expected_class` - Optional, for validation
 
 ### Step 6: Process Your Batch
 
@@ -421,15 +418,13 @@ idp-cli validate --manifest documents.csv
 **Optional Fields:**
 - `document_id`: Unique identifier (auto-generated from filename if omitted)
 - `type`: Document type (`local` or `s3-key`, auto-detected if omitted)
-- `expected_class`: Expected document class for validation
-- `baseline_key`: Baseline file key in EvaluationBaselineBucket
 
 **Example:**
 ```csv
-document_path,document_id,type,expected_class,baseline_key
-/home/user/docs/w2.pdf,w2-2024,local,W2,baselines/w2-2024.json
-existing/doc.pdf,existing-doc,s3-key,Paystub,
-samples/test.pdf,,,
+document_path,document_id,type
+/home/user/docs/w2.pdf,w2-2024,local
+existing/doc.pdf,existing-doc,s3-key
+samples/test.pdf,,
 ```
 
 ### JSON Format
@@ -440,9 +435,7 @@ samples/test.pdf,,,
   {
     "document_id": "doc1",
     "path": "/local/path/doc1.pdf",
-    "type": "local",
-    "expected_class": "W2",
-    "baseline_key": "baselines/doc1.json"
+    "type": "local"
   }
 ]
 ```
@@ -784,8 +777,6 @@ Uses existing LookupFunction Lambda to query document status:
 | `document_path` or `path` | Yes | string | Local file path or S3 key | `/home/user/doc.pdf` or `folder/doc.pdf` |
 | `document_id` or `id` | No | string | Unique identifier (auto-generated if omitted) | `doc-001` |
 | `type` | No | string | `local` or `s3-key` (auto-detected if omitted) | `local` |
-| `expected_class` | No | string | Expected document class for validation | `W2` |
-| `baseline_key` or `baseline_path` | No | string | Baseline key in EvaluationBaselineBucket | `baselines/doc.json` |
 
 ### Auto-Detection Rules
 
@@ -797,10 +788,6 @@ Uses existing LookupFunction Lambda to query document status:
 - Absolute path or file exists → `local`
 - Relative path and file doesn't exist → `s3-key`
 - S3 URI (`s3://...`) → **ERROR** (not supported)
-
-**Baseline Key Conversion:**
-- S3 URI: `s3://bucket/baselines/doc.json` → `baselines/doc.json`
-- Strips bucket name automatically
 
 ## Examples
 
@@ -825,12 +812,12 @@ idp-cli run-inference \
 ### Example 2: Evaluation with Baselines
 
 ```bash
-# Manifest with baseline references
+# Manifest for evaluation documents
 cat > eval-set.csv << EOF
-document_path,document_id,type,baseline_key
-eval/doc1.pdf,doc1,s3-key,baselines/doc1.json
-eval/doc2.pdf,doc2,s3-key,baselines/doc2.json
-eval/doc3.pdf,doc3,s3-key,baselines/doc3.json
+document_path,document_id,type
+eval/doc1.pdf,doc1,s3-key
+eval/doc2.pdf,doc2,s3-key
+eval/doc3.pdf,doc3,s3-key
 EOF
 
 # Process with evaluation

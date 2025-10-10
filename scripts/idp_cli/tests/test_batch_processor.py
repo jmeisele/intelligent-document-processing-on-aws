@@ -66,9 +66,7 @@ class TestBatchProcessor:
             {
                 'document_id': 'doc1',
                 'path': 'doc1.pdf',
-                'type': 's3-key',
-                'expected_class': 'W2',
-                'baseline_key': 'baselines/doc1.json'
+                'type': 's3-key'
             }
         ]
         

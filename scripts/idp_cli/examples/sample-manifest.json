@@ -3,23 +3,17 @@
     {
       "document_id": "lending-001",
       "path": "samples/lending_package.pdf",
-      "type": "s3-key",
-      "expected_class": "Lending Package",
-      "baseline_key": "baselines/lending-001.json"
+      "type": "s3-key"
     },
     {
       "document_id": "w2-001",
       "path": "samples/w2/w2-sample.pdf",
-      "type": "s3-key",
-      "expected_class": "W2",
-      "baseline_key": "baselines/w2-001.json"
+      "type": "s3-key"
     },
     {
       "document_id": "bank-statement-001",
       "path": "samples/bank-statement-multipage.pdf",
-      "type": "s3-key",
-      "expected_class": "Bank Statement",
-      "baseline_key": "baselines/bank-statement-001.json"
+      "type": "s3-key"
     }
   ],
   "config": {
