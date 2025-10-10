@@ -14,7 +14,7 @@
 set -e  # Exit on error
 
 # Configuration
-STACK_NAME="idp-cli-demo-w2-$(date +%Y%m%d-%H%M%S)"
+STACK_NAME="idp-cli-w2-$(date +%H%M%S)"
 ADMIN_EMAIL="${ADMIN_EMAIL:-user@example.com}"
 PATTERN="pattern-2"
 MAX_CONCURRENT=5
