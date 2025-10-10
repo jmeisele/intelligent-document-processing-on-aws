@@ -133,7 +133,7 @@ class StackDeployer:
     
     def _wait_for_completion(self, stack_name: str, operation: str) -> Dict:
         """
-        Wait for stack operation to complete
+        Wait for stack operation to complete with progress display
         
         Args:
             stack_name: Stack name
@@ -142,6 +142,12 @@ class StackDeployer:
         Returns:
             Dictionary with final status
         """
+        from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+        from rich.console import Console
+        from rich.live import Live
+        from rich.table import Table
+        
+        console = Console()
         logger.info(f"Waiting for {operation} to complete...")
         
         complete_statuses = {
@@ -157,42 +163,58 @@ class StackDeployer:
         target_statuses = complete_statuses[operation]
         success_set = success_statuses[operation]
         
-        while True:
-            try:
-                response = self.cfn.describe_stacks(StackName=stack_name)
-                stacks = response.get('Stacks', [])
-                
-                if not stacks:
-                    raise ValueError(f"Stack {stack_name} not found")
-                
-                stack = stacks[0]
-                status = stack.get('StackStatus', '')
-                
-                logger.info(f"Stack status: {status}")
-                
-                if status in target_statuses:
-                    # Operation complete
-                    is_success = status in success_set
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task(f"[cyan]{operation} stack: {stack_name}", total=None)
+            last_event_time = None
+            
+            while True:
+                try:
+                    response = self.cfn.describe_stacks(StackName=stack_name)
+                    stacks = response.get('Stacks', [])
                     
-                    result = {
-                        'stack_name': stack_name,
-                        'operation': operation,
-                        'status': status,
-                        'success': is_success,
-                        'outputs': self._get_stack_outputs(stack)
-                    }
+                    if not stacks:
+                        raise ValueError(f"Stack {stack_name} not found")
                     
-                    if not is_success:
-                        result['error'] = self._get_stack_failure_reason(stack_name)
+                    stack = stacks[0]
+                    status = stack.get('StackStatus', '')
                     
-                    return result
-                
-                # Wait before next check
-                time.sleep(10)
-                
-            except Exception as e:
-                logger.error(f"Error waiting for stack: {e}")
-                raise
+                    # Get recent events
+                    events = self.get_stack_events(stack_name, limit=5)
+                    if events and events[0]['timestamp'] != last_event_time:
+                        last_event_time = events[0]['timestamp']
+                        # Show most recent event
+                        latest = events[0]
+                        resource = latest['resource']
+                        resource_status = latest['status']
+                        progress.update(task, description=f"[cyan]{operation}: {resource} - {resource_status}")
+                    
+                    if status in target_statuses:
+                        # Operation complete
+                        is_success = status in success_set
+                        
+                        result = {
+                            'stack_name': stack_name,
+                            'operation': operation,
+                            'status': status,
+                            'success': is_success,
+                            'outputs': self._get_stack_outputs(stack)
+                        }
+                        
+                        if not is_success:
+                            result['error'] = self._get_stack_failure_reason(stack_name)
+                        
+                        return result
+                    
+                    # Wait before next check
+                    time.sleep(10)
+                    
+                except Exception as e:
+                    logger.error(f"Error waiting for stack: {e}")
+                    raise
     
     def _get_stack_outputs(self, stack: Dict) -> Dict[str, str]:
         """Extract stack outputs as dictionary"""
