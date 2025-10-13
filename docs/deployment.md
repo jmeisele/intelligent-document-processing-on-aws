@@ -16,7 +16,7 @@ This guide covers how to deploy, build, publish, and test the GenAI Intelligent 
 
 ### One-Click Deployment
 
-| US East (N.Virginia)      | us-east-1   | [![Launch Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/review?templateURL=https://s3.us-east-1.amazonaws.com/aws-ml-blog-us-east-1/artifacts/genai-idp/idp-main.yaml&stackName=IDP) |
+| US East (N.Virginia) | us-east-1 | [![Launch Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/review?templateURL=https://s3.us-east-1.amazonaws.com/aws-ml-blog-us-east-1/artifacts/genai-idp/idp-main.yaml&stackName=IDP) |
 
 3. Review the template parameters and provide values as needed
 4. Check the acknowledgment box and click **Create stack**
@@ -39,11 +39,13 @@ You need to have the following packages installed on your computer:
 7. **Node.js 18+** and **npm** (required for UI validation in publish script)
 
 For guidance on setting up a development environment, see:
-- [Development Environment Setup Guide on Linux](./setup-development-env-linux.md) 
+
+- [Development Environment Setup Guide on Linux](./setup-development-env-linux.md)
 - [Development Environment Setup Guide on macOS](./setup-development-env-macos.md)
 - [Development Environment Setup Guide on Windows (WSL)](./setup-development-env-WSL.md)
 
 Copy the repo to your computer. Either:
+
 - Use the git command to clone the repo, if you have access
 - OR, download and expand the ZIP file for the repo, or use the ZIP file that has been shared with you
 
@@ -51,35 +53,44 @@ Copy the repo to your computer. Either:
 
 To build and publish your own template to your own S3 bucket:
 
-* `cfn_bucket_basename`: A prefix added to the beginning of the bucket name (e.g. `idp-1234567890` to ensure global uniqueness) 
-* `cfn_prefix`: A prefix added to CloudFormation resources (e.g. `idp` or `idp-dev`)
+- `cfn_bucket_basename`: A prefix added to the beginning of the bucket name (e.g. `idp-1234567890` to ensure global uniqueness)
+- `cfn_prefix`: A prefix added to CloudFormation resources (e.g. `idp` or `idp-dev`)
 
 Navigate into the project root directory and run:
 
 #### Using publish.py (Recommended)
 
 ```bash
-python3 publish.py <cfn_bucket_basename> <cfn_prefix> <region> [--verbose]
+python3 publish.py <cfn_bucket_basename> <cfn_prefix> <region> [--verbose] [--no-validate] [--clean-build] [--max-workers N]
 ```
 
 **Parameters:**
+
 - `cfn_bucket_basename`: A prefix for the S3 bucket name (e.g., `idp-1234567890`)
 - `cfn_prefix`: S3 prefix for artifacts (e.g., `idp`)
 - `region`: AWS region for deployment (e.g., `us-east-1`)
 - `--verbose` or `-v`: (Optional) Enable detailed error output for debugging build failures
+- Pattern-2 functions are built and deployed as container images automatically. Pattern-1 and Pattern-3 use ZIP-based Lambdas.
 
-Example:
+**Standard ZIP Deployment:**
+
 ```bash
 python3 publish.py idp-1234567890 idp us-east-1
 ```
 
+Note: Pattern-2 container images are built and pushed automatically when Pattern-2 changes are detected. Ensure Docker is running and you have ECR permissions.
+
+> **Note**: Container-based deployment is recommended when Lambda functions exceed the 250MB unzipped size limit. This allows deployment packages up to 10GB.
+
 **Troubleshooting Build Issues:**
 If the build fails, use the `--verbose` flag to see detailed error messages:
+
 ```bash
 python3 publish.py idp-1234567890 idp us-east-1 --verbose
 ```
 
 This will show:
+
 - Exact SAM build commands being executed
 - Complete error output from failed builds
 - Python version compatibility issues
@@ -92,26 +103,31 @@ This will show:
 ```
 
 Example:
+
 ```bash
 ./publish.sh idp-1234567890 idp us-east-1
 ```
 
 Both scripts:
+
 - Check your system dependencies for required packages
 - Create CloudFormation templates and asset zip files
 - Publish the templates and required assets to an S3 bucket in your account
 - The bucket will be named `<cfn_bucket_basename>-<region>` (created if it doesn't exist)
 
 When completed, the script displays:
+
 - The CloudFormation template's S3 URL
 - A 1-click URL for launching the stack creation in the CloudFormation console
 
 ### Deployment Options
 
 #### Recommended: Deploy using AWS CloudFormation console
+
 For your first deployment, use the `1-Click Launch URL` provided by the publish script. This lets you inspect the available parameter options in the console.
 
 #### CLI Deployment
+
 For scripted/automated deployments, use the AWS CLI:
 
 ```bash
@@ -126,26 +142,83 @@ aws cloudformation deploy \
 ```
 
 Or to update an already-deployed stack:
+
 ```bash
 aws cloudformation update-stack \
   --stack-name <your-stack-name> \
   --template-url <template URL output by publish script, e.g. https://s3.us-east-1.amazonaws.com/blahblah.yaml> \
   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
   --region <region> \
-  --parameters ParameterKey=AdminEmail,ParameterValue="<your-email>" ParameterKey=IDPPattern,ParameterValue="<pattern-name>" 
+  --parameters ParameterKey=AdminEmail,ParameterValue="<your-email>" ParameterKey=IDPPattern,ParameterValue="<pattern-name>"
 ```
 
-
 **Pattern Parameter Options:**
-* `Pattern1 - Packet or Media processing with Bedrock Data Automation (BDA)`
-  * Can use an existing BDA project or create a new demo project
-* `Pattern2 - Packet processing with Textract and Bedrock`
-  * Supports both page-level and holistic classification
-  * Recommended for first-time users
-* `Pattern3 - Packet processing with Textract, SageMaker(UDOP), and Bedrock`
-  * Requires a UDOP model in S3 that will be deployed on SageMaker
+
+- `Pattern1 - Packet or Media processing with Bedrock Data Automation (BDA)`
+  - Can use an existing BDA project or create a new demo project
+- `Pattern2 - Packet processing with Textract and Bedrock`
+  - Supports both page-level and holistic classification
+  - Recommended for first-time users
+- `Pattern3 - Packet processing with Textract, SageMaker(UDOP), and Bedrock`
+  - Requires a UDOP model in S3 that will be deployed on SageMaker
 
 After deployment, check the Outputs tab in the CloudFormation console to find links to dashboards, buckets, workflows, and other solution resources.
+
+## Container-Based Lambda Deployment
+
+When Lambda functions exceed the 250MB unzipped size limit, use the container-based deployment option. This allows deployment packages up to 10GB.
+
+### When to Use Container Deployment
+
+Use container-based deployment when:
+
+- Lambda package size exceeds 250MB unzipped
+- You need additional system dependencies not available in the Lambda runtime
+- You want to use custom runtime environments
+- Your deployment includes large ML models or data files
+
+### Container Deployment Process
+
+1. **Pattern-2 Uses Containers Automatically:**
+   - When Pattern-2 changes are detected, the script builds Docker images for Pattern-2 functions and pushes them to ECR.
+   - Ensure Docker is running and your AWS credentials have ECR permissions.
+
+2. **What Happens Behind the Scenes:**
+   - Creates/verifies ECR repository for Lambda images
+   - Builds Docker images for each Lambda function
+   - Pushes images to ECR with appropriate tags
+   - Updates CloudFormation templates to use container images
+   - Uploads templates to S3 for deployment
+
+3. **Architecture Support:**
+
+- Default: ARM64 (Graviton2) for better price/performance
+- Optional: x86_64 for broader compatibility (adjust Docker build if needed)
+
+### Container Image Structure
+
+The solution uses optimized multi-stage Docker builds:
+
+- **Base stage**: Python runtime and system dependencies
+- **Dependencies stage**: Python packages from requirements.txt
+- **Function stage**: Lambda function code and handler
+
+### Monitoring Container Deployments
+
+Check deployment status:
+
+```bash
+# View ECR images
+aws ecr list-images --repository-name idp-<stack-name>-lambda
+
+# Check Lambda function configuration
+aws lambda get-function --function-name <function-name>
+
+# View container logs
+aws logs tail /aws/lambda/<function-name> --follow
+```
+
+For detailed container deployment documentation, see [Container Lambda Deployment Guide](./container-lambda-deployment.md).
 
 ## Updating an Existing Stack
 
@@ -156,7 +229,7 @@ To update an existing GenAIIDP deployment to a new version:
 3. Select your existing GenAIIDP stack
 4. Click on the "Update" button
 5. Select "Replace current template"
-6. Provide the new template URL: 
+6. Provide the new template URL:
    - us-west-2: `https://s3.us-west-2.amazonaws.com/aws-ml-blog-us-west-2/artifacts/genai-idp/idp-main.yaml`
    - us-east-1: `https://s3.us-east-1.amazonaws.com/aws-ml-blog-us-east-1/artifacts/genai-idp/idp-main.yaml`
 7. Click "Next"
@@ -196,11 +269,14 @@ To update an existing GenAIIDP deployment to a new version:
 ### Testing without the UI
 
 You can test the solution without using the UI through the following methods:
+
 1. Direct S3 uploads as described in the Basic Test section
 2. Using the AWS CLI to upload documents to the input bucket:
+
    ```bash
    aws s3 cp ./samples/lending_package.pdf s3://idp-inputbucket-kmsxxxxxxxxx/
    ```
+
 3. Using the AWS SDK in your application code to programmatically send documents for processing
 
 ### Upload Multiple Sample Files
@@ -221,6 +297,7 @@ To test any lambda function locally:
 3. Verify `./testing/env.json` and change the region if necessary
 4. Run `sam build` to package the function(s)
 5. Use `sam local` to run the function:
+
    ```bash
    sam local invoke OCRFunction -e testing/OCRFunction-event.json --env-vars testing/env.json
    ```

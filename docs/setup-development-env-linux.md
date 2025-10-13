@@ -148,8 +148,10 @@ https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html
 ## Install Required Python Packages
 
 ```bash
-pip install boto3 typer rich botocore
+pip install boto3 rich PyYAML botocore setuptools docker
 ```
+
+> **Note**: The `docker` Python package is required for container-based Lambda deployments.
 
 # Step 7: Run Publish Script 
 
@@ -164,10 +166,11 @@ python3 publish.py --help
 ### Test build using publish.py
 
 Standard ZIP-based deployment:
-
 ```bash
 python3 publish.py bucket_name build-test us-east-1
 ```
+
+Pattern-2 container images are built automatically when Pattern-2 changes are detected. Ensure Docker is running and you have ECR permissions.
 
 ### Troubleshooting Build Issues
 

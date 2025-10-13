@@ -245,6 +245,7 @@ def create_dynamic_extraction_tool_and_patch_tool(model_class: Type[TargetModel]
         required extraction schema is: {model_class.model_json_schema()}"""
     return extraction_tool, apply_json_patches
 
+
 @tool
 def view_existing_extraction(agent: Agent) -> str:
     """Use this tool to view data is currently stored as extracted."""
@@ -313,6 +314,7 @@ async def structured_output_async(
     max_retries: int = 7,
     connect_timeout: float = 10.0,
     read_timeout: float = 300.0,
+    max_tokens: Optional[int] = None,
 ) -> Tuple[TargetModel, BedrockInvokeModelResponse]:
     """
     Extract structured data using Strands agents with tool-based validation.
@@ -396,7 +398,7 @@ async def structured_output_async(
     )
 
     # Prepare tools list
-    tools = [extraction_tool, apply_json_patches]
+    tools = [extraction_tool, apply_json_patches, view_existing_extraction]
 
     # Create agent with system prompt and tools
     schema_json = json.dumps(data_format.model_json_schema(), indent=2)

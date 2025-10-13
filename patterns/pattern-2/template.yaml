@@ -111,6 +111,20 @@ Parameters:
     AllowedPattern: "^(|arn:aws[a-z-]*:iam::[0-9]{12}:policy/.+)$"
     ConstraintDescription: Must be empty or a valid IAM policy ARN
 
+  ImageVersion:
+    Type: String
+    Default: "latest"
+    Description: Version tag for Lambda container images (e.g. 0.3.19 or latest)
+  ArtifactBucket:
+    Type: String
+    Description: "S3 bucket containing deployment artifacts"
+  ArtifactPrefix:
+    Type: String
+    Description: "S3 prefix where deployment artifacts are stored"
+  Pattern2SourceZipfile:
+    Type: String
+    Description: "Pattern-2 source zipfile object name"
+
 Conditions:
   HasGuardrailConfig:
     !And [
@@ -125,6 +139,233 @@ Conditions:
   HasAppSyncApi: !Not [!Equals [!Ref AppSyncApiArn, ""]]
 
 Resources:
+  Pattern2DockerBuildRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: "Wildcard permissions required for CloudWatch Logs creation"
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: !Sub "codebuild.${AWS::URLSuffix}"
+      PermissionsBoundary:
+        !If [
+          HasPermissionsBoundary,
+          !Ref PermissionsBoundaryArn,
+          !Ref AWS::NoValue,
+        ]
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
+      Policies:
+        - PolicyName: CodeBuildAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource:
+                  - !Sub "arn:${AWS::Partition}:s3:::${ArtifactBucket}"
+                  - !Sub "arn:${AWS::Partition}:s3:::${ArtifactBucket}/${ArtifactPrefix}/*"
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+              - Resource:
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*"
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*:*"
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+
+  Pattern2ECRRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: KMS
+        KmsKey: !Ref CustomerManagedEncryptionKeyArn
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [{
+              "rulePriority": 1,
+              "description": "Keep last 10 images",
+              "selection": {
+                "tagStatus": "any",
+                "countType": "imageCountMoreThan",
+                "countNumber": 10
+              },
+              "action": { "type": "expire" }
+            }]
+          }
+
+  Pattern2DockerBuildProject:
+    Type: AWS::CodeBuild::Project
+    DependsOn:
+      - Pattern2DockerBuildRole
+      - Pattern2ECRRepository
+    Properties:
+      Name: !Sub "${AWS::StackName}-pattern2-docker-build"
+      Description: !Sub >-
+        Pattern-2 Docker image builder for GenAIIDP stack - ${AWS::StackName}
+      ServiceRole: !GetAtt Pattern2DockerBuildRole.Arn
+      EncryptionKey: alias/aws/s3
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Source:
+        Location: !Sub "arn:${AWS::Partition}:s3:::${ArtifactBucket}/${ArtifactPrefix}/${Pattern2SourceZipfile}"
+        Type: S3
+        BuildSpec: patterns/pattern-2/buildspec.yml
+      Environment:
+        ComputeType: BUILD_GENERAL1_LARGE
+        Image: aws/codebuild/amazonlinux2-aarch64-standard:3.0
+        Type: ARM_CONTAINER
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: ECR_URI
+            Value: !GetAtt Pattern2ECRRepository.RepositoryUri
+          - Name: IMAGE_VERSION
+            Value: !Ref ImageVersion
+          - Name: AWS_REGION
+            Value: !Ref AWS::Region
+      TimeoutInMinutes: 90
+
+  Pattern2CodeBuildExecutionRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: "Role requires * resource access for CloudWatch Logs and CloudFormation custom resource operations"
+    # checkov:skip=CKV_AWS_111: "Write access required for CloudWatch Logs and CloudFormation custom resource operations"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - !Sub "lambda.${AWS::URLSuffix}"
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      PermissionsBoundary:
+        !If [
+          HasPermissionsBoundary,
+          !Ref PermissionsBoundaryArn,
+          !Ref AWS::NoValue,
+        ]
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                Resource:
+                  - !GetAtt Pattern2DockerBuildProject.Arn
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+          # Used by custom resource helper poller
+          # https://github.com/aws-cloudformation/custom-resource-helper
+        - PolicyName: CustomResourcePoller
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - events:PutRule
+                  - events:DeleteRule
+                  - events:PutTargets
+                  - events:RemoveTargets
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:rule/*"
+              - Effect: Allow
+                Action:
+                  - lambda:AddPermission
+                  - lambda:RemovePermission
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:*"
+
+  Pattern2CodeBuildTrigger:
+    Type: AWS::Serverless::Function
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W89
+            reason: "Function does not require VPC access as it only interacts with AWS services via APIs"
+          - id: W92
+            reason: "Function does not require reserved concurrency as it scales based on demand"
+    # checkov:skip=CKV_AWS_116: "DLQ not required for Cfn Custom Resource function"
+    # checkov:skip=CKV_AWS_117: "Function does not require VPC access as it only interacts with AWS services via APIs"
+    # checkov:skip=CKV_AWS_115: "Function does not require reserved concurrency as it scales based on demand"
+    Properties:
+      PermissionsBoundary:
+        !If [
+          HasPermissionsBoundary,
+          !Ref PermissionsBoundaryArn,
+          !Ref AWS::NoValue,
+        ]
+      Role: !GetAtt Pattern2CodeBuildExecutionRole.Arn
+      Runtime: python3.12
+      Timeout: 60
+      MemorySize: 128
+      Handler: index.handler
+      CodeUri: ../../src/lambda/start_codebuild
+      Description: Pattern2 CodeBuild trigger Lambda for Docker image builds
+      LoggingConfig:
+        LogGroup: !Ref Pattern2CodeBuildTriggerLogGroup
+
+  Pattern2CodeBuildTriggerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      KmsKeyId: !Ref CustomerManagedEncryptionKeyArn
+      LogGroupName: !Sub "/${StackName}/lambda/Pattern2CodeBuildTrigger"
+      RetentionInDays: !Ref LogRetentionDays
+
+  Pattern2DockerBuildRun:
+    Type: Custom::CodeBuildRun
+    DependsOn:
+      - Pattern2DockerBuildProject
+      - Pattern2CodeBuildTrigger
+    Properties:
+      ServiceToken: !GetAtt Pattern2CodeBuildTrigger.Arn
+      BuildProjectName: !Ref Pattern2DockerBuildProject
+      # Force rebuild when source changes (filename includes content hash)
+      CodeLocation: !Sub "arn:${AWS::Partition}:s3:::${ArtifactBucket}/${ArtifactPrefix}/${Pattern2SourceZipfile}"
+  # Shared IAM policy for Lambda functions to pull container images from ECR
+  LambdaECRAccessPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Allows Lambda functions to pull container images from ECR
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchGetImage
+              - ecr:BatchCheckLayerAvailability
+            Resource: !Sub "arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/*"
+
   # JSON Schema which defines the structure of the pattern configuration settings
   # used by the UI to allow the configuration to be inspected and customized.
   UpdateSchemaConfig:
@@ -1111,7 +1352,9 @@ Resources:
 
   OCRFunction:
     Type: AWS::Serverless::Function
+    DependsOn: Pattern2DockerBuildRun
     Metadata:
+      SkipBuild: True
       cfn_nag:
         rules_to_suppress:
           - id: W89
@@ -1131,9 +1374,13 @@ Resources:
           !Ref PermissionsBoundaryArn,
           !Ref AWS::NoValue,
         ]
-      CodeUri: src/ocr_function/
-      Handler: index.handler
-      Runtime: python3.12
+      PackageType: Image
+      ImageUri: !Sub "${Pattern2ECRRepository.RepositoryUri}:ocr-function-${ImageVersion}"
+      Architectures:
+        - arm64
+      ImageConfig:
+        Command:
+          - "index.handler"
       Timeout: 900
       MemorySize: 4096
       Environment:
@@ -1150,6 +1397,7 @@ Resources:
         LogGroup: !Ref OCRFunctionLogGroup
       Policies:
         - AWSLambdaBasicExecutionRole
+        - !Ref LambdaECRAccessPolicy
         - S3CrudPolicy:
             BucketName: !Ref OutputBucket
         - S3CrudPolicy:
@@ -1205,7 +1453,9 @@ Resources:
 
   ClassificationFunction:
     Type: AWS::Serverless::Function
+    DependsOn: Pattern2DockerBuildRun
     Metadata:
+      SkipBuild: True
       cfn_nag:
         rules_to_suppress:
           - id: W11
@@ -1225,9 +1475,13 @@ Resources:
           !Ref PermissionsBoundaryArn,
           !Ref AWS::NoValue,
         ]
-      CodeUri: src/classification_function/
-      Handler: index.handler
-      Runtime: python3.12
+      PackageType: Image
+      ImageUri: !Sub "${Pattern2ECRRepository.RepositoryUri}:classification-function-${ImageVersion}"
+      Architectures:
+        - arm64
+      ImageConfig:
+        Command:
+          - "index.handler"
       Timeout: 900
       MemorySize: 4096
       Environment:
@@ -1247,6 +1501,7 @@ Resources:
         LogGroup: !Ref ClassificationFunctionLogGroup
       Policies:
         - AWSLambdaBasicExecutionRole
+        - !Ref LambdaECRAccessPolicy
         - S3CrudPolicy:
             BucketName: !Ref OutputBucket
         - S3CrudPolicy:
@@ -1309,7 +1564,9 @@ Resources:
 
   ExtractionFunction:
     Type: AWS::Serverless::Function
+    DependsOn: Pattern2DockerBuildRun
     Metadata:
+      SkipBuild: True
       cfn_nag:
         rules_to_suppress:
           - id: W89
@@ -1331,9 +1588,13 @@ Resources:
           !Ref PermissionsBoundaryArn,
           !Ref AWS::NoValue,
         ]
-      CodeUri: src/extraction_function/
-      Handler: index.handler
-      Runtime: python3.12
+      PackageType: Image
+      ImageUri: !Sub "${Pattern2ECRRepository.RepositoryUri}:extraction-function-${ImageVersion}"
+      Architectures:
+        - arm64
+      ImageConfig:
+        Command:
+          - "index.handler"
       Timeout: 900
       MemorySize: 512
       Environment:
@@ -1356,6 +1617,7 @@ Resources:
         LogGroup: !Ref ExtractionFunctionLogGroup
       Policies:
         - AWSLambdaBasicExecutionRole
+        - !Ref LambdaECRAccessPolicy
         - S3CrudPolicy:
             BucketName: !Ref OutputBucket
         - S3CrudPolicy:
@@ -1423,7 +1685,9 @@ Resources:
 
   AssessmentFunction:
     Type: AWS::Serverless::Function
+    DependsOn: Pattern2DockerBuildRun
     Metadata:
+      SkipBuild: True
       cfn_nag:
         rules_to_suppress:
           - id: W89
@@ -1443,9 +1707,13 @@ Resources:
           !Ref PermissionsBoundaryArn,
           !Ref AWS::NoValue,
         ]
-      CodeUri: src/assessment_function/
-      Handler: index.handler
-      Runtime: python3.12
+      PackageType: Image
+      ImageUri: !Sub "${Pattern2ECRRepository.RepositoryUri}:assessment-function-${ImageVersion}"
+      Architectures:
+        - arm64
+      ImageConfig:
+        Command:
+          - "index.handler"
       Timeout: 900
       MemorySize: 512
       Environment:
@@ -1462,6 +1730,7 @@ Resources:
         LogGroup: !Ref AssessmentFunctionLogGroup
       Policies:
         - AWSLambdaBasicExecutionRole
+        - !Ref LambdaECRAccessPolicy
         - S3CrudPolicy:
             BucketName: !Ref OutputBucket
         - S3CrudPolicy:
@@ -1518,7 +1787,9 @@ Resources:
 
   ProcessResultsFunction:
     Type: AWS::Serverless::Function
+    DependsOn: Pattern2DockerBuildRun
     Metadata:
+      SkipBuild: True
       cfn_nag:
         rules_to_suppress:
           - id: W11
@@ -1538,9 +1809,13 @@ Resources:
           !Ref PermissionsBoundaryArn,
           !Ref AWS::NoValue,
         ]
-      CodeUri: src/processresults_function/
-      Handler: index.handler
-      Runtime: python3.12
+      PackageType: Image
+      ImageUri: !Sub "${Pattern2ECRRepository.RepositoryUri}:processresults-function-${ImageVersion}"
+      Architectures:
+        - arm64
+      ImageConfig:
+        Command:
+          - "index.handler"
       Timeout: 900
       MemorySize: 4096
       Environment:
@@ -1559,6 +1834,7 @@ Resources:
         LogGroup: !Ref ProcessResultsFunctionLogGroup
       Policies:
         - AWSLambdaBasicExecutionRole
+        - !Ref LambdaECRAccessPolicy
         - S3ReadPolicy:
             BucketName: !Ref InputBucket
         - S3CrudPolicy:
@@ -1617,7 +1893,9 @@ Resources:
 
   HITLWaitFunction:
     Type: AWS::Serverless::Function
+    DependsOn: Pattern2DockerBuildRun
     Metadata:
+      SkipBuild: True
       cfn_nag:
         rules_to_suppress:
           - id: W11
@@ -1632,9 +1910,13 @@ Resources:
           !Ref PermissionsBoundaryArn,
           !Ref AWS::NoValue,
         ]
-      CodeUri: src/hitl-wait-function/
-      Handler: index.lambda_handler
-      Runtime: python3.12
+      PackageType: Image
+      ImageUri: !Sub "${Pattern2ECRRepository.RepositoryUri}:hitl-wait-function-${ImageVersion}"
+      Architectures:
+        - arm64
+      ImageConfig:
+        Command:
+          - "index.lambda_handler"
       Timeout: 300
       MemorySize: 512
       Environment:
@@ -1647,6 +1929,7 @@ Resources:
         LogGroup: !Ref HITLWaitFunctionLogGroup
       Policies:
         - AWSLambdaBasicExecutionRole
+        - !Ref LambdaECRAccessPolicy
         - DynamoDBCrudPolicy:
             TableName: !Ref TrackingTable
         - S3CrudPolicy:
@@ -1682,7 +1965,9 @@ Resources:
 
   HITLStatusUpdateFunction:
     Type: AWS::Serverless::Function
+    DependsOn: Pattern2DockerBuildRun
     Metadata:
+      SkipBuild: True
       cfn_nag:
         rules_to_suppress:
           - id: W89
@@ -1698,14 +1983,19 @@ Resources:
           !Ref PermissionsBoundaryArn,
           !Ref AWS::NoValue,
         ]
-      CodeUri: src/hitl-status-update-function/
-      Handler: index.handler
-      Runtime: python3.12
+      PackageType: Image
+      ImageUri: !Sub "${Pattern2ECRRepository.RepositoryUri}:hitl-status-update-function-${ImageVersion}"
+      Architectures:
+        - arm64
+      ImageConfig:
+        Command:
+          - "index.handler"
       Timeout: 60
       LoggingConfig:
         LogGroup: !Ref HITLStatusUpdateFunctionLogGroup
       Policies:
         - AWSLambdaBasicExecutionRole
+        - !Ref LambdaECRAccessPolicy
         - S3CrudPolicy:
             BucketName: !Ref WorkingBucket
         - Statement:
@@ -1751,7 +2041,9 @@ Resources:
 
   HITLProcessLambdaFunction:
     Type: AWS::Serverless::Function
+    DependsOn: Pattern2DockerBuildRun
     Metadata:
+      SkipBuild: True
       cfn_nag:
         rules_to_suppress:
           - id: W89
@@ -1771,12 +2063,16 @@ Resources:
           !Ref PermissionsBoundaryArn,
           !Ref AWS::NoValue,
         ]
-      Handler: index.lambda_handler
       LoggingConfig:
         LogGroup: !Ref HITLProcessLambdaLogGroup
-      Runtime: python3.12
+      PackageType: Image
+      ImageUri: !Sub "${Pattern2ECRRepository.RepositoryUri}:hitl-process-function-${ImageVersion}"
+      Architectures:
+        - arm64
+      ImageConfig:
+        Command:
+          - "index.lambda_handler"
       Timeout: 300
-      CodeUri: src/hitl-process-function/
       Role: !GetAtt HITLProcessLambdaRole.Arn
       Environment:
         Variables:
@@ -1800,6 +2096,7 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        - !Ref LambdaECRAccessPolicy
       Policies:
         - PolicyName: S3AccessPolicy
           PolicyDocument:
@@ -1861,7 +2158,9 @@ Resources:
 
   SummarizationFunction:
     Type: AWS::Serverless::Function
+    DependsOn: Pattern2DockerBuildRun
     Metadata:
+      SkipBuild: True
       cfn_nag:
         rules_to_suppress:
           - id: W11
@@ -1881,9 +2180,13 @@ Resources:
           !Ref PermissionsBoundaryArn,
           !Ref AWS::NoValue,
         ]
-      CodeUri: src/summarization_function/
-      Handler: index.handler
-      Runtime: python3.12
+      PackageType: Image
+      ImageUri: !Sub "${Pattern2ECRRepository.RepositoryUri}:summarization-function-${ImageVersion}"
+      Architectures:
+        - arm64
+      ImageConfig:
+        Command:
+          - "index.handler"
       Timeout: 900
       MemorySize: 4096
       Environment:
@@ -1905,6 +2208,7 @@ Resources:
         LogGroup: !Ref SummarizationFunctionLogGroup
       Policies:
         - AWSLambdaBasicExecutionRole
+        - !Ref LambdaECRAccessPolicy
         - S3ReadPolicy:
             BucketName: !Ref InputBucket
         - S3CrudPolicy:

@@ -292,3 +292,18 @@ Verbose mode provides:
 - Complete stdout/stderr from failed operations
 - Python environment and dependency information
 - Detailed error traces and stack traces
+
+### Container-Based Lambda Deployment Issues
+
+| Issue | Resolution |
+|-------|------------|
+| **Lambda package exceeds 250MB limit** | Pattern-2 uses container images automatically. For Pattern-1/3, consider reducing dependency size or switching to container images in a future update. |
+| **Docker daemon not running** | Start Docker Desktop or Docker service before running container deployment |
+| **ECR login failed** | Ensure AWS credentials have ECR permissions. The script will automatically handle ECR login |
+| **Container build fails** | Check Dockerfile syntax and ensure all referenced files exist |
+| **Image push timeout** | Check network connectivity and ECR repository permissions |
+
+**Container Deployment Behavior:**
+- Pattern-2 builds and pushes container images automatically when Pattern-2 changes are detected.
+- Ensure Docker Desktop/service is running and your AWS credentials have ECR permissions.
+- Use `--verbose` to see detailed build and push logs.
