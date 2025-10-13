@@ -109,7 +109,7 @@ def create_recent_completions_table(status_data: Dict, limit: int = 5) -> Table:
         Rich Table object
     """
     table = Table(title="Recent Completions", show_header=True, header_style="bold green")
-    table.add_column("Document ID", style="cyan", width=20)
+    table.add_column("Document ID", style="cyan", width=60)
     table.add_column("Status", width=10)
     table.add_column("Duration", justify="right", width=12)
     
@@ -126,9 +126,9 @@ def create_recent_completions_table(status_data: Dict, limit: int = 5) -> Table:
         duration = doc.get('duration', 0)
         doc_id = doc.get('document_id', 'unknown')
         
-        # Truncate long document IDs
-        if len(doc_id) > 18:
-            doc_id = doc_id[:15] + "..."
+        # Truncate if still too long for display
+        if len(doc_id) > 58:
+            doc_id = doc_id[:55] + "..."
         
         table.add_row(
             doc_id,
@@ -154,8 +154,8 @@ def create_failures_table(status_data: Dict) -> Table:
         Rich Table object
     """
     table = Table(title="Failed Documents", show_header=True, header_style="bold red")
-    table.add_column("Document ID", style="cyan", width=20)
-    table.add_column("Error", width=40)
+    table.add_column("Document ID", style="cyan", width=60)
+    table.add_column("Error", width=60)
     
     failed = status_data.get('failed', [])
     
@@ -163,11 +163,11 @@ def create_failures_table(status_data: Dict) -> Table:
         doc_id = doc.get('document_id', 'unknown')
         error = doc.get('error', 'Unknown error')
         
-        # Truncate long text
-        if len(doc_id) > 18:
-            doc_id = doc_id[:15] + "..."
-        if len(error) > 38:
-            error = error[:35] + "..."
+        # Truncate if still too long
+        if len(doc_id) > 58:
+            doc_id = doc_id[:55] + "..."
+        if len(error) > 58:
+            error = error[:55] + "..."
         
         table.add_row(doc_id, error, style="red")
     
@@ -338,15 +338,11 @@ def create_live_display(batch_id: str, status_data: Dict, stats: Dict, elapsed_t
     # Status summary
     layout.add_row(create_status_table(status_data))
     
-    # Recent completions and failures side by side
-    sub_layout = Table.grid(padding=2)
-    sub_layout.add_column()
-    sub_layout.add_column()
-    sub_layout.add_row(
-        create_recent_completions_table(status_data),
-        create_failures_table(status_data)
-    )
-    layout.add_row(sub_layout)
+    # Recent completions (stacked vertically for more horizontal space)
+    layout.add_row(create_recent_completions_table(status_data))
+    
+    # Failed documents (stacked below completions)
+    layout.add_row(create_failures_table(status_data))
     
     # Footer
     if not stats['all_complete']:

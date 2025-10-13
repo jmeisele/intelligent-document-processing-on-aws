@@ -7,14 +7,16 @@ Batch Processor Module
 Handles batch document upload and processing through SQS queue.
 """
 
-import boto3
+import glob as glob_module
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Dict, Optional
-import logging
+from typing import Dict, List, Optional
+
+import boto3
 from botocore.exceptions import ClientError
 
 from .manifest_parser import parse_manifest
@@ -83,14 +85,114 @@ class BatchProcessor:
         documents = parse_manifest(manifest_path)
         logger.info(f"Found {len(documents)} documents in manifest")
         
-        # Process each document
+        # Process documents
+        return self._process_documents(documents, batch_id, steps, output_prefix, manifest_path)
+    
+    def process_batch_from_directory(
+        self,
+        dir_path: str,
+        file_pattern: str = '*.pdf',
+        recursive: bool = True,
+        steps: str = 'all',
+        output_prefix: str = 'cli-batch'
+    ) -> Dict:
+        """
+        Process batch of documents from local directory
+        
+        Args:
+            dir_path: Path to local directory
+            file_pattern: Glob pattern for files (default: *.pdf)
+            recursive: Include subdirectories
+            steps: Comma-separated list of steps to execute, or 'all'
+            output_prefix: Prefix for output organization
+        
+        Returns:
+            Dictionary with batch processing results
+        """
+        logger.info(f"Scanning directory: {dir_path}")
+        
+        # Generate unique batch ID
+        batch_id = self._generate_batch_id(output_prefix)
+        logger.info(f"Batch ID: {batch_id}")
+        
+        # Scan directory and create manifest
+        documents = self._scan_local_directory(dir_path, file_pattern, recursive)
+        logger.info(f"Found {len(documents)} documents in directory")
+        
+        if not documents:
+            raise ValueError(f"No documents found matching pattern '{file_pattern}' in {dir_path}")
+        
+        # Process documents
+        return self._process_documents(documents, batch_id, steps, output_prefix, dir_path, base_dir=dir_path)
+    
+    def process_batch_from_s3_prefix(
+        self,
+        s3_prefix: str,
+        file_pattern: str = '*.pdf',
+        recursive: bool = True,
+        steps: str = 'all',
+        output_prefix: str = 'cli-batch'
+    ) -> Dict:
+        """
+        Process batch of documents from S3 prefix
+        
+        Args:
+            s3_prefix: S3 prefix within InputBucket
+            file_pattern: Pattern for files (default: *.pdf)
+            recursive: Include sub-prefixes
+            steps: Comma-separated list of steps to execute, or 'all'
+            output_prefix: Prefix for output organization
+        
+        Returns:
+            Dictionary with batch processing results
+        """
+        logger.info(f"Scanning S3 prefix: {s3_prefix}")
+        
+        # Generate unique batch ID
+        batch_id = self._generate_batch_id(output_prefix)
+        logger.info(f"Batch ID: {batch_id}")
+        
+        # Scan S3 prefix and create manifest
+        input_bucket = self.resources['InputBucket']
+        documents = self._scan_s3_prefix(input_bucket, s3_prefix, file_pattern, recursive)
+        logger.info(f"Found {len(documents)} documents in S3 prefix")
+        
+        if not documents:
+            raise ValueError(f"No documents found matching pattern '{file_pattern}' in s3://{input_bucket}/{s3_prefix}")
+        
+        # Process documents
+        return self._process_documents(documents, batch_id, steps, output_prefix, f"s3://{input_bucket}/{s3_prefix}")
+    
+    def _process_documents(
+        self,
+        documents: List[Dict],
+        batch_id: str,
+        steps: str,
+        output_prefix: str,
+        source: str,
+        base_dir: Optional[str] = None
+    ) -> Dict:
+        """
+        Process list of documents
+        
+        Args:
+            documents: List of document specifications
+            batch_id: Batch identifier
+            steps: Steps to execute
+            output_prefix: Output prefix
+            source: Source path/manifest for metadata
+            base_dir: Base directory for path preservation (optional)
+        
+        Returns:
+            Dictionary with batch processing results
+        """
         results = {
             'batch_id': batch_id,
             'document_ids': [],
             'uploaded': 0,
             'queued': 0,
             'failed': 0,
-            'manifest_path': manifest_path,
+            'source': source,
             'output_prefix': output_prefix,
             'steps': steps,
             'timestamp': datetime.now(timezone.utc).isoformat()
@@ -100,7 +202,7 @@ class BatchProcessor:
             try:
                 # Handle document upload/reference
                 # S3 upload automatically triggers EventBridge -> QueueSender -> SQS
-                s3_key = self._process_document(doc, batch_id)
+                s3_key = self._process_document_with_base(doc, batch_id, base_dir)
                 
                 results['document_ids'].append(s3_key)  # Use s3_key as document_id for tracking
                 results['queued'] += 1
@@ -117,6 +219,168 @@ class BatchProcessor:
         
         logger.info(f"Batch processing complete: {results['queued']} queued, {results['failed']} failed")
         return results
+    
+    def _scan_local_directory(self, dir_path: str, pattern: str, recursive: bool) -> List[Dict]:
+        """
+        Scan local directory for documents
+        
+        Args:
+            dir_path: Path to directory
+            pattern: Glob pattern for files
+            recursive: Include subdirectories
+        
+        Returns:
+            List of document specifications
+        """
+        documents = []
+        dir_path = os.path.abspath(dir_path)
+        
+        # Build glob pattern
+        if recursive:
+            search_pattern = os.path.join(dir_path, '**', pattern)
+        else:
+            search_pattern = os.path.join(dir_path, pattern)
+        
+        # Find all matching files
+        for file_path in glob_module.glob(search_pattern, recursive=recursive):
+            if os.path.isfile(file_path):
+                # Calculate relative path from base directory
+                rel_path = os.path.relpath(file_path, dir_path)
+                
+                # Use relative path (without extension) as document ID
+                doc_id = os.path.splitext(rel_path)[0]
+                
+                documents.append({
+                    'document_id': doc_id,
+                    'path': file_path,
+                    'relative_path': rel_path,  # Store for path preservation
+                    'type': 'local'
+                })
+        
+        return documents
+    
+    def _scan_s3_prefix(self, bucket: str, prefix: str, pattern: str, recursive: bool) -> List[Dict]:
+        """
+        Scan S3 prefix for documents
+        
+        Args:
+            bucket: S3 bucket name
+            prefix: S3 prefix
+            pattern: File pattern (supports * wildcard)
+            recursive: Include sub-prefixes
+        
+        Returns:
+            List of document specifications
+        """
+        documents = []
+        
+        # Ensure prefix ends with / if not empty
+        if prefix and not prefix.endswith('/'):
+            prefix = prefix + '/'
+        
+        try:
+            # List objects
+            paginator = self.s3.get_paginator('list_objects_v2')
+            pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+            
+            # Convert pattern to simple wildcard match
+            import fnmatch
+            
+            for page in pages:
+                for obj in page.get('Contents', []):
+                    key = obj['Key']
+                    
+                    # Skip if it's just a directory marker
+                    if key.endswith('/'):
+                        continue
+                    
+                    # Check recursive constraint
+                    if not recursive:
+                        # Only include files directly under prefix (no additional slashes)
+                        rel_key = key[len(prefix):]
+                        if '/' in rel_key:
+                            continue
+                    
+                    # Check pattern match
+                    filename = os.path.basename(key)
+                    if not fnmatch.fnmatch(filename, pattern):
+                        continue
+                    
+                    # Use S3 key (without extension) as document ID
+                    doc_id = os.path.splitext(key)[0]
+                    
+                    documents.append({
+                        'document_id': doc_id,
+                        'path': key,
+                        'type': 's3-key'
+                    })
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Error scanning S3 prefix: {e}")
+            raise
+    
+    def _process_document_with_base(self, doc: Dict, batch_id: str, base_dir: Optional[str] = None) -> str:
+        """
+        Process document with optional base directory for path preservation
+        
+        Args:
+            doc: Document specification
+            batch_id: Batch identifier
+            base_dir: Base directory for calculating relative paths
+        
+        Returns:
+            S3 key for the document
+        """
+        if doc['type'] == 'local':
+            # Upload local file with path preservation
+            s3_key = self._upload_local_file_with_path(doc, batch_id, base_dir)
+            logger.info(f"Uploaded {doc['document_id']} to {s3_key}")
+            return s3_key
+        elif doc['type'] == 's3-key':
+            # Document already in InputBucket
+            s3_key = doc['path']
+            self._validate_s3_key(s3_key)
+            logger.info(f"Referenced existing {doc['document_id']} at {s3_key}")
+            return s3_key
+        else:
+            raise ValueError(f"Unknown document type: {doc['type']}")
+    
+    def _upload_local_file_with_path(self, doc: Dict, batch_id: str, base_dir: Optional[str] = None) -> str:
+        """
+        Upload local file to S3 InputBucket with path preservation
+        
+        Args:
+            doc: Document specification with 'path' and optional 'relative_path'
+            batch_id: Batch identifier
+            base_dir: Base directory for path preservation
+        
+        Returns:
+            S3 key for uploaded file
+        """
+        local_path = doc['path']
+        
+        # Use relative_path if provided (from directory scan), otherwise construct S3 key
+        if 'relative_path' in doc and doc['relative_path']:
+            # Preserve directory structure: batch_id/relative_path
+            relative_path = doc['relative_path']
+            s3_key = f"{batch_id}/{relative_path}"
+        else:
+            # Legacy behavior: batch_id/document_id/filename
+            document_id = doc['document_id']
+            filename = Path(local_path).name
+            s3_key = f"{batch_id}/{document_id}/{filename}"
+        
+        # Upload file
+        input_bucket = self.resources['InputBucket']
+        self.s3.upload_file(
+            Filename=local_path,
+            Bucket=input_bucket,
+            Key=s3_key
+        )
+        
+        return s3_key
     
     def _generate_batch_id(self, prefix: str) -> str:
         """Generate unique batch ID"""

@@ -36,43 +36,140 @@ pip install -e ".[test]"
 
 ## Quick Start
 
-### 1. Create a manifest file
+### 1. Create a New Stack
 
-**CSV Format (sample-manifest.csv):**
-```csv
-document_path,document_id,type
-samples/lending_package.pdf,lending-001,s3-key
-samples/bank-statement-multipage.pdf,bank-statement-001,s3-key
-```
-
-**JSON Format (sample-manifest.json):**
-```json
-{
-  "documents": [
-    {
-      "document_id": "lending-001",
-      "path": "samples/lending_package.pdf",
-      "type": "s3-key"
-    }
-  ]
-}
-```
-
-### 2. Run batch inference with monitoring
+Deploy a new IDP stack with the CLI (requires `--pattern` and `--admin-email`):
 
 ```bash
+# Basic stack creation with Pattern 2
+idp-cli deploy \
+    --stack-name my-idp-stack \
+    --pattern pattern-2 \
+    --admin-email your.email@example.com \
+    --wait
+```
+
+**With local configuration file:**
+```bash
+# Deploy with custom local config (automatically uploaded to S3)
+idp-cli deploy \
+    --stack-name my-idp-stack \
+    --pattern pattern-2 \
+    --admin-email your.email@example.com \
+    --custom-config ./config_library/pattern-2/bank-statement-sample/config.yaml \
+    --wait
+```
+
+**With additional parameters:**
+```bash
+idp-cli deploy \
+    --stack-name my-idp-stack \
+    --pattern pattern-2 \
+    --admin-email your.email@example.com \
+    --max-concurrent 200 \
+    --parameters "DataRetentionInDays=90,ErrorThreshold=10" \
+    --wait
+```
+
+**Important:** Stack creation takes 10-15 minutes. Use `--wait` to monitor progress, or omit it to return immediately.
+
+### 2. Update an Existing Stack
+
+For existing stacks, `--pattern` and `--admin-email` are optional. The CLI automatically retrieves existing values.
+
+```bash
+# Update max concurrent workflows only
+idp-cli deploy \
+    --stack-name my-idp-stack \
+    --max-concurrent 200 \
+    --wait
+
+# Update multiple parameters
+idp-cli deploy \
+    --stack-name my-idp-stack \
+    --max-concurrent 150 \
+    --log-level DEBUG \
+    --parameters "DataRetentionInDays=180" \
+    --wait
+```
+
+### 3. Change Configuration on Existing Stack
+
+Update the processing configuration by specifying a new config file:
+
+```bash
+# Update with local config file (automatically uploaded to S3)
+idp-cli deploy \
+    --stack-name my-idp-stack \
+    --custom-config ./my-updated-config.yaml \
+    --wait
+
+# Update with S3 URI
+idp-cli deploy \
+    --stack-name my-idp-stack \
+    --custom-config s3://my-bucket/configs/new-config.yaml \
+    --wait
+
+# Combine config change with other updates
+idp-cli deploy \
+    --stack-name my-idp-stack \
+    --custom-config ./new-config.yaml \
+    --max-concurrent 200 \
+    --wait
+```
+
+**Note:** Local config files are automatically uploaded to a temporary S3 bucket and cleaned up after 30 days.
+
+### 4. Process Documents
+
+After your stack is deployed, process documents using one of three methods:
+
+**Option A: From a Directory (Simplest - NEW!)**
+```bash
+# Process all PDFs in a directory
 idp-cli run-inference \
     --stack-name my-idp-stack \
-    --manifest sample-manifest.csv \
+    --dir ./my-documents/ \
     --monitor
 ```
 
-### 3. Check status later
+**Option B: From an S3 Prefix**
+```bash
+# Process files already in InputBucket under a prefix
+idp-cli run-inference \
+    --stack-name my-idp-stack \
+    --s3-prefix archive/2024/ \
+    --monitor
+```
+
+**Option C: From a Manifest File (Most Control)**
+```bash
+# Create a manifest file
+cat > my-documents.csv << EOF
+document_path,document_id,type
+/path/to/document1.pdf,doc1,local
+/path/to/document2.pdf,doc2,local
+EOF
+
+# Process with live monitoring
+idp-cli run-inference \
+    --stack-name my-idp-stack \
+    --manifest my-documents.csv \
+    --monitor
+```
+
+**Which method to use:**
+- Use `--dir` for quick ad-hoc processing of local folders
+- Use `--s3-prefix` when files are already in S3
+- Use `--manifest` when you need precise control over document IDs or custom metadata
+
+### 5. Check Processing Status
 
 ```bash
 idp-cli status \
     --stack-name my-idp-stack \
-    --batch-id cli-batch-20250110-153045-abc12345
+    --batch-id cli-batch-20250110-153045-abc12345 \
+    --wait
 ```
 
 ---
@@ -251,17 +348,35 @@ aws cloudformation describe-stacks \
 
 ### Step 8: Iterate with Different Configurations
 
+To test different configurations, update the stack's config and then reprocess:
+
 ```bash
-# Test with different extraction prompts
+# Test with configuration v1
+idp-cli deploy \
+    --stack-name my-first-idp-stack \
+    --custom-config ./config-v1.yaml \
+    --wait
+
 idp-cli run-inference \
     --stack-name my-first-idp-stack \
     --manifest ~/my-documents.csv \
-    --config custom-extraction-prompts.yaml \
+    --output-prefix test-v1 \
+    --monitor
+
+# Test with configuration v2
+idp-cli deploy \
+    --stack-name my-first-idp-stack \
+    --custom-config ./config-v2.yaml \
+    --wait
+
+idp-cli run-inference \
+    --stack-name my-first-idp-stack \
+    --manifest ~/my-documents.csv \
     --output-prefix test-v2 \
     --monitor
 
 # Compare results
-aws s3 ls s3://$BUCKET/my-first-test/
+aws s3 ls s3://$BUCKET/test-v1/
 aws s3 ls s3://$BUCKET/test-v2/
 ```
 
@@ -291,9 +406,93 @@ aws sts get-caller-identity
 
 ## Commands
 
+### `deploy`
+
+Deploy or update an IDP CloudFormation stack.
+
+**Usage:**
+```bash
+idp-cli deploy [OPTIONS]
+```
+
+**Options:**
+- `--stack-name` (required): CloudFormation stack name
+- `--pattern`: IDP pattern (required for new stacks)
+  - Choices: `pattern-1`, `pattern-2`, `pattern-3`
+- `--admin-email`: Admin user email (required for new stacks)
+- `--custom-config`: Path to local config file or S3 URI
+- `--pattern-config`: Pattern configuration preset
+- `--template-path`: Path to local CloudFormation template
+- `--template-url`: URL to CloudFormation template in S3
+- `--max-concurrent`: Maximum concurrent workflows (default: 100)
+- `--log-level`: Logging level (default: INFO)
+  - Choices: `DEBUG`, `INFO`, `WARN`, `ERROR`
+- `--enable-hitl`: Enable Human-in-the-Loop (default: false)
+  - Choices: `true`, `false`
+- `--parameters`: Additional parameters as `key=value,key2=value2`
+- `--wait`: Wait for stack operation to complete (flag)
+- `--region`: AWS region (optional, auto-detected from AWS config)
+
+**Behavior:**
+- **New Stacks**: Requires `--pattern` and `--admin-email`
+- **Existing Stacks**: Optional parameters, automatically retrieves existing values
+- **Local Config Files**: Automatically uploaded to temporary S3 bucket with 30-day lifecycle
+
+**Examples:**
+
+```bash
+# Create new stack with Pattern 2
+idp-cli deploy \
+    --stack-name my-idp \
+    --pattern pattern-2 \
+    --admin-email user@example.com \
+    --wait
+
+# Create with local config file (automatically uploaded)
+idp-cli deploy \
+    --stack-name my-idp \
+    --pattern pattern-2 \
+    --admin-email user@example.com \
+    --custom-config ./my-config.yaml \
+    --wait
+
+# Update existing stack - change config only
+idp-cli deploy \
+    --stack-name my-idp \
+    --custom-config ./updated-config.yaml \
+    --wait
+
+# Update existing stack - multiple parameters
+idp-cli deploy \
+    --stack-name my-idp \
+    --max-concurrent 200 \
+    --log-level DEBUG \
+    --wait
+
+# Create with S3 config URI
+idp-cli deploy \
+    --stack-name my-idp \
+    --pattern pattern-2 \
+    --admin-email user@example.com \
+    --custom-config s3://my-bucket/configs/config.yaml
+```
+
+**Notes:**
+- Local config files are uploaded to: `idp-cli/custom-configurations/config_{timestamp}_{filename}`
+- Temporary bucket naming: `idp-cli-config-{account}-{region}-{suffix}`
+- Auto-cleanup: 30-day lifecycle policy on uploaded configs
+- Region auto-detected from AWS session or `~/.aws/config`
+
 ### `run-inference`
 
-Process a batch of documents from a manifest file.
+Process a batch of documents using the stack's current configuration.
+
+Specify documents using ONE of:
+- `--manifest`: Explicit manifest file (CSV or JSON)
+- `--dir`: Local directory (auto-generates manifest, preserves paths)
+- `--s3-prefix`: S3 prefix in InputBucket (auto-generates manifest)
+
+**Note:** To change the processing configuration, use `idp-cli deploy --custom-config` to update the stack first.
 
 **Usage:**
 ```bash
@@ -302,8 +501,12 @@ idp-cli run-inference [OPTIONS]
 
 **Options:**
 - `--stack-name` (required): CloudFormation stack name
-- `--manifest` (required): Path to manifest file (CSV or JSON)
-- `--config`: Path to custom configuration YAML file
+- **Document Source** (choose ONE):
+  - `--manifest`: Path to manifest file (CSV or JSON)
+  - `--dir`: Local directory containing documents
+  - `--s3-prefix`: S3 prefix within InputBucket
+- `--file-pattern`: File pattern for directory/S3 scanning (default: `*.pdf`)
+- `--recursive/--no-recursive`: Include subdirectories (default: recursive)
 - `--steps`: Steps to execute (default: `all`)
   - Examples: `all`, `extraction,assessment`, `classification,extraction,evaluation`
 - `--output-prefix`: Output prefix for organizing results (default: `cli-batch`)
@@ -314,29 +517,64 @@ idp-cli run-inference [OPTIONS]
 **Examples:**
 
 ```bash
-# Process batch with live monitoring
+# Process from explicit manifest file
 idp-cli run-inference \
     --stack-name my-idp-stack \
     --manifest docs.csv \
     --monitor
 
+# Process all PDFs in local directory (NEW!)
+idp-cli run-inference \
+    --stack-name my-idp-stack \
+    --dir ./documents/ \
+    --monitor
+
+# Process S3 prefix (files already in InputBucket)
+idp-cli run-inference \
+    --stack-name my-idp-stack \
+    --s3-prefix archive/2024/ \
+    --monitor
+
+# Process with file pattern filtering
+idp-cli run-inference \
+    --stack-name my-idp-stack \
+    --dir ./invoices/ \
+    --file-pattern "invoice*.pdf" \
+    --monitor
+
 # Process specific steps only
 idp-cli run-inference \
     --stack-name my-idp-stack \
-    --manifest docs.csv \
+    --dir ./docs/ \
     --steps extraction,assessment,evaluation
 
-# Fire-and-forget mode (submit and exit)
+# Non-recursive (top-level files only)
 idp-cli run-inference \
     --stack-name my-idp-stack \
-    --manifest docs.csv \
-    --output-prefix experiment-001
+    --dir ./documents/ \
+    --no-recursive \
+    --monitor
+```
 
-# Use custom configuration
-idp-cli run-inference \
-    --stack-name my-idp-stack \
-    --manifest docs.csv \
-    --config custom-config.yaml
+**Path Preservation:**
+
+When using `--dir`, the CLI preserves the directory structure in S3:
+
+```
+Local structure:
+./dataset/
+├── W2s/
+│   └── w2-john.pdf
+└── 1099s/
+    └── 1099-vendor.pdf
+
+Uploaded to S3 InputBucket:
+{batch-id}/W2s/w2-john.pdf
+{batch-id}/1099s/1099-vendor.pdf
+
+Document IDs:
+W2s/w2-john
+1099s/1099-vendor
 ```
 
 ### `status`
@@ -555,22 +793,22 @@ Press `Ctrl+C` to stop monitoring (processing continues in background)
 
 ### Rapid Iteration Testing
 
-Test different prompts and configurations quickly:
+Test different configurations by updating the stack between batches:
 
 ```bash
 # Test configuration v1
+idp-cli deploy --stack-name my-stack --custom-config ./config-v1.yaml --wait
 idp-cli run-inference \
     --stack-name my-stack \
     --manifest test-set.csv \
-    --config config-v1.yaml \
     --output-prefix test-v1 \
     --monitor
 
 # Test configuration v2
+idp-cli deploy --stack-name my-stack --custom-config ./config-v2.yaml --wait
 idp-cli run-inference \
     --stack-name my-stack \
     --manifest test-set.csv \
-    --config config-v2.yaml \
     --output-prefix test-v2 \
     --monitor
 
@@ -588,12 +826,12 @@ idp-cli run-inference \
     --manifest docs.csv \
     --output-prefix baseline
 
-# Later: re-run only extraction and evaluation with new prompts
+# Later: Update config and re-run only extraction and evaluation
+idp-cli deploy --stack-name my-stack --custom-config ./new-extraction-prompts.yaml --wait
 idp-cli run-inference \
     --stack-name my-stack \
     --manifest docs.csv \
     --steps extraction,assessment,evaluation \
-    --config new-extraction-prompts.yaml \
     --output-prefix experiment-new-prompts
 ```
 
@@ -791,7 +1029,68 @@ Uses existing LookupFunction Lambda to query document status:
 
 ## Examples
 
-### Example 1: Local Development Testing
+### Example 1: Directory-Based Processing (NEW!)
+
+```bash
+# Process all PDFs in a directory (simplest approach)
+idp-cli run-inference \
+    --stack-name my-stack \
+    --dir ./tax-documents-2024/ \
+    --monitor
+
+# With subdirectories preserved:
+# Source: ./tax-documents-2024/W2s/john-w2.pdf
+# Uploaded to S3: {batch-id}/W2s/john-w2.pdf
+# Document ID: W2s/john-w2
+```
+
+**With file pattern filtering:**
+```bash
+# Process only W2 forms
+idp-cli run-inference \
+    --stack-name my-stack \
+    --dir ./tax-documents/ \
+    --file-pattern "W2*.pdf" \
+    --output-prefix w2-batch \
+    --monitor
+
+# Process only invoices
+idp-cli run-inference \
+    --stack-name my-stack \
+    --dir ./documents/ \
+    --file-pattern "invoice_*.pdf" \
+    --monitor
+```
+
+**Non-recursive processing:**
+```bash
+# Process only top-level files (skip subdirectories)
+idp-cli run-inference \
+    --stack-name my-stack \
+    --dir ./documents/ \
+    --no-recursive \
+    --monitor
+```
+
+### Example 2: S3 Prefix Processing
+
+```bash
+# Process all documents under an S3 prefix
+idp-cli run-inference \
+    --stack-name my-stack \
+    --s3-prefix archive/2024/invoices/ \
+    --monitor
+
+# With file pattern
+idp-cli run-inference \
+    --stack-name my-stack \
+    --s3-prefix processed-docs/ \
+    --file-pattern "*.pdf" \
+    --output-prefix reprocess-batch \
+    --monitor
+```
+
+### Example 3: Manifest-Based Processing (Maximum Control)
 
 ```bash
 # Create test manifest

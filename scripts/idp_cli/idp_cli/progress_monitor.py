@@ -65,14 +65,17 @@ class ProgressMonitor:
         for doc_id in document_ids:
             try:
                 status = self.get_document_status(doc_id)
+                status_value = status['status']
                 
-                if status['status'] == 'COMPLETED':
+                if status_value == 'COMPLETED':
                     status_summary['completed'].append(status)
-                elif status['status'] == 'RUNNING':
-                    status_summary['running'].append(status)
-                elif status['status'] == 'FAILED':
+                elif status_value == 'FAILED':
                     status_summary['failed'].append(status)
+                elif status_value in ['RUNNING', 'CLASSIFYING', 'EXTRACTING', 'ASSESSING', 'SUMMARIZING', 'EVALUATING']:
+                    # Treat all processing states as RUNNING
+                    status_summary['running'].append(status)
                 else:
+                    # QUEUED, UNKNOWN, or other states
                     status_summary['queued'].append(status)
                     
             except Exception as e:
@@ -102,10 +105,12 @@ class ProgressMonitor:
         """
         try:
             # Invoke LookupFunction Lambda
+            payload_request = {'object_key': doc_id}
+            
             response = self.lambda_client.invoke(
                 FunctionName=self.lookup_function,
                 InvocationType='RequestResponse',
-                Payload=json.dumps({'object_key': doc_id})
+                Payload=json.dumps(payload_request)
             )
             
             # Parse response
@@ -121,8 +126,8 @@ class ProgressMonitor:
                     'error': result.get('errorMessage', 'Unknown error')
                 }
             
-            # Extract status information
-            status = result.get('Status', 'UNKNOWN')
+            # Extract status information (note: Lambda returns lowercase 'status')
+            status = result.get('status', 'UNKNOWN')
             
             doc_status = {
                 'document_id': doc_id,

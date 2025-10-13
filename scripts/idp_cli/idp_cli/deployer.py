@@ -7,11 +7,16 @@ Deployer Module
 Handles CloudFormation stack deployment from CLI.
 """
 
-import boto3
-import time
-from typing import Dict, Optional, List
-from pathlib import Path
 import logging
+import os
+import random
+import string
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import boto3
 
 logger = logging.getLogger(__name__)
 
@@ -142,10 +147,8 @@ class StackDeployer:
         Returns:
             Dictionary with final status
         """
-        from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
         from rich.console import Console
-        from rich.live import Live
-        from rich.table import Table
+        from rich.progress import Progress, SpinnerColumn, TextColumn
         
         console = Console()
         logger.info(f"Waiting for {operation} to complete...")
@@ -272,6 +275,187 @@ class StackDeployer:
             return []
 
 
+def is_local_file_path(path: str) -> bool:
+    """
+    Determine if path is a local file vs S3 URI
+    
+    Args:
+        path: Path to check
+    
+    Returns:
+        True if local file path, False if S3 URI
+    """
+    return not path.startswith('s3://')
+
+
+def validate_s3_uri(uri: str) -> bool:
+    """
+    Validate S3 URI format
+    
+    Args:
+        uri: S3 URI to validate
+    
+    Returns:
+        True if valid S3 URI format
+    """
+    if not uri.startswith('s3://'):
+        return False
+    
+    # Remove s3:// prefix and check for bucket/key structure
+    path = uri[5:]
+    parts = path.split('/', 1)
+    
+    # Must have bucket and key
+    return len(parts) == 2 and parts[0] and parts[1]
+
+
+def get_or_create_config_bucket(region: str) -> str:
+    """
+    Get or create temporary S3 bucket for CLI config uploads
+    
+    Args:
+        region: AWS region
+    
+    Returns:
+        Bucket name
+    """
+    s3 = boto3.client('s3', region_name=region)
+    sts = boto3.client('sts')
+    
+    try:
+        account_id = sts.get_caller_identity()['Account']
+    except Exception as e:
+        raise Exception(f"Failed to get AWS account ID: {e}")
+    
+    # Normalize region name for bucket (replace hyphens with nothing for cleaner name)
+    region_normalized = region.replace('-', '')
+    
+    # Check for existing bucket with pattern
+    bucket_prefix = f"idp-cli-config-{account_id}-{region_normalized}-"
+    
+    try:
+        response = s3.list_buckets()
+        for bucket in response.get('Buckets', []):
+            bucket_name = bucket['Name']
+            if bucket_name.startswith(bucket_prefix):
+                logger.info(f"Using existing config bucket: {bucket_name}")
+                return bucket_name
+    except Exception as e:
+        logger.warning(f"Error listing buckets: {e}")
+    
+    # Create new bucket with random suffix
+    suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+    bucket_name = f"{bucket_prefix}{suffix}"
+    
+    logger.info(f"Creating new config bucket: {bucket_name}")
+    
+    try:
+        # Create bucket
+        if region == 'us-east-1':
+            s3.create_bucket(Bucket=bucket_name)
+        else:
+            s3.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={'LocationConstraint': region}
+            )
+        
+        # Enable versioning
+        s3.put_bucket_versioning(
+            Bucket=bucket_name,
+            VersioningConfiguration={'Status': 'Enabled'}
+        )
+        
+        # Enable encryption
+        s3.put_bucket_encryption(
+            Bucket=bucket_name,
+            ServerSideEncryptionConfiguration={
+                'Rules': [{
+                    'ApplyServerSideEncryptionByDefault': {
+                        'SSEAlgorithm': 'AES256'
+                    }
+                }]
+            }
+        )
+        
+        # Set lifecycle policy (30-day expiration)
+        s3.put_bucket_lifecycle_configuration(
+            Bucket=bucket_name,
+            LifecycleConfiguration={
+                'Rules': [{
+                    'ID': 'DeleteOldConfigs',
+                    'Status': 'Enabled',
+                    'Prefix': 'idp-cli/custom-configurations/',
+                    'Expiration': {'Days': 30}
+                }]
+            }
+        )
+        
+        # Add tags
+        s3.put_bucket_tagging(
+            Bucket=bucket_name,
+            Tagging={
+                'TagSet': [
+                    {'Key': 'CreatedBy', 'Value': 'idp-cli'},
+                    {'Key': 'Purpose', 'Value': 'config-staging'}
+                ]
+            }
+        )
+        
+        logger.info(f"Successfully created config bucket: {bucket_name}")
+        return bucket_name
+        
+    except Exception as e:
+        raise Exception(f"Failed to create config bucket: {e}")
+
+
+def upload_local_config(file_path: str, region: str, stack_name: Optional[str] = None) -> str:
+    """
+    Upload local config file to temporary S3 bucket
+    
+    Args:
+        file_path: Path to local config file
+        region: AWS region
+        stack_name: CloudFormation stack name (unused, kept for compatibility)
+    
+    Returns:
+        S3 URI of uploaded file
+    """
+    # Validate file exists
+    if not os.path.isfile(file_path):
+        raise FileNotFoundError(f"Config file not found: {file_path}")
+    
+    logger.info(f"Uploading local config file: {file_path}")
+    
+    # Always use temp bucket
+    bucket_name = get_or_create_config_bucket(region)
+    
+    # Generate timestamped key - use underscores instead of hyphens in filename
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    original_name = os.path.basename(file_path)
+    # Sanitize filename - replace hyphens with underscores for maximum compatibility
+    safe_name = original_name.replace('-', '_')
+    s3_key = f"idp-cli/custom-configurations/config_{timestamp}_{safe_name}"
+    
+    # Upload file
+    s3 = boto3.client('s3', region_name=region)
+    try:
+        with open(file_path, 'rb') as f:
+            s3.put_object(
+                Bucket=bucket_name,
+                Key=s3_key,
+                Body=f,
+                ServerSideEncryption='AES256'
+            )
+        
+        # Return S3 URI
+        s3_uri = f"s3://{bucket_name}/{s3_key}"
+        logger.info(f"Uploaded config file to: {s3_uri}")
+        return s3_uri
+        
+    except Exception as e:
+        raise Exception(f"Failed to upload config file: {e}")
+
+
 def build_parameters(
     pattern: str,
     admin_email: str,
@@ -280,10 +464,16 @@ def build_parameters(
     enable_hitl: str = 'false',
     pattern_config: Optional[str] = None,
     custom_config: Optional[str] = None,
-    additional_params: Optional[Dict[str, str]] = None
+    additional_params: Optional[Dict[str, str]] = None,
+    region: Optional[str] = None,
+    stack_name: Optional[str] = None
 ) -> Dict[str, str]:
     """
     Build CloudFormation parameters dictionary
+    
+    If custom_config is a local file path, it will be uploaded to S3:
+    - For existing stacks: Uses the stack's ConfigurationBucket
+    - For new stacks: Creates a temporary bucket
     
     Args:
         pattern: IDP pattern (pattern-1, pattern-2, pattern-3)
@@ -292,8 +482,10 @@ def build_parameters(
         log_level: Logging level
         enable_hitl: Enable HITL (true/false)
         pattern_config: Pattern configuration preset
-        custom_config: Custom configuration S3 URI
+        custom_config: Custom configuration (local file path or S3 URI)
         additional_params: Additional parameters as dict
+        region: AWS region (auto-detected if not provided)
+        stack_name: Stack name (helps determine upload bucket for updates)
     
     Returns:
         Dictionary of parameter key-value pairs
@@ -322,9 +514,33 @@ def build_parameters(
         elif pattern == 'pattern-3':
             parameters['Pattern3Configuration'] = pattern_config
     
-    # Add custom config if provided
+    # Handle custom config - support both local files and S3 URIs
     if custom_config:
-        parameters['CustomConfigPath'] = custom_config
+        if is_local_file_path(custom_config):
+            # Local file - need to upload it
+            if not region:
+                # Auto-detect region from boto3 session
+                import boto3
+                session = boto3.session.Session()
+                region = session.region_name
+                if not region:
+                    raise ValueError("Region could not be determined. Please specify --region or configure AWS_DEFAULT_REGION")
+            
+            logger.info(f"Detected local config file: {custom_config}")
+            logger.info(f"Using region: {region}")
+            
+            # Upload to S3 bucket (stack's ConfigurationBucket if exists, else temp bucket)
+            s3_uri = upload_local_config(custom_config, region, stack_name)
+            parameters['CustomConfigPath'] = s3_uri
+            
+            logger.info(f"Using uploaded config: {s3_uri}")
+        else:
+            # Already an S3 URI - validate and use
+            if not validate_s3_uri(custom_config):
+                raise ValueError(f"Invalid S3 URI format: {custom_config}. Expected format: s3://bucket/key")
+            
+            parameters['CustomConfigPath'] = custom_config
+            logger.info(f"Using S3 config: {custom_config}")
     
     # Add any additional parameters
     if additional_params:

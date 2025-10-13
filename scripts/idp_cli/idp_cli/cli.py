@@ -7,21 +7,21 @@ IDP CLI - Main Command Line Interface
 Command-line tool for batch document processing with the IDP Accelerator.
 """
 
-import click
 import logging
-import time
 import sys
-from pathlib import Path
-from rich.live import Live
-from rich.console import Console
-from rich.table import Table
+import time
 from typing import Optional
 
-from .batch_processor import BatchProcessor
-from .progress_monitor import ProgressMonitor
-from .manifest_parser import validate_manifest
-from .deployer import StackDeployer, build_parameters
+import click
+from rich.console import Console
+from rich.live import Live
+from rich.table import Table
+
 from . import display
+from .batch_processor import BatchProcessor
+from .deployer import StackDeployer, build_parameters
+from .manifest_parser import validate_manifest
+from .progress_monitor import ProgressMonitor
 
 # Configure logging
 logging.basicConfig(
@@ -50,10 +50,10 @@ def cli():
 
 @cli.command()
 @click.option('--stack-name', required=True, help='CloudFormation stack name')
-@click.option('--pattern', required=True, 
+@click.option('--pattern', 
               type=click.Choice(['pattern-1', 'pattern-2', 'pattern-3']),
-              help='IDP pattern to deploy')
-@click.option('--admin-email', required=True, help='Admin user email address')
+              help='IDP pattern to deploy (required for new stacks)')
+@click.option('--admin-email', help='Admin user email address (required for new stacks)')
 @click.option('--template-path', 
               help='Path to local CloudFormation template')
 @click.option('--template-url', 
@@ -68,7 +68,7 @@ def cli():
               type=click.Choice(['true', 'false']),
               help='Enable Human-in-the-Loop (default: false)')
 @click.option('--pattern-config', help='Pattern configuration preset')
-@click.option('--custom-config', help='S3 URI to custom configuration')
+@click.option('--custom-config', help='Path to local config file or S3 URI (e.g., ./config.yaml or s3://bucket/config.yaml)')
 @click.option('--parameters', help='Additional parameters as key=value,key2=value2')
 @click.option('--wait', is_flag=True, help='Wait for stack creation to complete')
 @click.option('--region', help='AWS region (optional)')
@@ -88,24 +88,73 @@ def deploy(
     region: Optional[str]
 ):
     """
-    Deploy IDP stack from command line
+    Deploy or update IDP stack from command line
+    
+    For new stacks, --pattern and --admin-email are required.
+    For existing stacks, only specify parameters you want to update.
     
     Examples:
     
-      # Deploy Pattern 2 with defaults
+      # Create new stack with Pattern 2
       idp-cli deploy --stack-name my-idp --pattern pattern-2 --admin-email user@example.com
       
-      # Deploy with custom settings
-      idp-cli deploy --stack-name my-idp --pattern pattern-2 \\
-          --admin-email user@example.com --max-concurrent 200 --wait
+      # Update existing stack with local config file (NEW!)
+      idp-cli deploy --stack-name my-idp --custom-config ./my-config.yaml
       
-      # Deploy with additional parameters
+      # Update existing stack with custom settings
+      idp-cli deploy --stack-name my-idp --max-concurrent 200 --wait
+      
+      # Create with additional parameters
       idp-cli deploy --stack-name my-idp --pattern pattern-2 \\
           --admin-email user@example.com \\
           --parameters "DataRetentionInDays=90,ErrorThreshold=5"
     """
     try:
-        console.print(f"[bold blue]Deploying IDP stack: {stack_name}[/bold blue]")
+        # Initialize deployer
+        deployer = StackDeployer(region=region)
+        
+        # Check if stack exists
+        stack_exists = deployer._stack_exists(stack_name)
+        
+        if stack_exists:
+            # Stack exists - updating
+            console.print(f"[bold blue]Updating existing IDP stack: {stack_name}[/bold blue]")
+            
+            # Get existing stack parameters
+            try:
+                response = deployer.cfn.describe_stacks(StackName=stack_name)
+                existing_stack = response['Stacks'][0]
+                existing_params = {p['ParameterKey']: p['ParameterValue'] 
+                                 for p in existing_stack.get('Parameters', [])}
+                
+                # Use existing values if not provided
+                if not pattern and 'IDPPattern' in existing_params:
+                    # Extract pattern from existing value
+                    pattern_value = existing_params['IDPPattern']
+                    if 'Pattern1' in pattern_value:
+                        pattern = 'pattern-1'
+                    elif 'Pattern2' in pattern_value:
+                        pattern = 'pattern-2'
+                    elif 'Pattern3' in pattern_value:
+                        pattern = 'pattern-3'
+                
+                if not admin_email and 'AdminEmail' in existing_params:
+                    admin_email = existing_params['AdminEmail']
+                    
+            except Exception as e:
+                logger.warning(f"Could not retrieve existing stack parameters: {e}")
+        else:
+            # New stack - require pattern and admin_email
+            console.print(f"[bold blue]Creating new IDP stack: {stack_name}[/bold blue]")
+            
+            if not pattern:
+                console.print("[red]✗ Error: --pattern is required when creating a new stack[/red]")
+                sys.exit(1)
+            
+            if not admin_email:
+                console.print("[red]✗ Error: --admin-email is required when creating a new stack[/red]")
+                sys.exit(1)
+        
         console.print(f"Pattern: {pattern}")
         console.print(f"Admin Email: {admin_email}")
         console.print()
@@ -127,11 +176,14 @@ def deploy(
             enable_hitl=enable_hitl,
             pattern_config=pattern_config,
             custom_config=custom_config,
-            additional_params=additional_params
+            additional_params=additional_params,
+            region=region,
+            stack_name=stack_name
         )
         
-        # Initialize deployer
-        deployer = StackDeployer(region=region)
+        # Debug: Show CustomConfigPath if present
+        if 'CustomConfigPath' in cfn_parameters:
+            console.print(f"[yellow]DEBUG: CustomConfigPath = {cfn_parameters['CustomConfigPath']}[/yellow]")
         
         # Deploy stack
         with console.status("[bold green]Deploying stack..."):
@@ -179,8 +231,15 @@ def deploy(
 
 @cli.command()
 @click.option('--stack-name', required=True, help='CloudFormation stack name')
-@click.option('--manifest', required=True, type=click.Path(exists=True), 
+@click.option('--manifest', type=click.Path(exists=True), 
               help='Path to manifest file (CSV or JSON)')
+@click.option('--dir', 'directory', type=click.Path(exists=True, file_okay=False, dir_okay=True),
+              help='Local directory containing documents to process')
+@click.option('--s3-prefix', help='S3 prefix within InputBucket to process')
+@click.option('--file-pattern', default='*.pdf',
+              help='File pattern for directory/S3 scanning (default: *.pdf)')
+@click.option('--recursive/--no-recursive', default=True,
+              help='Include subdirectories when scanning (default: recursive)')
 @click.option('--config', type=click.Path(exists=True), 
               help='Path to configuration YAML file (optional)')
 @click.option('--steps', default='all', 
@@ -194,7 +253,11 @@ def deploy(
 @click.option('--region', help='AWS region (optional)')
 def run_inference(
     stack_name: str,
-    manifest: str,
+    manifest: Optional[str],
+    directory: Optional[str],
+    s3_prefix: Optional[str],
+    file_pattern: str,
+    recursive: bool,
     config: Optional[str],
     steps: str,
     output_prefix: str,
@@ -205,26 +268,48 @@ def run_inference(
     """
     Run inference on a batch of documents
     
+    Specify documents using ONE of:
+      --manifest: Explicit manifest file (CSV or JSON)
+      --dir: Local directory (auto-generates manifest)
+      --s3-prefix: S3 prefix in InputBucket (auto-generates manifest)
+    
     Examples:
     
-      # Process batch and monitor progress
+      # Process from manifest file
       idp-cli run-inference --stack-name my-stack --manifest docs.csv --monitor
       
-      # Process specific steps only
-      idp-cli run-inference --stack-name my-stack --manifest docs.csv \\
-          --steps extraction,assessment
+      # Process all PDFs in local directory
+      idp-cli run-inference --stack-name my-stack --dir ./documents/ --monitor
       
-      # Fire-and-forget mode (no monitoring)
-      idp-cli run-inference --stack-name my-stack --manifest docs.csv
+      # Process S3 prefix (preserves directory structure)
+      idp-cli run-inference --stack-name my-stack --s3-prefix archive/2024/ --monitor
+      
+      # Process with file pattern
+      idp-cli run-inference --stack-name my-stack --dir ./docs/ --file-pattern "invoice*.pdf"
+      
+      # Process specific steps only
+      idp-cli run-inference --stack-name my-stack --dir ./docs/ --steps extraction,assessment
     """
     try:
-        # Validate manifest
-        console.print("[bold blue]Validating manifest...[/bold blue]")
-        is_valid, error = validate_manifest(manifest)
-        if not is_valid:
-            console.print(f"[red]✗ Manifest validation failed: {error}[/red]")
+        # Validate mutually exclusive options
+        sources = [manifest, directory, s3_prefix]
+        sources_provided = sum(1 for s in sources if s is not None)
+        
+        if sources_provided == 0:
+            console.print("[red]✗ Error: Must specify one of: --manifest, --dir, or --s3-prefix[/red]")
             sys.exit(1)
-        console.print("[green]✓ Manifest validated successfully[/green]")
+        elif sources_provided > 1:
+            console.print("[red]✗ Error: Cannot specify more than one of: --manifest, --dir, --s3-prefix[/red]")
+            sys.exit(1)
+        
+        # Validate manifest if provided
+        if manifest:
+            console.print("[bold blue]Validating manifest...[/bold blue]")
+            is_valid, error = validate_manifest(manifest)
+            if not is_valid:
+                console.print(f"[red]✗ Manifest validation failed: {error}[/red]")
+                sys.exit(1)
+            console.print("[green]✓ Manifest validated successfully[/green]")
         
         # Initialize processor
         console.print(f"[bold blue]Initializing batch processor for stack: {stack_name}[/bold blue]")
@@ -234,13 +319,30 @@ def run_inference(
             region=region
         )
         
-        # Process batch
+        # Process batch based on source type
         with console.status("[bold green]Processing batch..."):
-            batch_result = processor.process_batch(
-                manifest_path=manifest,
-                steps=steps,
-                output_prefix=output_prefix
-            )
+            if manifest:
+                batch_result = processor.process_batch(
+                    manifest_path=manifest,
+                    steps=steps,
+                    output_prefix=output_prefix
+                )
+            elif directory:
+                batch_result = processor.process_batch_from_directory(
+                    dir_path=directory,
+                    file_pattern=file_pattern,
+                    recursive=recursive,
+                    steps=steps,
+                    output_prefix=output_prefix
+                )
+            else:  # s3_prefix
+                batch_result = processor.process_batch_from_s3_prefix(
+                    s3_prefix=s3_prefix,
+                    file_pattern=file_pattern,
+                    recursive=recursive,
+                    steps=steps,
+                    output_prefix=output_prefix
+                )
         
         # Show submission results
         display.show_batch_submission_summary(batch_result)
@@ -396,7 +498,7 @@ def validate(manifest: str):
         if is_valid:
             console.print(f"[green]✓ Manifest is valid: {manifest}[/green]")
         else:
-            console.print(f"[red]✗ Manifest validation failed:[/red]")
+            console.print("[red]✗ Manifest validation failed:[/red]")
             console.print(f"  {error}")
             sys.exit(1)
             
@@ -456,12 +558,21 @@ def _monitor_progress(
                 time.sleep(refresh_interval)
                 
     except KeyboardInterrupt:
+        logger.info("Monitoring interrupted by user")
         console.print()
         console.print("[yellow]Monitoring stopped. Processing continues in background.[/yellow]")
         display.show_monitoring_instructions(stack_name, batch_id)
         return
+    except Exception as e:
+        logger.error(f"Monitoring error: {e}", exc_info=True)
+        console.print()
+        console.print(f"[red]Monitoring error: {e}[/red]")
+        console.print("[yellow]You can check status later with:[/yellow]")
+        display.show_monitoring_instructions(stack_name, batch_id)
+        return
     
     # Show final summary
+    logger.info("Showing final summary")
     elapsed_time = time.time() - start_time
     display.show_final_summary(status_data, stats, elapsed_time)
 
