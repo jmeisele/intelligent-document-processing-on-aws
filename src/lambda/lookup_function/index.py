@@ -36,17 +36,19 @@ def calculate_durations(timestamps):
         logger.error(f"Error calculating durations: {e}", exc_info=True)
         return {}
 
-def handler(event, context):
-
-    logger.info(f"Event: {json.dumps(event)}")
-
-    object_key = event.get('object_key')
-    if not object_key:
-        return {'status': 'ERROR', 'message': 'object_key is required'}
+def get_document_status(object_key, status_only=False):
+    """
+    Get status for a single document
     
+    Args:
+        object_key: Document object key
+        status_only: If True, return only status (no timing or Step Functions details)
+    
+    Returns:
+        Dictionary with document status
+    """
     dynamodb = boto3.resource('dynamodb')
     tracking_table = dynamodb.Table(os.environ['TRACKING_TABLE'])
-    sfn = boto3.client('stepfunctions')
     
     try:
         PK = f"doc#{object_key}"
@@ -56,9 +58,20 @@ def handler(event, context):
         )
         
         if 'Item' not in response:
-            return {'status': 'NOT_FOUND'}
+            return {'object_key': object_key, 'status': 'NOT_FOUND'}
             
         item = response['Item']
+        
+        result = {
+            'object_key': object_key,
+            'status': item.get('ObjectStatus', 'UNKNOWN')
+        }
+        
+        # If status_only mode, return minimal response
+        if status_only:
+            return result
+        
+        # Include full details
         timestamps = {
             'InitialEventTime': item.get('InitialEventTime'),
             'QueuedTime': item.get('QueuedTime'),
@@ -66,17 +79,15 @@ def handler(event, context):
             'CompletionTime': item.get('CompletionTime')
         }
         
-        result = {
-            'status': item.get('ObjectStatus'),
-            'timing': {
-                'timestamps': timestamps,
-                'elapsed': calculate_durations(timestamps)
-            }
+        result['timing'] = {
+            'timestamps': timestamps,
+            'elapsed': calculate_durations(timestamps)
         }
         
         execution_arn = item.get('WorkflowExecutionArn')
         if execution_arn:
             try:
+                sfn = boto3.client('stepfunctions')
                 execution = sfn.describe_execution(executionArn=execution_arn)
                 history = sfn.get_execution_history(
                     executionArn=execution_arn,
@@ -102,8 +113,52 @@ def handler(event, context):
         return result
         
     except Exception as e:
-        logger.error(f"Error looking up document: {e}", exc_info=True)
+        logger.error(f"Error looking up document {object_key}: {e}", exc_info=True)
         return {
+            'object_key': object_key,
             'status': 'ERROR',
             'message': str(e)
         }
+
+
+def handler(event, context):
+    """
+    Lambda handler supporting both single and batch document queries
+    
+    Request formats:
+        Single: {'object_key': 'doc-123', 'status_only': False}
+        Batch: {'object_keys': ['doc-1', 'doc-2', ...], 'status_only': True}
+    
+    Response formats:
+        Single: {'status': 'RUNNING', 'timing': {...}, 'processingDetail': {...}}
+        Batch: {'results': [{'object_key': 'doc-1', 'status': 'COMPLETED'}, ...]}
+    """
+    logger.info(f"Event: {json.dumps(event)}")
+
+    # Extract request parameters
+    object_keys = event.get('object_keys')  # Batch mode
+    object_key = event.get('object_key')    # Single mode
+    status_only = event.get('status_only', False)
+    
+    # Validate request
+    if not object_keys and not object_key:
+        return {'status': 'ERROR', 'message': 'object_key or object_keys is required'}
+    
+    # Handle batch request
+    if object_keys:
+        logger.info(f"Batch query for {len(object_keys)} documents (status_only={status_only})")
+        results = []
+        for key in object_keys:
+            result = get_document_status(key, status_only)
+            results.append(result)
+        return {'results': results}
+    
+    # Handle single document request (backward compatible)
+    logger.info(f"Single query for {object_key} (status_only={status_only})")
+    result = get_document_status(object_key, status_only)
+    
+    # Remove object_key from response for backward compatibility
+    # (old format didn't include it)
+    result.pop('object_key', None)
+    
+    return result

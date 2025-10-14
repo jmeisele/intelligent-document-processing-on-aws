@@ -32,27 +32,24 @@ class ProgressMonitor:
         self.lambda_client = boto3.client('lambda')
         self.lookup_function = resources.get('LookupFunctionName', '')
         
+        # Track finished documents to avoid redundant queries
+        self.finished_docs = {}  # {doc_id: status_info}
+        
         if not self.lookup_function:
             raise ValueError("LookupFunctionName not found in stack resources")
     
     def get_batch_status(self, document_ids: List[str]) -> Dict:
         """
-        Get status of all documents in batch
+        Get status of all documents in batch using optimized batch query
+        
+        Uses batch Lambda invocation and caches finished documents to reduce API calls.
         
         Args:
             document_ids: List of document IDs to check
         
         Returns:
-            Dictionary with status summary:
-                - completed: List of completed documents
-                - running: List of running documents
-                - queued: List of queued documents
-                - failed: List of failed documents
-                - all_complete: Boolean indicating if all documents are finished
-                - total: Total number of documents
+            Dictionary with status summary
         """
-        logger.debug(f"Checking status for {len(document_ids)} documents")
-        
         status_summary = {
             'completed': [],
             'running': [],
@@ -62,36 +59,125 @@ class ProgressMonitor:
             'total': len(document_ids)
         }
         
+        # Separate finished (cached) from active (need to query) documents
+        docs_to_query = []
         for doc_id in document_ids:
-            try:
-                status = self.get_document_status(doc_id)
-                status_value = status['status']
+            if doc_id in self.finished_docs:
+                # Use cached status
+                cached = self.finished_docs[doc_id]
+                self._categorize_document(cached, status_summary)
+            else:
+                docs_to_query.append(doc_id)
+        
+        # If all docs are finished, return cached results
+        if not docs_to_query:
+            logger.debug("All documents finished (using cache)")
+            finished = len(status_summary['completed']) + len(status_summary['failed'])
+            status_summary['all_complete'] = (finished == len(document_ids))
+            return status_summary
+        
+        logger.debug(f"Querying {len(docs_to_query)} active documents ({len(self.finished_docs)} cached)")
+        
+        # Batch query active documents
+        try:
+            statuses = self._batch_query_documents(docs_to_query)
+            
+            for status in statuses:
+                self._categorize_document(status, status_summary)
                 
-                if status_value == 'COMPLETED':
-                    status_summary['completed'].append(status)
-                elif status_value == 'FAILED':
-                    status_summary['failed'].append(status)
-                elif status_value in ['RUNNING', 'CLASSIFYING', 'EXTRACTING', 'ASSESSING', 'SUMMARIZING', 'EVALUATING']:
-                    # Treat all processing states as RUNNING
-                    status_summary['running'].append(status)
-                else:
-                    # QUEUED, UNKNOWN, or other states
-                    status_summary['queued'].append(status)
+                # Cache finished documents
+                if status['status'] in ['COMPLETED', 'FAILED']:
+                    self.finished_docs[status['document_id']] = status
                     
-            except Exception as e:
-                logger.error(f"Error getting status for {doc_id}: {e}")
-                # Treat as queued if we can't determine status
-                status_summary['queued'].append({
-                    'document_id': doc_id,
-                    'status': 'UNKNOWN',
-                    'error': str(e)
-                })
+        except Exception as e:
+            logger.error(f"Error in batch query: {e}", exc_info=True)
+            # Fall back to individual queries if batch fails
+            for doc_id in docs_to_query:
+                try:
+                    status = self.get_document_status(doc_id)
+                    self._categorize_document(status, status_summary)
+                    
+                    if status['status'] in ['COMPLETED', 'FAILED']:
+                        self.finished_docs[status['document_id']] = status
+                except Exception as e:
+                    logger.error(f"Error getting status for {doc_id}: {e}")
+                    status_summary['queued'].append({
+                        'document_id': doc_id,
+                        'status': 'UNKNOWN',
+                        'error': str(e)
+                    })
         
         # Check if all complete
         finished = len(status_summary['completed']) + len(status_summary['failed'])
         status_summary['all_complete'] = (finished == len(document_ids))
         
         return status_summary
+    
+    def _batch_query_documents(self, document_ids: List[str]) -> List[Dict]:
+        """
+        Query multiple documents in a single Lambda invocation
+        
+        Args:
+            document_ids: List of document IDs to query
+        
+        Returns:
+            List of document status dictionaries
+        """
+        # Invoke Lambda with batch request (status_only mode for efficiency)
+        response = self.lambda_client.invoke(
+            FunctionName=self.lookup_function,
+            InvocationType='RequestResponse',
+            Payload=json.dumps({
+                'object_keys': document_ids,
+                'status_only': True
+            })
+        )
+        
+        # Parse response
+        payload = response['Payload'].read()
+        result = json.loads(payload)
+        
+        # Handle Lambda error
+        if response.get('FunctionError'):
+            logger.error(f"Batch Lambda error: {result}")
+            raise Exception(result.get('errorMessage', 'Unknown batch query error'))
+        
+        # Extract results from batch response
+        batch_results = result.get('results', [])
+        
+        # Convert to standard format
+        statuses = []
+        for doc_result in batch_results:
+            status = {
+                'document_id': doc_result.get('object_key'),
+                'status': doc_result.get('status', 'UNKNOWN'),
+                'workflow_arn': '',
+                'start_time': '',
+                'end_time': '',
+                'duration': 0
+            }
+            statuses.append(status)
+        
+        return statuses
+    
+    def _categorize_document(self, status: Dict, status_summary: Dict):
+        """
+        Categorize a document status into the appropriate summary bucket
+        
+        Args:
+            status: Document status dictionary
+            status_summary: Status summary dictionary to update
+        """
+        status_value = status['status']
+        
+        if status_value == 'COMPLETED':
+            status_summary['completed'].append(status)
+        elif status_value == 'FAILED':
+            status_summary['failed'].append(status)
+        elif status_value in ['RUNNING', 'CLASSIFYING', 'EXTRACTING', 'ASSESSING', 'SUMMARIZING', 'EVALUATING']:
+            status_summary['running'].append(status)
+        else:
+            status_summary['queued'].append(status)
     
     def get_document_status(self, doc_id: str) -> Dict:
         """
