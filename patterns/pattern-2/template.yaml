@@ -188,8 +188,6 @@ Resources:
 
   Pattern2ECRRepository:
     Type: AWS::ECR::Repository
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
     Properties:
       ImageScanningConfiguration:
         ScanOnPush: true
@@ -284,6 +282,12 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:ListImages
+                  - ecr:BatchDeleteImage
+                Resource:
+                  - !GetAtt Pattern2ECRRepository.Arn
           # Used by custom resource helper poller
           # https://github.com/aws-cloudformation/custom-resource-helper
         - PolicyName: CustomResourcePoller
@@ -351,6 +355,15 @@ Resources:
       BuildProjectName: !Ref Pattern2DockerBuildProject
       # Force rebuild when source changes (filename includes content hash)
       CodeLocation: !Sub "arn:${AWS::Partition}:s3:::${ArtifactBucket}/${ArtifactPrefix}/${Pattern2SourceZipfile}"
+
+  Pattern2EcrRepositoryCleanup:
+    Type: Custom::ECRRepositoryCleanup
+    DependsOn:
+      - Pattern2DockerBuildRun
+      - Pattern2ECRRepository
+    Properties:
+      ServiceToken: !GetAtt Pattern2CodeBuildTrigger.Arn
+      RepositoryName: !Ref Pattern2ECRRepository
   # Shared IAM policy for Lambda functions to pull container images from ECR
   LambdaECRAccessPolicy:
     Type: AWS::IAM::ManagedPolicy
