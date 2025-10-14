@@ -57,7 +57,8 @@ class BatchProcessor:
         self,
         manifest_path: str,
         steps: str = 'all',
-        output_prefix: str = 'cli-batch'
+        output_prefix: str = 'cli-batch',
+        batch_id: Optional[str] = None
     ) -> Dict:
         """
         Process batch of documents from manifest
@@ -66,19 +67,16 @@ class BatchProcessor:
             manifest_path: Path to manifest file (CSV or JSON)
             steps: Comma-separated list of steps to execute, or 'all'
             output_prefix: Prefix for output organization
+            batch_id: Optional custom batch ID (auto-generated if not provided)
         
         Returns:
-            Dictionary with batch processing results:
-                - batch_id: Unique batch identifier
-                - document_ids: List of document IDs
-                - uploaded: Number of documents uploaded
-                - queued: Number of messages sent to queue
-                - failed: Number of failures
+            Dictionary with batch processing results
         """
         logger.info(f"Processing batch from manifest: {manifest_path}")
         
-        # Generate unique batch ID
-        batch_id = self._generate_batch_id(output_prefix)
+        # Generate or use provided batch ID
+        if not batch_id:
+            batch_id = self._generate_batch_id(output_prefix)
         logger.info(f"Batch ID: {batch_id}")
         
         # Parse manifest
@@ -94,7 +92,8 @@ class BatchProcessor:
         file_pattern: str = '*.pdf',
         recursive: bool = True,
         steps: str = 'all',
-        output_prefix: str = 'cli-batch'
+        output_prefix: str = 'cli-batch',
+        batch_id: Optional[str] = None
     ) -> Dict:
         """
         Process batch of documents from local directory
@@ -105,14 +104,16 @@ class BatchProcessor:
             recursive: Include subdirectories
             steps: Comma-separated list of steps to execute, or 'all'
             output_prefix: Prefix for output organization
+            batch_id: Optional custom batch ID (auto-generated if not provided)
         
         Returns:
             Dictionary with batch processing results
         """
         logger.info(f"Scanning directory: {dir_path}")
         
-        # Generate unique batch ID
-        batch_id = self._generate_batch_id(output_prefix)
+        # Generate or use provided batch ID
+        if not batch_id:
+            batch_id = self._generate_batch_id(output_prefix)
         logger.info(f"Batch ID: {batch_id}")
         
         # Scan directory and create manifest
@@ -131,7 +132,8 @@ class BatchProcessor:
         file_pattern: str = '*.pdf',
         recursive: bool = True,
         steps: str = 'all',
-        output_prefix: str = 'cli-batch'
+        output_prefix: str = 'cli-batch',
+        batch_id: Optional[str] = None
     ) -> Dict:
         """
         Process batch of documents from S3 prefix
@@ -142,14 +144,16 @@ class BatchProcessor:
             recursive: Include sub-prefixes
             steps: Comma-separated list of steps to execute, or 'all'
             output_prefix: Prefix for output organization
+            batch_id: Optional custom batch ID (auto-generated if not provided)
         
         Returns:
             Dictionary with batch processing results
         """
         logger.info(f"Scanning S3 prefix: {s3_prefix}")
         
-        # Generate unique batch ID
-        batch_id = self._generate_batch_id(output_prefix)
+        # Generate or use provided batch ID
+        if not batch_id:
+            batch_id = self._generate_batch_id(output_prefix)
         logger.info(f"Batch ID: {batch_id}")
         
         # Scan S3 prefix and create manifest
@@ -360,17 +364,16 @@ class BatchProcessor:
             S3 key for uploaded file
         """
         local_path = doc['path']
+        filename = os.path.basename(local_path)
         
-        # Use relative_path if provided (from directory scan), otherwise construct S3 key
+        # Use relative_path if provided (from directory scan), otherwise use filename
         if 'relative_path' in doc and doc['relative_path']:
             # Preserve directory structure: batch_id/relative_path
             relative_path = doc['relative_path']
             s3_key = f"{batch_id}/{relative_path}"
         else:
-            # Legacy behavior: batch_id/document_id/filename
-            document_id = doc['document_id']
-            filename = Path(local_path).name
-            s3_key = f"{batch_id}/{document_id}/{filename}"
+            # Standardized: batch_id/filename
+            s3_key = f"{batch_id}/{filename}"
         
         # Upload file
         input_bucket = self.resources['InputBucket']
@@ -390,19 +393,24 @@ class BatchProcessor:
     
     def _process_document(self, doc: Dict, batch_id: str) -> str:
         """
-        Process a single document (upload or reference)
+        Process a single document (upload, copy, or reference)
         
         Args:
             doc: Document specification from manifest
             batch_id: Batch identifier
         
         Returns:
-            S3 key for the document
+            S3 key for the document in InputBucket
         """
         if doc['type'] == 'local':
             # Upload local file to InputBucket
             s3_key = self._upload_local_file(doc, batch_id)
             logger.info(f"Uploaded {doc['document_id']} to {s3_key}")
+            return s3_key
+        elif doc['type'] == 's3':
+            # Copy from external S3 location to InputBucket
+            s3_key = self._copy_s3_file(doc, batch_id)
+            logger.info(f"Copied {doc['document_id']} from {doc['path']} to {s3_key}")
             return s3_key
         elif doc['type'] == 's3-key':
             # Document already in InputBucket, validate it exists
@@ -416,11 +424,10 @@ class BatchProcessor:
     def _upload_local_file(self, doc: Dict, batch_id: str) -> str:
         """Upload local file to S3 InputBucket"""
         local_path = doc['path']
-        document_id = doc['document_id']
+        filename = doc['filename']
         
-        # Construct S3 key: batch_id/document_id/filename
-        filename = Path(local_path).name
-        s3_key = f"{batch_id}/{document_id}/{filename}"
+        # Construct S3 key: batch_id/filename
+        s3_key = f"{batch_id}/{filename}"
         
         # Upload file
         input_bucket = self.resources['InputBucket']
@@ -431,6 +438,44 @@ class BatchProcessor:
         )
         
         return s3_key
+    
+    def _copy_s3_file(self, doc: Dict, batch_id: str) -> str:
+        """
+        Copy file from any S3 location to InputBucket
+        
+        Args:
+            doc: Document specification with S3 URI
+            batch_id: Batch identifier
+        
+        Returns:
+            S3 key in InputBucket
+        """
+        s3_uri = doc['path']
+        filename = doc['filename']
+        
+        # Parse S3 URI
+        # Format: s3://bucket/key/path/file.pdf
+        uri_parts = s3_uri[5:].split('/', 1)  # Remove 's3://' and split
+        source_bucket = uri_parts[0]
+        source_key = uri_parts[1] if len(uri_parts) > 1 else ''
+        
+        if not source_key:
+            raise ValueError(f"Invalid S3 URI (no key): {s3_uri}")
+        
+        # Construct destination key: batch_id/filename
+        dest_key = f"{batch_id}/{filename}"
+        
+        # Copy object
+        input_bucket = self.resources['InputBucket']
+        copy_source = {'Bucket': source_bucket, 'Key': source_key}
+        
+        self.s3.copy_object(
+            CopySource=copy_source,
+            Bucket=input_bucket,
+            Key=dest_key
+        )
+        
+        return dest_key
     
     def _validate_s3_key(self, s3_key: str):
         """Validate that S3 key exists in InputBucket"""

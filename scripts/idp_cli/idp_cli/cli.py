@@ -236,6 +236,7 @@ def deploy(
 @click.option('--dir', 'directory', type=click.Path(exists=True, file_okay=False, dir_okay=True),
               help='Local directory containing documents to process')
 @click.option('--s3-prefix', help='S3 prefix within InputBucket to process')
+@click.option('--batch-id', help='Custom batch ID (auto-generated if not provided)')
 @click.option('--file-pattern', default='*.pdf',
               help='File pattern for directory/S3 scanning (default: *.pdf)')
 @click.option('--recursive/--no-recursive', default=True,
@@ -256,6 +257,7 @@ def run_inference(
     manifest: Optional[str],
     directory: Optional[str],
     s3_prefix: Optional[str],
+    batch_id: Optional[str],
     file_pattern: str,
     recursive: bool,
     config: Optional[str],
@@ -280,6 +282,9 @@ def run_inference(
       
       # Process all PDFs in local directory
       idp-cli run-inference --stack-name my-stack --dir ./documents/ --monitor
+      
+      # Process with custom batch ID
+      idp-cli run-inference --stack-name my-stack --dir ./docs/ --batch-id my-experiment-v1 --monitor
       
       # Process S3 prefix (preserves directory structure)
       idp-cli run-inference --stack-name my-stack --s3-prefix archive/2024/ --monitor
@@ -325,7 +330,8 @@ def run_inference(
                 batch_result = processor.process_batch(
                     manifest_path=manifest,
                     steps=steps,
-                    output_prefix=output_prefix
+                    output_prefix=output_prefix,
+                    batch_id=batch_id
                 )
             elif directory:
                 batch_result = processor.process_batch_from_directory(
@@ -333,7 +339,8 @@ def run_inference(
                     file_pattern=file_pattern,
                     recursive=recursive,
                     steps=steps,
-                    output_prefix=output_prefix
+                    output_prefix=output_prefix,
+                    batch_id=batch_id
                 )
             else:  # s3_prefix
                 batch_result = processor.process_batch_from_s3_prefix(
@@ -341,7 +348,8 @@ def run_inference(
                     file_pattern=file_pattern,
                     recursive=recursive,
                     steps=steps,
-                    output_prefix=output_prefix
+                    output_prefix=output_prefix,
+                    batch_id=batch_id
                 )
         
         # Show submission results

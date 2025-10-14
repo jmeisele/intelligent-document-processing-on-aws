@@ -112,43 +112,46 @@ class ManifestParser:
             row_num: Row number for error messages
         
         Returns:
-            Normalized document dictionary
+            Normalized document dictionary with keys:
+                - document_id: Unique identifier
+                - path: Local file path or full S3 URI
+                - type: 'local' or 's3' (auto-detected)
+                - filename: Base filename
         """
-        # Required fields
+        # Required field: document_path
         document_path = row.get('document_path') or row.get('path', '').strip()
-        document_id = row.get('document_id') or row.get('id', '').strip()
-        doc_type = row.get('type', '').strip().lower()
         
         if not document_path:
             raise ValueError(f"Missing required field 'document_path' or 'path'")
         
-        # Auto-generate document_id if not provided
+        # Auto-detect type based on path format
+        if document_path.startswith('s3://'):
+            doc_type = 's3'
+            # Validate S3 URI format
+            if len(document_path) < 8 or '/' not in document_path[5:]:
+                raise ValueError(f"Invalid S3 URI format: {document_path}")
+            filename = os.path.basename(document_path)
+        elif os.path.isabs(document_path) or os.path.exists(document_path):
+            doc_type = 'local'
+            # Validate local file exists
+            if not os.path.exists(document_path):
+                raise ValueError(f"Local file not found: {document_path}")
+            filename = os.path.basename(document_path)
+        else:
+            raise ValueError(f"Invalid path '{document_path}'. Use absolute local path or s3:// URI")
+        
+        # Get document_id (optional, auto-generate from filename if not provided)
+        document_id = row.get('document_id') or row.get('id', '').strip()
         if not document_id:
             # Use filename without extension as ID
-            document_id = Path(document_path).stem
+            document_id = Path(filename).stem
             logger.debug(f"Auto-generated document_id: {document_id}")
-        
-        # Determine type if not specified
-        if not doc_type:
-            if document_path.startswith('s3://'):
-                raise ValueError("S3 URIs not supported. Use 's3-key' type with key only")
-            elif os.path.isabs(document_path) or os.path.exists(document_path):
-                doc_type = 'local'
-            else:
-                doc_type = 's3-key'
-        
-        # Validate type
-        if doc_type not in ['local', 's3-key']:
-            raise ValueError(f"Invalid type '{doc_type}'. Must be 'local' or 's3-key'")
-        
-        # Validate local file exists
-        if doc_type == 'local' and not os.path.exists(document_path):
-            raise ValueError(f"Local file not found: {document_path}")
         
         return {
             'document_id': document_id,
             'path': document_path,
-            'type': doc_type
+            'type': doc_type,
+            'filename': filename
         }
 
 
@@ -183,11 +186,17 @@ def validate_manifest(manifest_path: str) -> tuple[bool, Optional[str]]:
         if not documents:
             return False, "Manifest contains no documents"
         
-        # Check for duplicate IDs
+        # Check for duplicate document IDs
         ids = [doc['document_id'] for doc in documents]
         if len(ids) != len(set(ids)):
             duplicates = [id for id in ids if ids.count(id) > 1]
             return False, f"Duplicate document IDs found: {', '.join(set(duplicates))}"
+        
+        # Check for duplicate filenames (which would cause S3 key collisions)
+        filenames = [doc['filename'] for doc in documents]
+        if len(filenames) != len(set(filenames)):
+            duplicates = [f for f in filenames if filenames.count(f) > 1]
+            return False, f"Duplicate filenames found: {', '.join(set(duplicates))}. Provide explicit document_id values to avoid collisions."
         
         return True, None
         

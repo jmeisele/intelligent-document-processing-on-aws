@@ -124,7 +124,7 @@ idp-cli deploy \
 
 After your stack is deployed, process documents using one of three methods:
 
-**Option A: From a Directory (Simplest - NEW!)**
+**Option A: From a Directory (Simplest)**
 ```bash
 # Process all PDFs in a directory
 idp-cli run-inference \
@@ -144,11 +144,12 @@ idp-cli run-inference \
 
 **Option C: From a Manifest File (Most Control)**
 ```bash
-# Create a manifest file
+# Create a simplified manifest file
 cat > my-documents.csv << EOF
-document_path,document_id,type
-/path/to/document1.pdf,doc1,local
-/path/to/document2.pdf,doc2,local
+document_path
+/path/to/document1.pdf
+/path/to/document2.pdf
+s3://external-bucket/document3.pdf
 EOF
 
 # Process with live monitoring
@@ -505,6 +506,7 @@ idp-cli run-inference [OPTIONS]
   - `--manifest`: Path to manifest file (CSV or JSON)
   - `--dir`: Local directory containing documents
   - `--s3-prefix`: S3 prefix within InputBucket
+- `--batch-id`: Custom batch ID (optional, auto-generated if not provided)
 - `--file-pattern`: File pattern for directory/S3 scanning (default: `*.pdf`)
 - `--recursive/--no-recursive`: Include subdirectories (default: recursive)
 - `--steps`: Steps to execute (default: `all`)
@@ -523,7 +525,7 @@ idp-cli run-inference \
     --manifest docs.csv \
     --monitor
 
-# Process all PDFs in local directory (NEW!)
+# Process all PDFs in local directory
 idp-cli run-inference \
     --stack-name my-idp-stack \
     --dir ./documents/ \
@@ -651,29 +653,57 @@ idp-cli validate --manifest documents.csv
 ### CSV Format
 
 **Required Fields:**
-- `document_path`: Local file path or S3 key (within InputBucket)
+- `document_path`: Local file path or full S3 URI (s3://bucket/key)
 
 **Optional Fields:**
 - `document_id`: Unique identifier (auto-generated from filename if omitted)
-- `type`: Document type (`local` or `s3-key`, auto-detected if omitted)
 
-**Example:**
+**Simplified Example (No Duplicates):**
 ```csv
-document_path,document_id,type
-/home/user/docs/w2.pdf,w2-2024,local
-existing/doc.pdf,existing-doc,s3-key
-samples/test.pdf,,
+document_path
+/home/user/docs/invoice-001.pdf
+/home/user/docs/invoice-002.pdf
+s3://external-bucket/archive/statement.pdf
 ```
+
+**With Custom IDs (For Duplicates or Organization):**
+```csv
+document_path,document_id
+/home/user/clientA/invoice.pdf,clientA-invoice-2024
+/home/user/clientB/invoice.pdf,clientB-invoice-2024
+s3://data-lake/docs/report.pdf,q1-report
+```
+
+**Key Features:**
+- Type auto-detected from path format (local file vs S3 URI)
+- S3 URIs can be from **any bucket** (automatically copied to InputBucket)
+- `document_id` optional - auto-generated from filename if omitted
+- Duplicate filenames detected - provide explicit `document_id` values to resolve
 
 ### JSON Format
 
-**Array Format:**
+**Minimal Array Format:**
 ```json
 [
   {
-    "document_id": "doc1",
-    "path": "/local/path/doc1.pdf",
-    "type": "local"
+    "path": "/local/path/doc1.pdf"
+  },
+  {
+    "path": "s3://external-bucket/doc2.pdf"
+  }
+]
+```
+
+**With Custom IDs:**
+```json
+[
+  {
+    "path": "/local/clientA/invoice.pdf",
+    "document_id": "clientA-invoice"
+  },
+  {
+    "path": "s3://data-lake/report.pdf",
+    "document_id": "q1-report"
   }
 ]
 ```
@@ -683,9 +713,12 @@ samples/test.pdf,,
 {
   "documents": [
     {
-      "id": "doc1",
-      "path": "folder/doc1.pdf",
-      "type": "s3-key"
+      "path": "/local/doc1.pdf",
+      "document_id": "doc1"
+    },
+    {
+      "path": "s3://bucket/doc2.pdf",
+      "document_id": "doc2"
     }
   ],
   "config": {
@@ -695,37 +728,53 @@ samples/test.pdf,,
 }
 ```
 
-### Document Types
+### Auto-Detection
 
-**`local` Type:**
-- File exists on local filesystem
-- CLI uploads to InputBucket automatically
-- Path can be absolute or relative
+**Document Type (Automatic):**
+- `s3://...` → S3 file (copied from source bucket to InputBucket)
+- Absolute path or existing file → Local file (uploaded)
+- Invalid path → Error
 
-**`s3-key` Type:**
-- File already exists in InputBucket
-- Path is the S3 key (not full S3 URI)
-- CLI validates existence before processing
+**Document ID (If Not Provided):**
+- Auto-generated from filename without extension
+- Example: `s3://bucket/invoice-2024.pdf` → ID: `invoice-2024`
 
-### Important Constraints
+### Path Construction
 
-⚠️ **S3 Bucket Restrictions:**
-- Documents must be in stack's InputBucket (cannot use external buckets)
-- Baselines must be in stack's EvaluationBaselineBucket
-- Use S3 keys only (not full `s3://bucket/key` URIs)
+All documents uploaded/copied to InputBucket follow consistent pattern:
 
-✅ **Supported:**
-```csv
-document_path,type
-samples/doc.pdf,s3-key
-/local/file.pdf,local
+**Manifest-based:**
 ```
+Source: /local/invoice.pdf
+Destination: {batch-id}/invoice.pdf
+```
+
+**Directory-based (preserves structure):**
+```
+Source: ./docs/W2s/w2.pdf
+Destination: {batch-id}/W2s/w2.pdf
+```
+
+**S3 source:**
+```
+Source: s3://external-bucket/archive/doc.pdf
+Destination: {batch-id}/doc.pdf
+```
+
+### Important Notes
+
+✅ **Now Supported:**
+- Documents from **any S3 bucket** (automatically copied)
+- Local files with absolute or relative paths
+- Mixed sources in same manifest
+
+⚠️ **Duplicate Filenames:**
+- If multiple files have same name, provide explicit `document_id` values
+- Validation will catch duplicates and provide clear error message
 
 ❌ **Not Supported:**
-```csv
-document_path,type
-s3://external-bucket/doc.pdf,s3-key
-```
+- S3 URIs without `s3://` prefix
+- Relative paths that don't exist locally
 
 ## Architecture
 
@@ -1012,24 +1061,29 @@ Uses existing LookupFunction Lambda to query document status:
 
 | Field | Required | Type | Description | Example |
 |-------|----------|------|-------------|---------|
-| `document_path` or `path` | Yes | string | Local file path or S3 key | `/home/user/doc.pdf` or `folder/doc.pdf` |
-| `document_id` or `id` | No | string | Unique identifier (auto-generated if omitted) | `doc-001` |
-| `type` | No | string | `local` or `s3-key` (auto-detected if omitted) | `local` |
+| `document_path` or `path` | Yes | string | Local file path or S3 URI | `/home/user/doc.pdf` or `s3://bucket/doc.pdf` |
+| `document_id` or `id` | No | string | Unique identifier (auto-generated from filename if omitted) | `doc-001` |
 
 ### Auto-Detection Rules
 
-**Document ID:**
-- If omitted, extracted from filename without extension
-- Example: `folder/my-document.pdf` → `my-document`
+**Document Type (Automatic):**
+- Starts with `s3://` → S3 file (copied from source bucket to InputBucket)
+- Absolute path or file exists → Local file (uploaded to InputBucket)
+- Invalid path → Error with descriptive message
 
-**Document Type:**
-- Absolute path or file exists → `local`
-- Relative path and file doesn't exist → `s3-key`
-- S3 URI (`s3://...`) → **ERROR** (not supported)
+**Document ID (If Not Provided):**
+- Auto-generated from filename without extension
+- Example: `s3://bucket/invoice-2024.pdf` → `invoice-2024`
+- Example: `/local/statement.pdf` → `statement`
+
+**Duplicate Detection:**
+- Validates no duplicate document_id values
+- Validates no duplicate filenames (would cause S3 key collisions)
+- Clear error message if duplicates found
 
 ## Examples
 
-### Example 1: Directory-Based Processing (NEW!)
+### Example 1: Directory-Based Processing
 
 ```bash
 # Process all PDFs in a directory (simplest approach)
@@ -1069,6 +1123,23 @@ idp-cli run-inference \
     --stack-name my-stack \
     --dir ./documents/ \
     --no-recursive \
+    --monitor
+```
+
+**With custom batch ID:**
+```bash
+# Use meaningful batch ID for easier tracking
+idp-cli run-inference \
+    --stack-name my-stack \
+    --dir ./tax-documents-2024/ \
+    --batch-id tax-returns-2024-q1 \
+    --monitor
+
+# Useful for experiments with version tracking
+idp-cli run-inference \
+    --stack-name my-stack \
+    --dir ./test-set/ \
+    --batch-id experiment-prompt-v3 \
     --monitor
 ```
 
