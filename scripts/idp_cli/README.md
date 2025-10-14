@@ -270,7 +270,7 @@ EOF
 idp-cli run-inference \
     --stack-name my-first-idp-stack \
     --manifest ~/my-documents.csv \
-    --output-prefix my-first-test \
+    --batch-prefix my-first-test \
     --monitor
 ```
 
@@ -361,7 +361,7 @@ idp-cli deploy \
 idp-cli run-inference \
     --stack-name my-first-idp-stack \
     --manifest ~/my-documents.csv \
-    --output-prefix test-v1 \
+    --batch-prefix test-v1 \
     --monitor
 
 # Test with configuration v2
@@ -373,7 +373,7 @@ idp-cli deploy \
 idp-cli run-inference \
     --stack-name my-first-idp-stack \
     --manifest ~/my-documents.csv \
-    --output-prefix test-v2 \
+    --batch-prefix test-v2 \
     --monitor
 
 # Compare results
@@ -507,11 +507,11 @@ idp-cli run-inference [OPTIONS]
   - `--dir`: Local directory containing documents
   - `--s3-prefix`: S3 prefix within InputBucket
 - `--batch-id`: Custom batch ID (optional, auto-generated if not provided)
+- `--batch-prefix`: Batch ID prefix for auto-generation (default: `cli-batch`, only used if --batch-id not provided)
 - `--file-pattern`: File pattern for directory/S3 scanning (default: `*.pdf`)
 - `--recursive/--no-recursive`: Include subdirectories (default: recursive)
 - `--steps`: Steps to execute (default: `all`)
   - Examples: `all`, `extraction,assessment`, `classification,extraction,evaluation`
-- `--output-prefix`: Output prefix for organizing results (default: `cli-batch`)
 - `--monitor`: Monitor progress until completion (flag)
 - `--refresh-interval`: Seconds between status checks (default: 5)
 - `--region`: AWS region (optional)
@@ -657,6 +657,7 @@ idp-cli validate --manifest documents.csv
 
 **Optional Fields:**
 - `document_id`: Unique identifier (auto-generated from filename if omitted)
+- `baseline_source`: S3 URI or local path to baseline data for automatic evaluation
 
 **Simplified Example (No Duplicates):**
 ```csv
@@ -672,6 +673,14 @@ document_path,document_id
 /home/user/clientA/invoice.pdf,clientA-invoice-2024
 /home/user/clientB/invoice.pdf,clientB-invoice-2024
 s3://data-lake/docs/report.pdf,q1-report
+```
+
+**With Baselines (For Automatic Evaluation):**
+```csv
+document_path,document_id,baseline_source
+/local/invoice.pdf,inv-001,s3://output-bucket/validated/invoice.pdf/
+/local/w2.pdf,w2-001,/local/baselines/w2-baseline/
+s3://data-lake/doc.pdf,doc-001,s3://my-baseline-bucket/doc-001/
 ```
 
 **Key Features:**
@@ -850,7 +859,7 @@ idp-cli deploy --stack-name my-stack --custom-config ./config-v1.yaml --wait
 idp-cli run-inference \
     --stack-name my-stack \
     --manifest test-set.csv \
-    --output-prefix test-v1 \
+    --batch-prefix test-v1 \
     --monitor
 
 # Test configuration v2
@@ -858,7 +867,7 @@ idp-cli deploy --stack-name my-stack --custom-config ./config-v2.yaml --wait
 idp-cli run-inference \
     --stack-name my-stack \
     --manifest test-set.csv \
-    --output-prefix test-v2 \
+    --batch-prefix test-v2 \
     --monitor
 
 # Compare results in OutputBucket under test-v1/ and test-v2/
@@ -873,7 +882,7 @@ Re-run specific steps with cached earlier results:
 idp-cli run-inference \
     --stack-name my-stack \
     --manifest docs.csv \
-    --output-prefix baseline
+    --batch-prefix baseline
 
 # Later: Update config and re-run only extraction and evaluation
 idp-cli deploy --stack-name my-stack --custom-config ./new-extraction-prompts.yaml --wait
@@ -881,7 +890,7 @@ idp-cli run-inference \
     --stack-name my-stack \
     --manifest docs.csv \
     --steps extraction,assessment,evaluation \
-    --output-prefix experiment-new-prompts
+    --batch-prefix experiment-new-prompts
 ```
 
 ### Large-Scale Evaluation
@@ -893,7 +902,7 @@ Process large document sets for accuracy testing:
 idp-cli run-inference \
     --stack-name my-stack \
     --manifest evaluation-set-1000.csv \
-    --output-prefix eval-batch-001 \
+    --batch-prefix eval-batch-001 \
     --monitor
 
 # Results automatically include evaluation metrics
@@ -911,7 +920,7 @@ Integrate into automated testing pipelines:
 idp-cli run-inference \
     --stack-name $STACK_NAME \
     --manifest test-suite.csv \
-    --output-prefix ci-test-$BUILD_ID \
+    --batch-prefix ci-test-$BUILD_ID \
     --monitor
 
 # Check exit code
@@ -1105,7 +1114,7 @@ idp-cli run-inference \
     --stack-name my-stack \
     --dir ./tax-documents/ \
     --file-pattern "W2*.pdf" \
-    --output-prefix w2-batch \
+    --batch-prefix w2-batch \
     --monitor
 
 # Process only invoices
@@ -1157,7 +1166,7 @@ idp-cli run-inference \
     --stack-name my-stack \
     --s3-prefix processed-docs/ \
     --file-pattern "*.pdf" \
-    --output-prefix reprocess-batch \
+    --batch-prefix reprocess-batch \
     --monitor
 ```
 
@@ -1175,7 +1184,7 @@ EOF
 idp-cli run-inference \
     --stack-name dev-idp-stack \
     --manifest test-docs.csv \
-    --output-prefix dev-test \
+    --batch-prefix dev-test \
     --monitor
 ```
 
@@ -1195,7 +1204,7 @@ idp-cli run-inference \
     --stack-name prod-idp-stack \
     --manifest eval-set.csv \
     --steps all \
-    --output-prefix accuracy-test-001 \
+    --batch-prefix accuracy-test-001 \
     --monitor
 ```
 
@@ -1207,7 +1216,7 @@ idp-cli run-inference \
     --stack-name my-stack \
     --manifest docs-already-classified.csv \
     --steps extraction,assessment \
-    --output-prefix extraction-experiment
+    --batch-prefix extraction-experiment
 ```
 
 ### Example 4: Background Processing
@@ -1217,7 +1226,7 @@ idp-cli run-inference \
 idp-cli run-inference \
     --stack-name my-stack \
     --manifest large-batch.csv \
-    --output-prefix overnight-batch
+    --batch-prefix overnight-batch
 
 # Returns immediately with batch ID
 # Batch ID: cli-batch-20250110-220045-xyz98765

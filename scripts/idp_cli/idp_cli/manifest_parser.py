@@ -147,11 +147,15 @@ class ManifestParser:
             document_id = Path(filename).stem
             logger.debug(f"Auto-generated document_id: {document_id}")
         
+        # Get baseline_source (optional)
+        baseline_source = row.get('baseline_source', '').strip() or None
+        
         return {
             'document_id': document_id,
             'path': document_path,
             'type': doc_type,
-            'filename': filename
+            'filename': filename,
+            'baseline_source': baseline_source
         }
 
 

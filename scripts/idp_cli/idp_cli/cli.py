@@ -245,8 +245,8 @@ def deploy(
               help='Path to configuration YAML file (optional)')
 @click.option('--steps', default='all', 
               help='Steps to execute: all, or comma-separated list (e.g., extraction,assessment)')
-@click.option('--output-prefix', default='cli-batch', 
-              help='Output prefix for organizing results')
+@click.option('--batch-prefix', default='cli-batch', 
+              help='Batch ID prefix (used only if --batch-id not provided, default: cli-batch)')
 @click.option('--monitor', is_flag=True, 
               help='Monitor progress until completion')
 @click.option('--refresh-interval', default=5, type=int,
@@ -262,7 +262,7 @@ def run_inference(
     recursive: bool,
     config: Optional[str],
     steps: str,
-    output_prefix: str,
+    batch_prefix: str,
     monitor: bool,
     refresh_interval: int,
     region: Optional[str]
@@ -330,7 +330,7 @@ def run_inference(
                 batch_result = processor.process_batch(
                     manifest_path=manifest,
                     steps=steps,
-                    output_prefix=output_prefix,
+                    output_prefix=batch_prefix,
                     batch_id=batch_id
                 )
             elif directory:
@@ -339,7 +339,7 @@ def run_inference(
                     file_pattern=file_pattern,
                     recursive=recursive,
                     steps=steps,
-                    output_prefix=output_prefix,
+                    output_prefix=batch_prefix,
                     batch_id=batch_id
                 )
             else:  # s3_prefix
@@ -348,7 +348,7 @@ def run_inference(
                     file_pattern=file_pattern,
                     recursive=recursive,
                     steps=steps,
-                    output_prefix=output_prefix,
+                    output_prefix=batch_prefix,
                     batch_id=batch_id
                 )
         

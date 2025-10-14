@@ -196,6 +196,7 @@ class BatchProcessor:
             'uploaded': 0,
             'queued': 0,
             'failed': 0,
+            'baselines_uploaded': 0,
             'source': source,
             'output_prefix': output_prefix,
             'steps': steps,
@@ -204,6 +205,16 @@ class BatchProcessor:
         
         for doc in documents:
             try:
+                # Upload baseline if specified
+                if doc.get('baseline_source'):
+                    try:
+                        self._upload_baseline(doc, batch_id, base_dir)
+                        results['baselines_uploaded'] += 1
+                        logger.info(f"Uploaded baseline for {doc['document_id']}")
+                    except Exception as e:
+                        logger.error(f"Failed to upload baseline for {doc['document_id']}: {e}")
+                        # Continue processing document even if baseline fails
+                
                 # Handle document upload/reference
                 # S3 upload automatically triggers EventBridge -> QueueSender -> SQS
                 s3_key = self._process_document_with_base(doc, batch_id, base_dir)
@@ -221,7 +232,8 @@ class BatchProcessor:
         # Store batch metadata
         self._store_batch_metadata(batch_id, results)
         
-        logger.info(f"Batch processing complete: {results['queued']} queued, {results['failed']} failed")
+        logger.info(f"Batch processing complete: {results['queued']} queued, "
+                   f"{results['failed']} failed, {results['baselines_uploaded']} baselines uploaded")
         return results
     
     def _scan_local_directory(self, dir_path: str, pattern: str, recursive: bool) -> List[Dict]:
@@ -386,10 +398,17 @@ class BatchProcessor:
         return s3_key
     
     def _generate_batch_id(self, prefix: str) -> str:
-        """Generate unique batch ID"""
+        """
+        Generate batch ID from prefix and timestamp
+        
+        Args:
+            prefix: Batch prefix (e.g., 'cli-batch', 'experiment-v1')
+        
+        Returns:
+            Batch ID in format: {prefix}-{YYYYMMDD-HHMMSS}
+        """
         timestamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
-        unique_id = uuid.uuid4().hex[:8]
-        return f"{prefix}-{timestamp}-{unique_id}"
+        return f"{prefix}-{timestamp}"
     
     def _process_document(self, doc: Dict, batch_id: str) -> str:
         """
@@ -476,6 +495,124 @@ class BatchProcessor:
         )
         
         return dest_key
+    
+    def _upload_baseline(self, doc: Dict, batch_id: str, base_dir: Optional[str] = None) -> None:
+        """
+        Upload baseline data for automatic evaluation
+        
+        Args:
+            doc: Document specification with baseline_source
+            batch_id: Batch identifier
+            base_dir: Base directory (unused for baselines)
+        """
+        baseline_source = doc.get('baseline_source')
+        if not baseline_source:
+            return
+        
+        # Get destination key (matches where document will be processed)
+        if 'relative_path' in doc and doc['relative_path']:
+            # Directory-based: preserve structure
+            dest_doc_key = f"{batch_id}/{doc['relative_path']}"
+        else:
+            # Manifest-based: use filename
+            dest_doc_key = f"{batch_id}/{doc['filename']}"
+        
+        baseline_bucket = self.resources.get('EvaluationBaselineBucket')
+        if not baseline_bucket:
+            logger.warning("EvaluationBaselineBucket not found - skipping baseline upload")
+            return
+        
+        logger.info(f"Uploading baseline from {baseline_source} for document key: {dest_doc_key}")
+        
+        # Detect source type
+        if baseline_source.startswith('s3://'):
+            # Copy from S3 (preserves directory structure)
+            self._copy_s3_baseline_tree(baseline_source, baseline_bucket, dest_doc_key)
+        else:
+            # Upload from local directory
+            self._upload_local_baseline_tree(baseline_source, baseline_bucket, dest_doc_key)
+    
+    def _copy_s3_baseline_tree(self, source_uri: str, dest_bucket: str, dest_doc_key: str) -> None:
+        """
+        Copy baseline directory tree from S3
+        
+        Args:
+            source_uri: S3 URI to baseline root (e.g., s3://bucket/doc-001/)
+            dest_bucket: Destination bucket (BaselineEvaluationBucket)
+            dest_doc_key: Document key for destination path
+        """
+        # Parse S3 URI
+        uri_parts = source_uri[5:].split('/', 1)
+        source_bucket = uri_parts[0]
+        source_prefix = uri_parts[1] if len(uri_parts) > 1 else ''
+        
+        # Ensure prefix ends with /
+        if source_prefix and not source_prefix.endswith('/'):
+            source_prefix = source_prefix + '/'
+        
+        # List all objects under source prefix
+        paginator = self.s3.get_paginator('list_objects_v2')
+        pages = paginator.paginate(Bucket=source_bucket, Prefix=source_prefix)
+        
+        copied_count = 0
+        for page in pages:
+            for obj in page.get('Contents', []):
+                source_key = obj['Key']
+                
+                # Calculate relative path from source prefix
+                rel_path = source_key[len(source_prefix):]
+                
+                # Construct destination key
+                dest_key = f"{dest_doc_key}/{rel_path}"
+                
+                # Copy object
+                copy_source = {'Bucket': source_bucket, 'Key': source_key}
+                self.s3.copy_object(
+                    CopySource=copy_source,
+                    Bucket=dest_bucket,
+                    Key=dest_key
+                )
+                copied_count += 1
+                logger.debug(f"Copied baseline file: {source_key} -> {dest_key}")
+        
+        logger.info(f"Copied {copied_count} baseline files from {source_uri}")
+    
+    def _upload_local_baseline_tree(self, local_dir: str, dest_bucket: str, dest_doc_key: str) -> None:
+        """
+        Upload baseline directory tree from local filesystem
+        
+        Args:
+            local_dir: Local directory containing baseline structure
+            dest_bucket: Destination bucket (BaselineEvaluationBucket)
+            dest_doc_key: Document key for destination path
+        """
+        if not os.path.isdir(local_dir):
+            raise ValueError(f"Baseline directory not found: {local_dir}")
+        
+        local_dir = os.path.abspath(local_dir)
+        uploaded_count = 0
+        
+        # Walk directory tree
+        for root, dirs, files in os.walk(local_dir):
+            for filename in files:
+                local_file_path = os.path.join(root, filename)
+                
+                # Calculate relative path from local_dir
+                rel_path = os.path.relpath(local_file_path, local_dir)
+                
+                # Construct destination key
+                dest_key = f"{dest_doc_key}/{rel_path}"
+                
+                # Upload file
+                self.s3.upload_file(
+                    Filename=local_file_path,
+                    Bucket=dest_bucket,
+                    Key=dest_key
+                )
+                uploaded_count += 1
+                logger.debug(f"Uploaded baseline file: {local_file_path} -> {dest_key}")
+        
+        logger.info(f"Uploaded {uploaded_count} baseline files from {local_dir}")
     
     def _validate_s3_key(self, s3_key: str):
         """Validate that S3 key exists in InputBucket"""
