@@ -123,13 +123,13 @@ class ProgressMonitor:
         Returns:
             List of document status dictionaries
         """
-        # Invoke Lambda with batch request (status_only mode for efficiency)
+        # Invoke Lambda with batch request (status_only=True includes timing, excludes Step Functions)
         response = self.lambda_client.invoke(
             FunctionName=self.lookup_function,
             InvocationType='RequestResponse',
             Payload=json.dumps({
                 'object_keys': document_ids,
-                'status_only': True
+                'status_only': True  # Includes status + timing, excludes processingDetail
             })
         )
         
@@ -148,13 +148,17 @@ class ProgressMonitor:
         # Convert to standard format
         statuses = []
         for doc_result in batch_results:
+            # Extract timing info if available
+            timing = doc_result.get('timing', {})
+            elapsed = timing.get('elapsed', {})
+            
             status = {
                 'document_id': doc_result.get('object_key'),
                 'status': doc_result.get('status', 'UNKNOWN'),
                 'workflow_arn': '',
                 'start_time': '',
                 'end_time': '',
-                'duration': 0
+                'duration': elapsed.get('total', 0) / 1000.0 if elapsed.get('total') else 0  # Convert ms to seconds
             }
             statuses.append(status)
         

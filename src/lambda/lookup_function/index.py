@@ -42,7 +42,7 @@ def get_document_status(object_key, status_only=False):
     
     Args:
         object_key: Document object key
-        status_only: If True, return only status (no timing or Step Functions details)
+        status_only: If True, return status + timing (no Step Functions details)
     
     Returns:
         Dictionary with document status
@@ -62,16 +62,7 @@ def get_document_status(object_key, status_only=False):
             
         item = response['Item']
         
-        result = {
-            'object_key': object_key,
-            'status': item.get('ObjectStatus', 'UNKNOWN')
-        }
-        
-        # If status_only mode, return minimal response
-        if status_only:
-            return result
-        
-        # Include full details
+        # Always include status and timing
         timestamps = {
             'InitialEventTime': item.get('InitialEventTime'),
             'QueuedTime': item.get('QueuedTime'),
@@ -79,10 +70,18 @@ def get_document_status(object_key, status_only=False):
             'CompletionTime': item.get('CompletionTime')
         }
         
-        result['timing'] = {
-            'timestamps': timestamps,
-            'elapsed': calculate_durations(timestamps)
+        result = {
+            'object_key': object_key,
+            'status': item.get('ObjectStatus', 'UNKNOWN'),
+            'timing': {
+                'timestamps': timestamps,
+                'elapsed': calculate_durations(timestamps)
+            }
         }
+        
+        # If status_only mode, skip expensive Step Functions queries
+        if status_only:
+            return result
         
         execution_arn = item.get('WorkflowExecutionArn')
         if execution_arn:
