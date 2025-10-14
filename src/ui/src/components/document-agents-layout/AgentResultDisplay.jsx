@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Box, Container, Header, SpaceBetween, Alert } from '@awsui/components-react';
+import { Box, Container, Header, SpaceBetween, Alert } from '@cloudscape-design/components';
 import { Logger } from 'aws-amplify';
 
 import PlotDisplay from './PlotDisplay';

@@ -3,7 +3,7 @@
 
 /* eslint-disable react/prop-types */
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, SpaceBetween } from '@awsui/components-react';
+import { Box, Button, SpaceBetween } from '@cloudscape-design/components';
 import { API, Logger } from 'aws-amplify';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';

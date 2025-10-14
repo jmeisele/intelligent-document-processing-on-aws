@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Box, Modal, SpaceBetween, Button } from '@awsui/components-react';
+import { Box, Modal, SpaceBetween, Button } from '@cloudscape-design/components';
 import { Logger } from 'aws-amplify';
 
 const logger = new Logger('ReprocessDocumentModal');

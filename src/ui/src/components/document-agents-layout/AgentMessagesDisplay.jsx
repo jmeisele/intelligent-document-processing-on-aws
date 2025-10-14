@@ -3,7 +3,7 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { Container, Header, Box, Spinner, SpaceBetween, Button, Modal } from '@awsui/components-react';
+import { Container, Header, Box, Spinner, SpaceBetween, Button, Modal } from '@cloudscape-design/components';
 
 const AgentMessagesDisplay = ({ agentMessages, isProcessing }) => {
   const messagesEndRef = useRef(null);

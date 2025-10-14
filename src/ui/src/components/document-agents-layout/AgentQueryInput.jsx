@@ -15,7 +15,7 @@ import {
   Modal,
   Header,
   Link,
-} from '@awsui/components-react';
+} from '@cloudscape-design/components';
 import listAgentJobs from '../../graphql/queries/listAgentJobs';
 import deleteAgentJob from '../../graphql/queries/deleteAgentJob';
 import listAvailableAgents from '../../graphql/queries/listAvailableAgents';
@@ -388,18 +388,6 @@ const AgentQueryInput = ({ onSubmit, isSubmitting, selectedResult }) => {
                 }
               }}
               ariaLabel={`Delete query: ${displayText}`}
-              style={{
-                opacity: 0.7,
-                transition: 'opacity 0.2s',
-                marginLeft: 'auto',
-                flexShrink: 0,
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.opacity = 1;
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.opacity = 0.7;
-              }}
             />
           </div>
         ),
@@ -418,14 +406,7 @@ const AgentQueryInput = ({ onSubmit, isSubmitting, selectedResult }) => {
               <Box fontSize="heading-xs" fontWeight="bold">
                 Select from available agents
               </Box>
-              <Button
-                variant="normal"
-                onClick={() => setShowMcpInfoModal(true)}
-                fontSize="body-s"
-                style={{
-                  borderColor: '#e9ecef',
-                }}
-              >
+              <Button variant="normal" onClick={() => setShowMcpInfoModal(true)} fontSize="body-s">
                 🚀 NEW: Integrate your own systems with MCP!
               </Button>
             </div>

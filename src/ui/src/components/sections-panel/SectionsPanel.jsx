@@ -17,7 +17,7 @@ import {
   Textarea,
   Modal,
   Alert,
-} from '@awsui/components-react';
+} from '@cloudscape-design/components';
 import { API, graphqlOperation } from 'aws-amplify';
 import FileViewer from '../document-viewer/JSONViewer';
 import { getSectionConfidenceAlertCount, getSectionConfidenceAlerts } from '../common/confidence-alerts-utils';

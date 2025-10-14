@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 
 import React from 'react';
-import { Box, SpaceBetween } from '@awsui/components-react';
+import { Box, SpaceBetween } from '@cloudscape-design/components';
 import ConfidenceDisplay from './ConfidenceDisplay';
 
 /**

@@ -3,7 +3,7 @@
 
 /* eslint-disable react/prop-types */
 import React, { useState } from 'react';
-import { Box, Container, SpaceBetween, Table } from '@awsui/components-react';
+import { Box, Container, SpaceBetween, Table } from '@cloudscape-design/components';
 import { Logger } from 'aws-amplify';
 import useAppContext from '../../contexts/app';
 import generateS3PresignedUrl from '../common/generate-s3-presigned-url';

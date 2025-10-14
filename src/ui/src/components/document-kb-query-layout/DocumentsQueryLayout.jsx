@@ -5,7 +5,17 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import { Box, Button, Spinner, Header, Grid, Container, SpaceBetween, Input, Link } from '@awsui/components-react';
+import {
+  Box,
+  Button,
+  Spinner,
+  Header,
+  Grid,
+  Container,
+  SpaceBetween,
+  Input,
+  Link,
+} from '@cloudscape-design/components';
 import PropTypes from 'prop-types';
 import { API, Logger } from 'aws-amplify';
 import queryKnowledgeBase from '../../graphql/queries/queryKnowledgeBase';

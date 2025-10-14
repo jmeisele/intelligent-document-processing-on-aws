@@ -12,7 +12,7 @@ import {
   FormField,
   Input,
   Checkbox,
-} from '@awsui/components-react';
+} from '@cloudscape-design/components';
 import { API, Logger } from 'aws-amplify';
 import { Editor } from '@monaco-editor/react';
 import getFileContents from '../../graphql/queries/getFileContents';

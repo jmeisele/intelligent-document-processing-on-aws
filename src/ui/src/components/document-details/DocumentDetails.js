@@ -12,7 +12,7 @@ import DeleteDocumentModal from '../common/DeleteDocumentModal';
 import ReprocessDocumentModal from '../common/ReprocessDocumentModal';
 import { DOCUMENTS_PATH } from '../../routes/constants';
 
-import '@awsui/global-styles/index.css';
+import '@cloudscape-design/global-styles/index.css';
 
 import DocumentPanel from '../document-panel';
 

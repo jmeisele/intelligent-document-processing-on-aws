@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Box, SpaceBetween, ExpandableSection, Button, Alert, Container } from '@awsui/components-react';
+import { Box, SpaceBetween, ExpandableSection, Button, Alert, Container } from '@cloudscape-design/components';
 import './StepDetails.css';
 
 const JsonDisplay = ({ data }) => {

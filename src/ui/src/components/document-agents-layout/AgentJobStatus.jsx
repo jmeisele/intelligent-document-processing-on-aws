@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 import React from 'react';
 import PropTypes from 'prop-types';
-import { StatusIndicator, Box, SpaceBetween } from '@awsui/components-react';
+import { StatusIndicator, Box, SpaceBetween } from '@cloudscape-design/components';
 
 const getStatusIndicator = (status) => {
   switch (status) {

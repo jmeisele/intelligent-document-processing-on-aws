@@ -3,7 +3,7 @@
 
 /* eslint-disable react/prop-types */
 import React, { useState, useEffect } from 'react';
-import { SpaceBetween, Box, Button, StatusIndicator } from '@awsui/components-react';
+import { SpaceBetween, Box, Button, StatusIndicator } from '@cloudscape-design/components';
 import { API, graphqlOperation, Logger } from 'aws-amplify';
 import copyToBaselineMutation from '../../graphql/queries/copyToBaseline';
 import FileViewer from '../document-viewer/FileViewer';

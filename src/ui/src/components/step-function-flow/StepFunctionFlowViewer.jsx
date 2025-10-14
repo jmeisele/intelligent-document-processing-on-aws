@@ -5,7 +5,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { API, graphqlOperation, Logger } from 'aws-amplify';
-import { Container, Header, SpaceBetween, Box, Alert, Spinner, Button, Modal, Badge } from '@awsui/components-react';
+import {
+  Container,
+  Header,
+  SpaceBetween,
+  Box,
+  Alert,
+  Spinner,
+  Button,
+  Modal,
+  Badge,
+} from '@cloudscape-design/components';
 import {
   FaPlay,
   FaCheck,

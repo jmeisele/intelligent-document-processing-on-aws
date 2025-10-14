@@ -15,9 +15,9 @@
     "@aws-sdk/s3-request-presigner": "^3.779.0",
     "@aws-sdk/url-parser": "^3.374.0",
     "@aws-sdk/util-format-url": "^3.775.0",
-    "@awsui/collection-hooks": "^1.0.98",
-    "@awsui/components-react": "^3.0.1487",
-    "@awsui/global-styles": "^1.0.25",
+    "@cloudscape-design/collection-hooks": "^1.0.76",
+    "@cloudscape-design/components": "^3.0.1111",
+    "@cloudscape-design/global-styles": "^1.0.46",
     "@monaco-editor/react": "^4.7.0",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^12.1.5",
@@ -90,7 +90,7 @@
   },
   "jest": {
     "transformIgnorePatterns": [
-      "<roodDir>/node_modules/(?!@awsui)"
+      "<roodDir>/node_modules/(?!@cloudscape-design)"
     ]
   },
   "overrides": {

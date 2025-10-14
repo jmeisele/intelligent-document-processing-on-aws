@@ -3,7 +3,7 @@
 
 /* eslint-disable react/prop-types */
 import React, { useState } from 'react';
-import { Box } from '@awsui/components-react';
+import { Box } from '@cloudscape-design/components';
 import { API, Logger } from 'aws-amplify';
 import DOMPurify from 'dompurify';
 // Note: XLSX and mammoth imports removed since we're using download approach for Excel/Docx files

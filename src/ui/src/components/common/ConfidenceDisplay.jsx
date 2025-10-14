@@ -3,7 +3,7 @@
 
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Box, Badge } from '@awsui/components-react';
+import { Box, Badge } from '@cloudscape-design/components';
 
 /**
  * Enhanced confidence display component with color coding and threshold information

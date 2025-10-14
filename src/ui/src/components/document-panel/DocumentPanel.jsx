@@ -13,7 +13,7 @@ import {
   Table,
   ExpandableSection,
   StatusIndicator,
-} from '@awsui/components-react';
+} from '@cloudscape-design/components';
 import { Logger } from 'aws-amplify';
 import './DocumentPanel.css';
 import DocumentViewers from '../document-viewers/DocumentViewers';

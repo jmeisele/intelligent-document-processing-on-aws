@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { API, Logger } from 'aws-amplify';
-import { Modal, Box, SpaceBetween, Button, Spinner, Alert, Header } from '@awsui/components-react';
+import { Modal, Box, SpaceBetween, Button, Spinner, Alert, Header } from '@cloudscape-design/components';
 
 import submitAgentQuery from '../../graphql/queries/submitAgentQuery';
 import getAgentJobStatus from '../../graphql/queries/getAgentJobStatus';

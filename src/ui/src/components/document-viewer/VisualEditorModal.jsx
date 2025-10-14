@@ -16,7 +16,7 @@ import {
   Header,
   Spinner,
   Button,
-} from '@awsui/components-react';
+} from '@cloudscape-design/components';
 import { Logger } from 'aws-amplify';
 import generateS3PresignedUrl from '../common/generate-s3-presigned-url';
 import useAppContext from '../../contexts/app';
