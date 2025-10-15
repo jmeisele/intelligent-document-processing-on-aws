@@ -296,10 +296,14 @@ class BatchProcessor:
                 # Use relative path (without extension) as document ID
                 doc_id = os.path.splitext(rel_path)[0]
 
+                # Extract filename
+                filename = os.path.basename(file_path)
+
                 documents.append(
                     {
                         "document_id": doc_id,
                         "path": file_path,
+                        "filename": filename,  # Add filename key
                         "relative_path": rel_path,  # Store for path preservation
                         "type": "local",
                     }
