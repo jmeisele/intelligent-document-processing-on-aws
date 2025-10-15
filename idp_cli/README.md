@@ -627,7 +627,7 @@ idp-cli download-results [OPTIONS]
 - `--batch-id` (required): Batch identifier
 - `--output-dir` (required): Local directory to download to
 - `--file-types`: File types to download (default: all)
-  - Options: `pages`, `sections`, `summary`, or `all`
+  - Options: `pages`, `sections`, `summary`, `evaluation`, or `all`
 - `--region`: AWS region (optional)
 
 **Examples:**
@@ -646,12 +646,19 @@ idp-cli download-results \
     --output-dir ./results/ \
     --file-types sections
 
-# Download pages and summaries
+# Download evaluation results only
 idp-cli download-results \
     --stack-name my-stack \
     --batch-id cli-batch-20251015-143000 \
     --output-dir ./results/ \
-    --file-types pages,summary
+    --file-types evaluation
+
+# Download sections and evaluations
+idp-cli download-results \
+    --stack-name my-stack \
+    --batch-id cli-batch-20251015-143000 \
+    --output-dir ./results/ \
+    --file-types sections,evaluation
 ```
 
 **Output Structure:**

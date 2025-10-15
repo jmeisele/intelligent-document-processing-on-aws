@@ -577,7 +577,7 @@ def list_batches(stack_name: str, limit: int, region: Optional[str]):
 @click.option(
     "--file-types",
     default="all",
-    help="File types to download: pages, sections, summary, or 'all' (default: all)",
+    help="File types to download: pages, sections, summary, evaluation, or 'all' (default: all)",
 )
 @click.option("--region", help="AWS region (optional)")
 def download_results(
@@ -598,8 +598,8 @@ def download_results(
       # Download only extraction results (sections)
       idp-cli download-results --stack-name my-stack --batch-id <id> --output-dir ./results/ --file-types sections
 
-      # Download pages and summaries
-      idp-cli download-results --stack-name my-stack --batch-id <id> --output-dir ./results/ --file-types pages,summary
+      # Download evaluations only
+      idp-cli download-results --stack-name my-stack --batch-id <id> --output-dir ./results/ --file-types evaluation
     """
     try:
         console.print(
@@ -610,7 +610,7 @@ def download_results(
 
         # Parse file types
         if file_types == "all":
-            types_list = ["pages", "sections", "summary"]
+            types_list = ["pages", "sections", "summary", "evaluation"]
         else:
             types_list = [t.strip() for t in file_types.split(",")]
 
