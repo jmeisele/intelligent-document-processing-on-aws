@@ -12,6 +12,12 @@ A command-line tool for batch document processing with the GenAI IDP Accelerator
 📈 **Batch Analytics** - Success rates, durations, and detailed error reporting  
 🎯 **Evaluation Framework** - Validate accuracy against baselines with detailed metrics
 
+Demo:
+
+https://github.com/user-attachments/assets/3d448a74-ba5b-4a4a-96ad-ec03ac0b4d7d
+
+
+
 ## Table of Contents
 
 - [Installation](#installation)
