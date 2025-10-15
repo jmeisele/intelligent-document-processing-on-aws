@@ -641,6 +641,11 @@ def download_results(
 )
 @click.option("--s3-uri", help="S3 URI to scan (e.g., s3://bucket/prefix/)")
 @click.option(
+    "--baseline-dir",
+    type=click.Path(exists=True, file_okay=False),
+    help="Baseline directory to auto-match (only with --dir)",
+)
+@click.option(
     "--output", required=True, type=click.Path(), help="Output manifest file path (CSV)"
 )
 @click.option("--file-pattern", default="*.pdf", help="File pattern (default: *.pdf)")
@@ -653,6 +658,7 @@ def download_results(
 def generate_manifest(
     directory: Optional[str],
     s3_uri: Optional[str],
+    baseline_dir: Optional[str],
     output: str,
     file_pattern: str,
     recursive: bool,
@@ -662,11 +668,15 @@ def generate_manifest(
     Generate a manifest file from directory or S3 URI
 
     The manifest can then be edited to add baseline_source or customize document_id values.
+    Use --baseline-dir to automatically match baseline directories by document ID.
 
     Examples:
 
       # Generate from local directory
       idp-cli generate-manifest --dir ./documents/ --output manifest.csv
+
+      # With automatic baseline matching
+      idp-cli generate-manifest --dir ./documents/ --baseline-dir ./baselines/ --output manifest.csv
 
       # Generate from S3 URI
       idp-cli generate-manifest --s3-uri s3://bucket/prefix/ --output manifest.csv
@@ -764,6 +774,40 @@ def generate_manifest(
 
         console.print(f"Found {len(documents)} documents")
 
+        # Match baselines if baseline_dir provided
+        baseline_map = {}
+        if baseline_dir:
+            if s3_uri:
+                console.print(
+                    "[yellow]Warning: --baseline-dir only works with --dir, ignoring[/yellow]"
+                )
+            else:
+                console.print(
+                    f"[bold blue]Matching baselines from: {baseline_dir}[/bold blue]"
+                )
+
+                import os
+
+                baseline_path = os.path.abspath(baseline_dir)
+
+                # Scan for baseline subdirectories
+                for item in os.listdir(baseline_path):
+                    item_path = os.path.join(baseline_path, item)
+                    if os.path.isdir(item_path):
+                        # Directory name is the document ID
+                        baseline_map[item] = item_path
+
+                console.print(f"Found {len(baseline_map)} baseline directories")
+
+                # Show matching statistics
+                matched = sum(
+                    1 for doc in documents if doc["document_id"] in baseline_map
+                )
+                console.print(
+                    f"Matched {matched}/{len(documents)} documents to baselines"
+                )
+                console.print()
+
         # Write manifest
         with open(output, "w", newline="") as f:
             writer = csv.DictWriter(
@@ -771,20 +815,29 @@ def generate_manifest(
             )
             writer.writeheader()
             for doc in documents:
+                doc_id = doc["document_id"]
+                baseline_source = baseline_map.get(doc_id, "")
+
                 writer.writerow(
                     {
                         "document_path": doc["document_path"],
-                        "document_id": doc["document_id"],
-                        "baseline_source": "",  # Empty for user to fill
+                        "document_id": doc_id,
+                        "baseline_source": baseline_source,
                     }
                 )
 
         console.print(f"[green]✓ Generated manifest: {output}[/green]")
         console.print()
-        console.print("[bold]Next steps:[/bold]")
-        console.print(
-            "1. Edit manifest to add baseline_source or customize document_id"
-        )
+
+        if baseline_map:
+            console.print("[bold]Baseline matching complete[/bold]")
+            console.print("Ready to process with evaluations!")
+        else:
+            console.print("[bold]Next steps:[/bold]")
+            console.print(
+                "1. Edit manifest to add baseline_source or customize document_id"
+            )
+
         console.print(
             f"2. Process: [cyan]idp-cli run-inference --stack-name <stack> --manifest {output}[/cyan]"
         )

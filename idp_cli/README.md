@@ -678,14 +678,19 @@ Results are downloaded preserving the S3 directory structure:
         │   └── 1/
         │       ├── result.json
         │       └── summary.json
-        └── summary/
-            ├── fulltext.txt
-            └── summary.json
+        ├── summary/
+        │   ├── fulltext.txt
+        │   └── summary.json
+        └── evaluation/
+            ├── report.json
+            └── report.md
 ```
 
 ### `generate-manifest`
 
 Generate a manifest file from directory or S3 URI. The generated manifest can be edited to add baseline sources or customize document IDs before processing.
+
+Supports automatic baseline matching when document IDs match baseline directory names.
 
 **Usage:**
 ```bash
@@ -696,6 +701,7 @@ idp-cli generate-manifest [OPTIONS]
 - **Source** (choose ONE):
   - `--dir`: Local directory to scan
   - `--s3-uri`: S3 URI to scan
+- `--baseline-dir`: Baseline directory for automatic matching (only with --dir)
 - `--output` (required): Output manifest file path (CSV)
 - `--file-pattern`: File pattern (default: `*.pdf`)
 - `--recursive/--no-recursive`: Include subdirectories (default: recursive)
@@ -707,6 +713,9 @@ idp-cli generate-manifest [OPTIONS]
 # Generate from local directory
 idp-cli generate-manifest --dir ./documents/ --output manifest.csv
 
+# With automatic baseline matching
+idp-cli generate-manifest --dir ./documents/ --baseline-dir ./baselines/ --output manifest.csv
+
 # Generate from S3 URI
 idp-cli generate-manifest --s3-uri s3://bucket/prefix/ --output manifest.csv
 
@@ -714,24 +723,52 @@ idp-cli generate-manifest --s3-uri s3://bucket/prefix/ --output manifest.csv
 idp-cli generate-manifest --dir ./docs/ --output manifest.csv --file-pattern "W2*.pdf"
 ```
 
+**Automatic Baseline Matching:**
+
+When using `--baseline-dir`, baselines are matched by document ID:
+
+```
+Documents Directory:
+./documents/
+├── invoice-001.pdf    → doc_id: invoice-001
+└── w2-form.pdf       → doc_id: w2-form
+
+Baselines Directory:
+./baselines/
+├── invoice-001/      ← Matches invoice-001.pdf
+│   └── sections/
+│       └── 1/result.json
+└── w2-form/         ← Matches w2-form.pdf
+    └── sections/
+        └── 1/result.json
+
+Generated Manifest:
+document_path,document_id,baseline_source
+/local/documents/invoice-001.pdf,invoice-001,/local/baselines/invoice-001/
+/local/documents/w2-form.pdf,w2-form,/local/baselines/w2-form/
+```
+
 **Workflow:**
 
 ```bash
-# Step 1: Generate manifest
+# Step 1: Generate manifest (baselines auto-matched)
+idp-cli generate-manifest --dir ./documents/ --baseline-dir ./baselines/ --output manifest.csv
+
+# Step 2: Process with evaluations (no editing needed!)
+idp-cli run-inference --stack-name my-stack --manifest manifest.csv --monitor
+```
+
+**Or Manual Workflow:**
+
+```bash
+# Step 1: Generate manifest without baselines
 idp-cli generate-manifest --dir ./documents/ --output manifest.csv
 
-# Step 2: Edit manifest (add baseline_source, customize IDs)
+# Step 2: Edit manifest to add baseline_source
 vi manifest.csv
 
 # Step 3: Process with edited manifest
 idp-cli run-inference --stack-name my-stack --manifest manifest.csv --monitor
-```
-
-**Generated Manifest Format:**
-```csv
-document_path,document_id,baseline_source
-/local/doc1.pdf,doc1,
-/local/doc2.pdf,doc2,
 ```
 
 ### `validate-manifest`
