@@ -25,8 +25,7 @@ from .progress_monitor import ProgressMonitor
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ console = Console()
 def cli():
     """
     IDP CLI - Batch document processing for IDP Accelerator
-    
+
     This tool provides commands for:
     - Stack deployment
     - Batch document upload and processing
@@ -49,34 +48,50 @@ def cli():
 
 
 @cli.command()
-@click.option('--stack-name', required=True, help='CloudFormation stack name')
-@click.option('--pattern', 
-              type=click.Choice(['pattern-1', 'pattern-2', 'pattern-3']),
-              help='IDP pattern to deploy (required for new stacks)')
-@click.option('--admin-email', help='Admin user email address (required for new stacks)')
-@click.option('--template-path', 
-              help='Path to local CloudFormation template')
-@click.option('--template-url', 
-              default='https://s3.us-west-2.amazonaws.com/aws-ml-blog-us-west-2/artifacts/genai-idp/idp-main.yaml',
-              help='URL to CloudFormation template in S3 (default: public template)')
-@click.option('--max-concurrent', default=100, type=int,
-              help='Maximum concurrent workflows (default: 100)')
-@click.option('--log-level', default='INFO',
-              type=click.Choice(['DEBUG', 'INFO', 'WARN', 'ERROR']),
-              help='Logging level (default: INFO)')
-@click.option('--enable-hitl', default='false',
-              type=click.Choice(['true', 'false']),
-              help='Enable Human-in-the-Loop (default: false)')
-@click.option('--pattern-config', help='Pattern configuration preset')
-@click.option('--custom-config', help='Path to local config file or S3 URI (e.g., ./config.yaml or s3://bucket/config.yaml)')
-@click.option('--parameters', help='Additional parameters as key=value,key2=value2')
-@click.option('--wait', is_flag=True, help='Wait for stack creation to complete')
-@click.option('--region', help='AWS region (optional)')
+@click.option("--stack-name", required=True, help="CloudFormation stack name")
+@click.option(
+    "--pattern",
+    type=click.Choice(["pattern-1", "pattern-2", "pattern-3"]),
+    help="IDP pattern to deploy (required for new stacks)",
+)
+@click.option(
+    "--admin-email", help="Admin user email address (required for new stacks)"
+)
+@click.option(
+    "--template-url",
+    default="https://s3.us-west-2.amazonaws.com/aws-ml-blog-us-west-2/artifacts/genai-idp/idp-main.yaml",
+    help="URL to CloudFormation template in S3 (default: public template)",
+)
+@click.option(
+    "--max-concurrent",
+    default=100,
+    type=int,
+    help="Maximum concurrent workflows (default: 100)",
+)
+@click.option(
+    "--log-level",
+    default="INFO",
+    type=click.Choice(["DEBUG", "INFO", "WARN", "ERROR"]),
+    help="Logging level (default: INFO)",
+)
+@click.option(
+    "--enable-hitl",
+    default="false",
+    type=click.Choice(["true", "false"]),
+    help="Enable Human-in-the-Loop (default: false)",
+)
+@click.option("--pattern-config", help="Pattern configuration preset")
+@click.option(
+    "--custom-config",
+    help="Path to local config file or S3 URI (e.g., ./config.yaml or s3://bucket/config.yaml)",
+)
+@click.option("--parameters", help="Additional parameters as key=value,key2=value2")
+@click.option("--wait", is_flag=True, help="Wait for stack creation to complete")
+@click.option("--region", help="AWS region (optional)")
 def deploy(
     stack_name: str,
     pattern: str,
     admin_email: str,
-    template_path: Optional[str],
     template_url: str,
     max_concurrent: int,
     log_level: str,
@@ -85,7 +100,7 @@ def deploy(
     custom_config: Optional[str],
     parameters: Optional[str],
     wait: bool,
-    region: Optional[str]
+    region: Optional[str],
 ):
     """
     Deploy or update IDP stack from command line
@@ -112,61 +127,71 @@ def deploy(
     try:
         # Initialize deployer
         deployer = StackDeployer(region=region)
-        
+
         # Check if stack exists
         stack_exists = deployer._stack_exists(stack_name)
-        
+
         if stack_exists:
             # Stack exists - updating
-            console.print(f"[bold blue]Updating existing IDP stack: {stack_name}[/bold blue]")
-            
+            console.print(
+                f"[bold blue]Updating existing IDP stack: {stack_name}[/bold blue]"
+            )
+
             # Get existing stack parameters
             try:
                 response = deployer.cfn.describe_stacks(StackName=stack_name)
-                existing_stack = response['Stacks'][0]
-                existing_params = {p['ParameterKey']: p['ParameterValue'] 
-                                 for p in existing_stack.get('Parameters', [])}
-                
+                existing_stack = response["Stacks"][0]
+                existing_params = {
+                    p["ParameterKey"]: p["ParameterValue"]
+                    for p in existing_stack.get("Parameters", [])
+                }
+
                 # Use existing values if not provided
-                if not pattern and 'IDPPattern' in existing_params:
+                if not pattern and "IDPPattern" in existing_params:
                     # Extract pattern from existing value
-                    pattern_value = existing_params['IDPPattern']
-                    if 'Pattern1' in pattern_value:
-                        pattern = 'pattern-1'
-                    elif 'Pattern2' in pattern_value:
-                        pattern = 'pattern-2'
-                    elif 'Pattern3' in pattern_value:
-                        pattern = 'pattern-3'
-                
-                if not admin_email and 'AdminEmail' in existing_params:
-                    admin_email = existing_params['AdminEmail']
-                    
+                    pattern_value = existing_params["IDPPattern"]
+                    if "Pattern1" in pattern_value:
+                        pattern = "pattern-1"
+                    elif "Pattern2" in pattern_value:
+                        pattern = "pattern-2"
+                    elif "Pattern3" in pattern_value:
+                        pattern = "pattern-3"
+
+                if not admin_email and "AdminEmail" in existing_params:
+                    admin_email = existing_params["AdminEmail"]
+
             except Exception as e:
                 logger.warning(f"Could not retrieve existing stack parameters: {e}")
         else:
             # New stack - require pattern and admin_email
-            console.print(f"[bold blue]Creating new IDP stack: {stack_name}[/bold blue]")
-            
+            console.print(
+                f"[bold blue]Creating new IDP stack: {stack_name}[/bold blue]"
+            )
+
             if not pattern:
-                console.print("[red]✗ Error: --pattern is required when creating a new stack[/red]")
+                console.print(
+                    "[red]✗ Error: --pattern is required when creating a new stack[/red]"
+                )
                 sys.exit(1)
-            
+
             if not admin_email:
-                console.print("[red]✗ Error: --admin-email is required when creating a new stack[/red]")
+                console.print(
+                    "[red]✗ Error: --admin-email is required when creating a new stack[/red]"
+                )
                 sys.exit(1)
-        
+
         console.print(f"Pattern: {pattern}")
         console.print(f"Admin Email: {admin_email}")
         console.print()
-        
+
         # Parse additional parameters
         additional_params = {}
         if parameters:
-            for param in parameters.split(','):
-                if '=' in param:
-                    key, value = param.split('=', 1)
+            for param in parameters.split(","):
+                if "=" in param:
+                    key, value = param.split("=", 1)
                     additional_params[key.strip()] = value.strip()
-        
+
         # Build parameters
         cfn_parameters = build_parameters(
             pattern=pattern,
@@ -178,48 +203,59 @@ def deploy(
             custom_config=custom_config,
             additional_params=additional_params,
             region=region,
-            stack_name=stack_name
+            stack_name=stack_name,
         )
-        
+
         # Debug: Show CustomConfigPath if present
-        if 'CustomConfigPath' in cfn_parameters:
-            console.print(f"[yellow]DEBUG: CustomConfigPath = {cfn_parameters['CustomConfigPath']}[/yellow]")
-        
+        if "CustomConfigPath" in cfn_parameters:
+            console.print(
+                f"[yellow]DEBUG: CustomConfigPath = {cfn_parameters['CustomConfigPath']}[/yellow]"
+            )
+
         # Deploy stack
         with console.status("[bold green]Deploying stack..."):
             result = deployer.deploy_stack(
                 stack_name=stack_name,
-                template_path=template_path,
-                template_url=template_url if not template_path else None,
+                template_url=template_url,
                 parameters=cfn_parameters,
-                wait=wait
+                wait=wait,
             )
-        
+
         # Show results
-        if result.get('success'):
-            console.print(f"\n[green]✓ Stack {result['operation']} completed successfully![/green]\n")
-            
+        if result.get("success"):
+            console.print(
+                f"\n[green]✓ Stack {result['operation']} completed successfully![/green]\n"
+            )
+
             # Show outputs
-            outputs = result.get('outputs', {})
+            outputs = result.get("outputs", {})
             if outputs:
                 console.print("[bold]Important Outputs:[/bold]")
-                console.print(f"  Application URL: [cyan]{outputs.get('ApplicationWebURL', 'N/A')}[/cyan]")
-                console.print(f"  Input Bucket: {outputs.get('S3InputBucketName', 'N/A')}")
-                console.print(f"  Output Bucket: {outputs.get('S3OutputBucketName', 'N/A')}")
+                console.print(
+                    f"  Application URL: [cyan]{outputs.get('ApplicationWebURL', 'N/A')}[/cyan]"
+                )
+                console.print(
+                    f"  Input Bucket: {outputs.get('S3InputBucketName', 'N/A')}"
+                )
+                console.print(
+                    f"  Output Bucket: {outputs.get('S3OutputBucketName', 'N/A')}"
+                )
                 console.print()
-            
+
             console.print("[bold]Next Steps:[/bold]")
             console.print("1. Check your email for temporary admin password")
             console.print("2. Enable Bedrock model access (see README)")
             console.print("3. Process documents:")
-            console.print(f"   [cyan]idp-cli run-inference --stack-name {stack_name} --manifest docs.csv[/cyan]")
+            console.print(
+                f"   [cyan]idp-cli run-inference --stack-name {stack_name} --manifest docs.csv[/cyan]"
+            )
             console.print()
         else:
             console.print(f"\n[red]✗ Stack {result['operation']} failed![/red]")
             console.print(f"Status: {result.get('status')}")
             console.print(f"Error: {result.get('error', 'Unknown')}")
             sys.exit(1)
-            
+
     except FileNotFoundError as e:
         console.print(f"[red]✗ {e}[/red]")
         sys.exit(1)
@@ -230,28 +266,53 @@ def deploy(
 
 
 @cli.command()
-@click.option('--stack-name', required=True, help='CloudFormation stack name')
-@click.option('--manifest', type=click.Path(exists=True), 
-              help='Path to manifest file (CSV or JSON)')
-@click.option('--dir', 'directory', type=click.Path(exists=True, file_okay=False, dir_okay=True),
-              help='Local directory containing documents to process')
-@click.option('--s3-prefix', help='S3 prefix within InputBucket to process')
-@click.option('--batch-id', help='Custom batch ID (auto-generated if not provided)')
-@click.option('--file-pattern', default='*.pdf',
-              help='File pattern for directory/S3 scanning (default: *.pdf)')
-@click.option('--recursive/--no-recursive', default=True,
-              help='Include subdirectories when scanning (default: recursive)')
-@click.option('--config', type=click.Path(exists=True), 
-              help='Path to configuration YAML file (optional)')
-@click.option('--steps', default='all', 
-              help='Steps to execute: all, or comma-separated list (e.g., extraction,assessment)')
-@click.option('--batch-prefix', default='cli-batch', 
-              help='Batch ID prefix (used only if --batch-id not provided, default: cli-batch)')
-@click.option('--monitor', is_flag=True, 
-              help='Monitor progress until completion')
-@click.option('--refresh-interval', default=5, type=int,
-              help='Seconds between status checks (default: 5)')
-@click.option('--region', help='AWS region (optional)')
+@click.option("--stack-name", required=True, help="CloudFormation stack name")
+@click.option(
+    "--manifest",
+    type=click.Path(exists=True),
+    help="Path to manifest file (CSV or JSON)",
+)
+@click.option(
+    "--dir",
+    "directory",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    help="Local directory containing documents to process",
+)
+@click.option("--s3-prefix", help="S3 prefix within InputBucket to process")
+@click.option("--batch-id", help="Custom batch ID (auto-generated if not provided)")
+@click.option(
+    "--file-pattern",
+    default="*.pdf",
+    help="File pattern for directory/S3 scanning (default: *.pdf)",
+)
+@click.option(
+    "--recursive/--no-recursive",
+    default=True,
+    help="Include subdirectories when scanning (default: recursive)",
+)
+@click.option(
+    "--config",
+    type=click.Path(exists=True),
+    help="Path to configuration YAML file (optional)",
+)
+@click.option(
+    "--steps",
+    default="all",
+    help="Steps to execute: all, or comma-separated list (e.g., extraction,assessment)",
+)
+@click.option(
+    "--batch-prefix",
+    default="cli-batch",
+    help="Batch ID prefix (used only if --batch-id not provided, default: cli-batch)",
+)
+@click.option("--monitor", is_flag=True, help="Monitor progress until completion")
+@click.option(
+    "--refresh-interval",
+    default=5,
+    type=int,
+    help="Seconds between status checks (default: 5)",
+)
+@click.option("--region", help="AWS region (optional)")
 def run_inference(
     stack_name: str,
     manifest: Optional[str],
@@ -265,33 +326,33 @@ def run_inference(
     batch_prefix: str,
     monitor: bool,
     refresh_interval: int,
-    region: Optional[str]
+    region: Optional[str],
 ):
     """
     Run inference on a batch of documents
-    
+
     Specify documents using ONE of:
       --manifest: Explicit manifest file (CSV or JSON)
       --dir: Local directory (auto-generates manifest)
       --s3-prefix: S3 prefix in InputBucket (auto-generates manifest)
-    
+
     Examples:
-    
+
       # Process from manifest file
       idp-cli run-inference --stack-name my-stack --manifest docs.csv --monitor
-      
+
       # Process all PDFs in local directory
       idp-cli run-inference --stack-name my-stack --dir ./documents/ --monitor
-      
+
       # Process with custom batch ID
       idp-cli run-inference --stack-name my-stack --dir ./docs/ --batch-id my-experiment-v1 --monitor
-      
+
       # Process S3 prefix (preserves directory structure)
       idp-cli run-inference --stack-name my-stack --s3-prefix archive/2024/ --monitor
-      
+
       # Process with file pattern
       idp-cli run-inference --stack-name my-stack --dir ./docs/ --file-pattern "invoice*.pdf"
-      
+
       # Process specific steps only
       idp-cli run-inference --stack-name my-stack --dir ./docs/ --steps extraction,assessment
     """
@@ -299,14 +360,18 @@ def run_inference(
         # Validate mutually exclusive options
         sources = [manifest, directory, s3_prefix]
         sources_provided = sum(1 for s in sources if s is not None)
-        
+
         if sources_provided == 0:
-            console.print("[red]✗ Error: Must specify one of: --manifest, --dir, or --s3-prefix[/red]")
+            console.print(
+                "[red]✗ Error: Must specify one of: --manifest, --dir, or --s3-prefix[/red]"
+            )
             sys.exit(1)
         elif sources_provided > 1:
-            console.print("[red]✗ Error: Cannot specify more than one of: --manifest, --dir, --s3-prefix[/red]")
+            console.print(
+                "[red]✗ Error: Cannot specify more than one of: --manifest, --dir, --s3-prefix[/red]"
+            )
             sys.exit(1)
-        
+
         # Validate manifest if provided
         if manifest:
             console.print("[bold blue]Validating manifest...[/bold blue]")
@@ -315,15 +380,15 @@ def run_inference(
                 console.print(f"[red]✗ Manifest validation failed: {error}[/red]")
                 sys.exit(1)
             console.print("[green]✓ Manifest validated successfully[/green]")
-        
+
         # Initialize processor
-        console.print(f"[bold blue]Initializing batch processor for stack: {stack_name}[/bold blue]")
-        processor = BatchProcessor(
-            stack_name=stack_name,
-            config_path=config,
-            region=region
+        console.print(
+            f"[bold blue]Initializing batch processor for stack: {stack_name}[/bold blue]"
         )
-        
+        processor = BatchProcessor(
+            stack_name=stack_name, config_path=config, region=region
+        )
+
         # Process batch based on source type
         with console.status("[bold green]Processing batch..."):
             if manifest:
@@ -331,7 +396,7 @@ def run_inference(
                     manifest_path=manifest,
                     steps=steps,
                     output_prefix=batch_prefix,
-                    batch_id=batch_id
+                    batch_id=batch_id,
                 )
             elif directory:
                 batch_result = processor.process_batch_from_directory(
@@ -340,7 +405,7 @@ def run_inference(
                     recursive=recursive,
                     steps=steps,
                     output_prefix=batch_prefix,
-                    batch_id=batch_id
+                    batch_id=batch_id,
                 )
             else:  # s3_prefix
                 batch_result = processor.process_batch_from_s3_prefix(
@@ -349,26 +414,26 @@ def run_inference(
                     recursive=recursive,
                     steps=steps,
                     output_prefix=batch_prefix,
-                    batch_id=batch_id
+                    batch_id=batch_id,
                 )
-        
+
         # Show submission results
         display.show_batch_submission_summary(batch_result)
-        
+
         if monitor:
             # Monitor until completion
             _monitor_progress(
                 stack_name=stack_name,
-                batch_id=batch_result['batch_id'],
-                document_ids=batch_result['document_ids'],
+                batch_id=batch_result["batch_id"],
+                document_ids=batch_result["document_ids"],
                 refresh_interval=refresh_interval,
                 region=region,
-                resources=processor.resources
+                resources=processor.resources,
             )
         else:
             # Show how to monitor later
-            display.show_monitoring_instructions(stack_name, batch_result['batch_id'])
-            
+            display.show_monitoring_instructions(stack_name, batch_result["batch_id"])
+
     except Exception as e:
         logger.error(f"Error processing batch: {e}", exc_info=True)
         console.print(f"[red]✗ Error: {e}[/red]")
@@ -376,28 +441,31 @@ def run_inference(
 
 
 @cli.command()
-@click.option('--stack-name', required=True, help='CloudFormation stack name')
-@click.option('--batch-id', required=True, help='Batch identifier')
-@click.option('--wait', is_flag=True, 
-              help='Wait for all documents to complete')
-@click.option('--refresh-interval', default=5, type=int,
-              help='Seconds between status checks (default: 5)')
-@click.option('--region', help='AWS region (optional)')
+@click.option("--stack-name", required=True, help="CloudFormation stack name")
+@click.option("--batch-id", required=True, help="Batch identifier")
+@click.option("--wait", is_flag=True, help="Wait for all documents to complete")
+@click.option(
+    "--refresh-interval",
+    default=5,
+    type=int,
+    help="Seconds between status checks (default: 5)",
+)
+@click.option("--region", help="AWS region (optional)")
 def status(
     stack_name: str,
     batch_id: str,
     wait: bool,
     refresh_interval: int,
-    region: Optional[str]
+    region: Optional[str],
 ):
     """
     Check status of a batch processing job
-    
+
     Examples:
-    
+
       # Check current status once
       idp-cli status --stack-name my-stack --batch-id cli-batch-20250110-153045-abc12345
-      
+
       # Monitor until completion
       idp-cli status --stack-name my-stack --batch-id cli-batch-20250110-153045-abc12345 --wait
     """
@@ -405,13 +473,13 @@ def status(
         # Get batch info
         processor = BatchProcessor(stack_name=stack_name, region=region)
         batch_info = processor.get_batch_info(batch_id)
-        
+
         if not batch_info:
             console.print(f"[red]✗ Batch not found: {batch_id}[/red]")
             sys.exit(1)
-        
-        document_ids = batch_info['document_ids']
-        
+
+        document_ids = batch_info["document_ids"]
+
         if wait:
             # Monitor until completion
             _monitor_progress(
@@ -420,22 +488,24 @@ def status(
                 document_ids=document_ids,
                 refresh_interval=refresh_interval,
                 region=region,
-                resources=processor.resources
+                resources=processor.resources,
             )
         else:
             # Show current status once
-            monitor = ProgressMonitor(stack_name=stack_name, resources=processor.resources)
+            monitor = ProgressMonitor(
+                stack_name=stack_name, resources=processor.resources
+            )
             status_data = monitor.get_batch_status(document_ids)
             stats = monitor.calculate_statistics(status_data)
-            
+
             console.print()
             console.print(f"[bold blue]Batch: {batch_id}[/bold blue]")
             display.display_status_table(status_data)
-            
+
             # Show statistics
             console.print(display.create_statistics_panel(stats))
             console.print()
-            
+
     except Exception as e:
         logger.error(f"Error checking status: {e}", exc_info=True)
         console.print(f"[red]✗ Error: {e}[/red]")
@@ -443,25 +513,25 @@ def status(
 
 
 @cli.command()
-@click.option('--stack-name', required=True, help='CloudFormation stack name')
-@click.option('--limit', default=10, type=int, help='Maximum number of batches to list')
-@click.option('--region', help='AWS region (optional)')
+@click.option("--stack-name", required=True, help="CloudFormation stack name")
+@click.option("--limit", default=10, type=int, help="Maximum number of batches to list")
+@click.option("--region", help="AWS region (optional)")
 def list_batches(stack_name: str, limit: int, region: Optional[str]):
     """
     List recent batch processing jobs
-    
+
     Example:
-    
+
       idp-cli list-batches --stack-name my-stack --limit 5
     """
     try:
         processor = BatchProcessor(stack_name=stack_name, region=region)
         batches = processor.list_batches(limit=limit)
-        
+
         if not batches:
             console.print("[yellow]No batches found[/yellow]")
             return
-        
+
         # Create table
         table = Table(title=f"Recent Batches (Last {limit})", show_header=True)
         table.add_column("Batch ID", style="cyan")
@@ -469,20 +539,20 @@ def list_batches(stack_name: str, limit: int, region: Optional[str]):
         table.add_column("Queued", justify="right")
         table.add_column("Failed", justify="right")
         table.add_column("Timestamp")
-        
+
         for batch in batches:
             table.add_row(
-                batch['batch_id'],
-                str(len(batch['document_ids'])),
-                str(batch['queued']),
-                str(batch['failed']),
-                batch['timestamp'][:19]  # Trim timestamp
+                batch["batch_id"],
+                str(len(batch["document_ids"])),
+                str(batch["queued"]),
+                str(batch["failed"]),
+                batch["timestamp"][:19],  # Trim timestamp
             )
-        
+
         console.print()
         console.print(table)
         console.print()
-        
+
     except Exception as e:
         logger.error(f"Error listing batches: {e}", exc_info=True)
         console.print(f"[red]✗ Error: {e}[/red]")
@@ -490,26 +560,30 @@ def list_batches(stack_name: str, limit: int, region: Optional[str]):
 
 
 @cli.command()
-@click.option('--manifest', required=True, type=click.Path(exists=True),
-              help='Path to manifest file to validate')
+@click.option(
+    "--manifest",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to manifest file to validate",
+)
 def validate(manifest: str):
     """
     Validate a manifest file without processing
-    
+
     Example:
-    
+
       idp-cli validate --manifest documents.csv
     """
     try:
         is_valid, error = validate_manifest(manifest)
-        
+
         if is_valid:
             console.print(f"[green]✓ Manifest is valid: {manifest}[/green]")
         else:
             console.print("[red]✗ Manifest validation failed:[/red]")
             console.print(f"  {error}")
             sys.exit(1)
-            
+
     except Exception as e:
         logger.error(f"Error validating manifest: {e}", exc_info=True)
         console.print(f"[red]✗ Error: {e}[/red]")
@@ -522,11 +596,11 @@ def _monitor_progress(
     document_ids: list,
     refresh_interval: int,
     region: Optional[str],
-    resources: dict
+    resources: dict,
 ):
     """
     Monitor batch progress with live updates
-    
+
     Args:
         stack_name: CloudFormation stack name
         batch_id: Batch identifier
@@ -536,11 +610,11 @@ def _monitor_progress(
         resources: Stack resources dictionary
     """
     monitor = ProgressMonitor(stack_name=stack_name, resources=resources)
-    
+
     display.show_monitoring_header(batch_id)
-    
+
     start_time = time.time()
-    
+
     try:
         with Live(console=console, refresh_per_second=1) as live:
             while True:
@@ -548,27 +622,29 @@ def _monitor_progress(
                 status_data = monitor.get_batch_status(document_ids)
                 stats = monitor.calculate_statistics(status_data)
                 elapsed_time = time.time() - start_time
-                
+
                 # Update display
                 layout = display.create_live_display(
                     batch_id=batch_id,
                     status_data=status_data,
                     stats=stats,
-                    elapsed_time=elapsed_time
+                    elapsed_time=elapsed_time,
                 )
                 live.update(layout)
-                
+
                 # Check if all complete
-                if stats['all_complete']:
+                if stats["all_complete"]:
                     break
-                
+
                 # Wait before next check
                 time.sleep(refresh_interval)
-                
+
     except KeyboardInterrupt:
         logger.info("Monitoring interrupted by user")
         console.print()
-        console.print("[yellow]Monitoring stopped. Processing continues in background.[/yellow]")
+        console.print(
+            "[yellow]Monitoring stopped. Processing continues in background.[/yellow]"
+        )
         display.show_monitoring_instructions(stack_name, batch_id)
         return
     except Exception as e:
@@ -578,7 +654,7 @@ def _monitor_progress(
         console.print("[yellow]You can check status later with:[/yellow]")
         display.show_monitoring_instructions(stack_name, batch_id)
         return
-    
+
     # Show final summary
     logger.info("Showing final summary")
     elapsed_time = time.time() - start_time
@@ -590,5 +666,5 @@ def main():
     cli()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

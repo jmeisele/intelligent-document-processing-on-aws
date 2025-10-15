@@ -9,42 +9,42 @@ Parses CSV and JSON manifest files containing document batch information.
 
 import csv
 import json
-import os
-from typing import List, Dict, Optional
-from pathlib import Path
 import logging
+import os
+from pathlib import Path
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class ManifestParser:
     """Parses manifest files in CSV or JSON format"""
-    
+
     def __init__(self, manifest_path: str):
         """
         Initialize manifest parser
-        
+
         Args:
             manifest_path: Path to manifest file (CSV or JSON)
         """
         self.manifest_path = manifest_path
         self.format = self._detect_format()
-    
+
     def _detect_format(self) -> str:
         """Detect manifest format from file extension"""
         ext = Path(self.manifest_path).suffix.lower()
-        
-        if ext in ['.csv', '.txt']:
-            return 'csv'
-        elif ext in ['.json', '.jsonl']:
-            return 'json'
+
+        if ext in [".csv", ".txt"]:
+            return "csv"
+        elif ext in [".json", ".jsonl"]:
+            return "json"
         else:
             raise ValueError(f"Unsupported manifest format: {ext}. Use .csv or .json")
-    
+
     def parse(self) -> List[Dict]:
         """
         Parse manifest file and return list of document specifications
-        
+
         Returns:
             List of document dictionaries with keys:
                 - document_id: Unique identifier
@@ -52,21 +52,21 @@ class ManifestParser:
                 - type: 'local' or 's3-key'
         """
         logger.info(f"Parsing {self.format.upper()} manifest: {self.manifest_path}")
-        
-        if self.format == 'csv':
+
+        if self.format == "csv":
             return self._parse_csv()
-        elif self.format == 'json':
+        elif self.format == "json":
             return self._parse_json()
         else:
             raise ValueError(f"Unsupported format: {self.format}")
-    
+
     def _parse_csv(self) -> List[Dict]:
         """Parse CSV manifest"""
         documents = []
-        
-        with open(self.manifest_path, 'r', encoding='utf-8') as f:
+
+        with open(self.manifest_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            
+
             for row_num, row in enumerate(reader, start=2):  # Start at 2 (after header)
                 try:
                     doc = self._validate_and_normalize_row(row, row_num)
@@ -74,23 +74,25 @@ class ManifestParser:
                 except ValueError as e:
                     logger.error(f"Row {row_num}: {e}")
                     raise
-        
+
         logger.info(f"Parsed {len(documents)} documents from CSV")
         return documents
-    
+
     def _parse_json(self) -> List[Dict]:
         """Parse JSON manifest"""
-        with open(self.manifest_path, 'r', encoding='utf-8') as f:
+        with open(self.manifest_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        
+
         # Handle both array format and object with 'documents' key
         if isinstance(data, list):
             documents_list = data
-        elif isinstance(data, dict) and 'documents' in data:
-            documents_list = data['documents']
+        elif isinstance(data, dict) and "documents" in data:
+            documents_list = data["documents"]
         else:
-            raise ValueError("JSON manifest must be an array or object with 'documents' key")
-        
+            raise ValueError(
+                "JSON manifest must be an array or object with 'documents' key"
+            )
+
         documents = []
         for idx, doc in enumerate(documents_list, start=1):
             try:
@@ -99,18 +101,18 @@ class ManifestParser:
             except ValueError as e:
                 logger.error(f"Document {idx}: {e}")
                 raise
-        
+
         logger.info(f"Parsed {len(documents)} documents from JSON")
         return documents
-    
+
     def _validate_and_normalize_row(self, row: Dict, row_num: int) -> Dict:
         """
         Validate and normalize a manifest row
-        
+
         Args:
             row: Raw row data
             row_num: Row number for error messages
-        
+
         Returns:
             Normalized document dictionary with keys:
                 - document_id: Unique identifier
@@ -119,53 +121,55 @@ class ManifestParser:
                 - filename: Base filename
         """
         # Required field: document_path
-        document_path = row.get('document_path') or row.get('path', '').strip()
-        
+        document_path = row.get("document_path") or row.get("path", "").strip()
+
         if not document_path:
-            raise ValueError(f"Missing required field 'document_path' or 'path'")
-        
+            raise ValueError("Missing required field 'document_path' or 'path'")
+
         # Auto-detect type based on path format
-        if document_path.startswith('s3://'):
-            doc_type = 's3'
+        if document_path.startswith("s3://"):
+            doc_type = "s3"
             # Validate S3 URI format
-            if len(document_path) < 8 or '/' not in document_path[5:]:
+            if len(document_path) < 8 or "/" not in document_path[5:]:
                 raise ValueError(f"Invalid S3 URI format: {document_path}")
             filename = os.path.basename(document_path)
         elif os.path.isabs(document_path) or os.path.exists(document_path):
-            doc_type = 'local'
+            doc_type = "local"
             # Validate local file exists
             if not os.path.exists(document_path):
                 raise ValueError(f"Local file not found: {document_path}")
             filename = os.path.basename(document_path)
         else:
-            raise ValueError(f"Invalid path '{document_path}'. Use absolute local path or s3:// URI")
-        
+            raise ValueError(
+                f"Invalid path '{document_path}'. Use absolute local path or s3:// URI"
+            )
+
         # Get document_id (optional, auto-generate from filename if not provided)
-        document_id = row.get('document_id') or row.get('id', '').strip()
+        document_id = row.get("document_id") or row.get("id", "").strip()
         if not document_id:
             # Use filename without extension as ID
             document_id = Path(filename).stem
             logger.debug(f"Auto-generated document_id: {document_id}")
-        
+
         # Get baseline_source (optional)
-        baseline_source = row.get('baseline_source', '').strip() or None
-        
+        baseline_source = row.get("baseline_source", "").strip() or None
+
         return {
-            'document_id': document_id,
-            'path': document_path,
-            'type': doc_type,
-            'filename': filename,
-            'baseline_source': baseline_source
+            "document_id": document_id,
+            "path": document_path,
+            "type": doc_type,
+            "filename": filename,
+            "baseline_source": baseline_source,
         }
 
 
 def parse_manifest(manifest_path: str) -> List[Dict]:
     """
     Convenience function to parse a manifest file
-    
+
     Args:
         manifest_path: Path to manifest file
-    
+
     Returns:
         List of document dictionaries
     """
@@ -176,33 +180,36 @@ def parse_manifest(manifest_path: str) -> List[Dict]:
 def validate_manifest(manifest_path: str) -> tuple[bool, Optional[str]]:
     """
     Validate a manifest file without fully parsing it
-    
+
     Args:
         manifest_path: Path to manifest file
-    
+
     Returns:
         Tuple of (is_valid, error_message)
     """
     try:
         parser = ManifestParser(manifest_path)
         documents = parser.parse()
-        
+
         if not documents:
             return False, "Manifest contains no documents"
-        
+
         # Check for duplicate document IDs
-        ids = [doc['document_id'] for doc in documents]
+        ids = [doc["document_id"] for doc in documents]
         if len(ids) != len(set(ids)):
             duplicates = [id for id in ids if ids.count(id) > 1]
             return False, f"Duplicate document IDs found: {', '.join(set(duplicates))}"
-        
+
         # Check for duplicate filenames (which would cause S3 key collisions)
-        filenames = [doc['filename'] for doc in documents]
+        filenames = [doc["filename"] for doc in documents]
         if len(filenames) != len(set(filenames)):
             duplicates = [f for f in filenames if filenames.count(f) > 1]
-            return False, f"Duplicate filenames found: {', '.join(set(duplicates))}. Provide explicit document_id values to avoid collisions."
-        
+            return (
+                False,
+                f"Duplicate filenames found: {', '.join(set(duplicates))}. Provide explicit document_id values to avoid collisions.",
+            )
+
         return True, None
-        
+
     except Exception as e:
         return False, str(e)

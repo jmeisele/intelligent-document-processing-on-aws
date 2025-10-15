@@ -23,14 +23,14 @@ A command-line tool for batch document processing with the GenAI IDP Accelerator
 ### Install from source
 
 ```bash
-cd scripts/idp_cli
+cd idp_cli
 pip install -e .
 ```
 
 ### Install with test dependencies
 
 ```bash
-cd scripts/idp_cli
+cd idp_cli
 pip install -e ".[test]"
 ```
 
@@ -190,7 +190,7 @@ This tutorial walks you through deploying a stack and processing your first batc
 
 ```bash
 # Navigate to CLI directory
-cd scripts/idp_cli
+cd idp_cli
 
 # Install in development mode
 pip install -e .
@@ -389,12 +389,6 @@ aws s3 ls s3://$BUCKET/test-v2/
 aws cloudformation describe-stacks --stack-name my-first-idp-stack
 ```
 
-**Issue:** "Template not found"
-```bash
-# Specify full template path
-idp-cli deploy --template-path /full/path/to/template.yaml ...
-```
-
 **Issue:** "Access Denied" errors
 ```bash
 # Check your AWS credentials
@@ -423,7 +417,6 @@ idp-cli deploy [OPTIONS]
 - `--admin-email`: Admin user email (required for new stacks)
 - `--custom-config`: Path to local config file or S3 URI
 - `--pattern-config`: Pattern configuration preset
-- `--template-path`: Path to local CloudFormation template
 - `--template-url`: URL to CloudFormation template in S3
 - `--max-concurrent`: Maximum concurrent workflows (default: 100)
 - `--log-level`: Logging level (default: INFO)
@@ -1018,7 +1011,7 @@ existing/old-doc.pdf,old-doc,s3-key
 Run the test suite:
 
 ```bash
-cd scripts/idp_cli
+cd idp_cli
 pytest
 ```
 
@@ -1368,7 +1361,7 @@ To contribute improvements:
 ### Development Setup
 
 ```bash
-cd scripts/idp_cli
+cd idp_cli
 pip install -e ".[test]"
 pytest
 ```
