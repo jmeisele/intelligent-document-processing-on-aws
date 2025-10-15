@@ -144,18 +144,10 @@ class ManifestParser:
                 f"Invalid path '{document_path}'. Use absolute local path or s3:// URI"
             )
 
-        # Get document_id (optional, auto-generate from filename if not provided)
-        document_id = row.get("document_id") or row.get("id", "").strip()
-        if not document_id:
-            # Use filename without extension as ID
-            document_id = Path(filename).stem
-            logger.debug(f"Auto-generated document_id: {document_id}")
-
         # Get baseline_source (optional)
         baseline_source = row.get("baseline_source", "").strip() or None
 
         return {
-            "document_id": document_id,
             "path": document_path,
             "type": doc_type,
             "filename": filename,
@@ -194,19 +186,13 @@ def validate_manifest(manifest_path: str) -> tuple[bool, Optional[str]]:
         if not documents:
             return False, "Manifest contains no documents"
 
-        # Check for duplicate document IDs
-        ids = [doc["document_id"] for doc in documents]
-        if len(ids) != len(set(ids)):
-            duplicates = [id for id in ids if ids.count(id) > 1]
-            return False, f"Duplicate document IDs found: {', '.join(set(duplicates))}"
-
         # Check for duplicate filenames (which would cause S3 key collisions)
         filenames = [doc["filename"] for doc in documents]
         if len(filenames) != len(set(filenames)):
             duplicates = [f for f in filenames if filenames.count(f) > 1]
             return (
                 False,
-                f"Duplicate filenames found: {', '.join(set(duplicates))}. Provide explicit document_id values to avoid collisions.",
+                f"Duplicate filenames found: {', '.join(set(duplicates))}.",
             )
 
         return True, None

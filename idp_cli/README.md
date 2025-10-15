@@ -4,13 +4,40 @@ A command-line tool for batch document processing with the GenAI IDP Accelerator
 
 ## Features
 
-✨ **Batch Processing** - Process multiple documents from CSV/JSON manifests
-📊 **Live Progress Monitoring** - Real-time updates with rich terminal UI
-🔄 **Resume Monitoring** - Stop and resume monitoring without affecting processing
-🎯 **Selective Step Execution** - Run specific pipeline steps only
-📁 **Flexible Input** - Support for local files and S3 references
-🔍 **Comprehensive Status** - Track queued, running, completed, and failed documents
-📈 **Batch Analytics** - Success rates, durations, and detailed error reporting
+✨ **Batch Processing** - Process multiple documents from CSV/JSON manifests  
+📊 **Live Progress Monitoring** - Real-time updates with rich terminal UI  
+🔄 **Resume Monitoring** - Stop and resume monitoring without affecting processing  
+📁 **Flexible Input** - Support for local files and S3 references  
+🔍 **Comprehensive Status** - Track queued, running, completed, and failed documents  
+📈 **Batch Analytics** - Success rates, durations, and detailed error reporting  
+🎯 **Evaluation Framework** - Validate accuracy against baselines with detailed metrics
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Commands Reference](#commands-reference)
+  - [deploy](#deploy)
+  - [run-inference](#run-inference)
+  - [status](#status)
+  - [download-results](#download-results)
+  - [generate-manifest](#generate-manifest)
+  - [validate-manifest](#validate-manifest)
+  - [list-batches](#list-batches)
+- [Complete Evaluation Workflow](#complete-evaluation-workflow)
+  - [Step 1: Deploy Your Stack](#step-1-deploy-your-stack)
+  - [Step 2: Initial Processing from Local Directory](#step-2-initial-processing-from-local-directory)
+  - [Step 3: Download Extraction Results](#step-3-download-extraction-results)
+  - [Step 4: Manual Validation & Baseline Preparation](#step-4-manual-validation--baseline-preparation)
+  - [Step 5: Create Manifest with Baseline References](#step-5-create-manifest-with-baseline-references)
+  - [Step 6: Process with Evaluation Enabled](#step-6-process-with-evaluation-enabled)
+  - [Step 7: Download and Review Evaluation Results](#step-7-download-and-review-evaluation-results)
+- [Evaluation Analytics](#evaluation-analytics)
+  - [Query Aggregated Results with Athena](#query-aggregated-results-with-athena)
+  - [Use Agent Analytics in the Web UI](#use-agent-analytics-in-the-web-ui)
+- [Manifest Format Reference](#manifest-format-reference)
+- [Advanced Usage](#advanced-usage)
+- [Troubleshooting](#troubleshooting)
 
 ## Installation
 
@@ -36,362 +63,36 @@ pip install -e ".[test]"
 
 ## Quick Start
 
-### 1. Create a New Stack
-
-Deploy a new IDP stack with the CLI (requires `--pattern` and `--admin-email`):
+### Deploy a stack and process documents in 3 commands:
 
 ```bash
-# Basic stack creation with Pattern 2
+# 1. Deploy stack (10-15 minutes)
 idp-cli deploy \
     --stack-name my-idp-stack \
     --pattern pattern-2 \
     --admin-email your.email@example.com \
     --wait
-```
 
-**With local configuration file:**
-```bash
-# Deploy with custom local config (automatically uploaded to S3)
-idp-cli deploy \
-    --stack-name my-idp-stack \
-    --pattern pattern-2 \
-    --admin-email your.email@example.com \
-    --custom-config ./config_library/pattern-2/bank-statement-sample/config.yaml \
-    --wait
-```
-
-**With additional parameters:**
-```bash
-idp-cli deploy \
-    --stack-name my-idp-stack \
-    --pattern pattern-2 \
-    --admin-email your.email@example.com \
-    --max-concurrent 200 \
-    --parameters "DataRetentionInDays=90,ErrorThreshold=10" \
-    --wait
-```
-
-**Important:** Stack creation takes 10-15 minutes. Use `--wait` to monitor progress, or omit it to return immediately.
-
-### 2. Update an Existing Stack
-
-For existing stacks, `--pattern` and `--admin-email` are optional. The CLI automatically retrieves existing values.
-
-```bash
-# Update max concurrent workflows only
-idp-cli deploy \
-    --stack-name my-idp-stack \
-    --max-concurrent 200 \
-    --wait
-
-# Update multiple parameters
-idp-cli deploy \
-    --stack-name my-idp-stack \
-    --max-concurrent 150 \
-    --log-level DEBUG \
-    --parameters "DataRetentionInDays=180" \
-    --wait
-```
-
-### 3. Change Configuration on Existing Stack
-
-Update the processing configuration by specifying a new config file:
-
-```bash
-# Update with local config file (automatically uploaded to S3)
-idp-cli deploy \
-    --stack-name my-idp-stack \
-    --custom-config ./my-updated-config.yaml \
-    --wait
-
-# Update with S3 URI
-idp-cli deploy \
-    --stack-name my-idp-stack \
-    --custom-config s3://my-bucket/configs/new-config.yaml \
-    --wait
-
-# Combine config change with other updates
-idp-cli deploy \
-    --stack-name my-idp-stack \
-    --custom-config ./new-config.yaml \
-    --max-concurrent 200 \
-    --wait
-```
-
-**Note:** Local config files are automatically uploaded to a temporary S3 bucket and cleaned up after 30 days.
-
-### 4. Process Documents
-
-After your stack is deployed, process documents using one of three methods:
-
-**Option A: From a Directory (Simplest)**
-```bash
-# Process all PDFs in a directory
+# 2. Process documents from a local directory
 idp-cli run-inference \
     --stack-name my-idp-stack \
     --dir ./my-documents/ \
     --monitor
-```
 
-**Option B: From an S3 Prefix**
-```bash
-# Process files already in InputBucket under a prefix
-idp-cli run-inference \
-    --stack-name my-idp-stack \
-    --s3-uri archive/2024/ \
-    --monitor
-```
-
-**Option C: From a Manifest File (Most Control)**
-```bash
-# Create a simplified manifest file
-cat > my-documents.csv << EOF
-document_path
-/path/to/document1.pdf
-/path/to/document2.pdf
-s3://external-bucket/document3.pdf
-EOF
-
-# Process with live monitoring
-idp-cli run-inference \
-    --stack-name my-idp-stack \
-    --manifest my-documents.csv \
-    --monitor
-```
-
-**Which method to use:**
-- Use `--dir` for quick ad-hoc processing of local folders
-- Use `--s3-uri` when files are already in S3
-- Use `--manifest` when you need precise control over document IDs or custom metadata
-
-### 5. Check Processing Status
-
-```bash
-idp-cli status \
-    --stack-name my-idp-stack \
-    --batch-id cli-batch-20250110-153045-abc12345 \
-    --wait
-```
-
----
-
-## Complete Tutorial: From Zero to Results
-
-This tutorial walks you through deploying a stack and processing your first batch of documents.
-
-### Prerequisites
-
-- AWS account with Bedrock access enabled
-- AWS CLI configured with credentials
-- Python 3.9+ and pip installed
-- Local documents to process (e.g., PDFs)
-
-### Step 1: Install the CLI
-
-```bash
-# Navigate to CLI directory
-cd idp_cli
-
-# Install in development mode
-pip install -e .
-
-# Verify installation
-idp-cli --version
-```
-
-### Step 2: Deploy an IDP Stack
-
-```bash
-# Deploy Pattern 2 (Textract + Bedrock)
-idp-cli deploy \
-    --stack-name my-first-idp-stack \
-    --pattern pattern-2 \
-    --admin-email your.email@example.com \
-    --max-concurrent 50 \
-    --wait
-
-# This will take 10-15 minutes
-# Stack creation includes: S3 buckets, Lambda functions, Step Functions, DynamoDB tables, etc.
-```
-
-**What happens during deployment:**
-- CloudFormation creates ~120 resources
-- You'll receive an email with temporary admin password
-- Stack outputs include web UI URL and bucket names
-
-### Step 3: Enable Bedrock Model Access
-
-**Important:** Before processing documents, enable Bedrock models:
-
-```bash
-# Open AWS Console → Bedrock → Model Access
-# Or use this link:
-echo "https://console.aws.amazon.com/bedrock/home#/modelaccess"
-
-# Enable these models:
-# - Amazon Nova (nova-lite, nova-pro)
-# - Anthropic Claude (3.x Haiku, Sonnet)
-# - Amazon Titan Embeddings
-```
-
-### Step 4: Prepare Your Documents
-
-```bash
-# Create a folder for your documents
-mkdir ~/idp-test-documents
-
-# Copy your PDFs (examples)
-cp /path/to/your/invoice.pdf ~/idp-test-documents/
-cp /path/to/your/w2-form.pdf ~/idp-test-documents/
-cp /path/to/your/paystub.pdf ~/idp-test-documents/
-```
-
-### Step 5: Create a Manifest
-
-```bash
-# Create manifest file
-cat > ~/my-documents.csv << EOF
-document_path,document_id,type
-/home/user/idp-test-documents/invoice.pdf,invoice-001,local
-/home/user/idp-test-documents/w2-form.pdf,w2-2024,local
-/home/user/idp-test-documents/paystub.pdf,paystub-jan,local
-EOF
-```
-
-**Manifest explained:**
-- `document_path` - Full path to your local PDF file
-- `document_id` - Unique identifier for each document
-- `type` - `local` means CLI will upload it (vs `s3-key` for files already in S3)
-
-### Step 6: Process Your Batch
-
-```bash
-# Run inference with live monitoring
-idp-cli run-inference \
-    --stack-name my-first-idp-stack \
-    --manifest ~/my-documents.csv \
-    --batch-prefix my-first-test \
-    --monitor
-```
-
-**What you'll see:**
-```
-Validating manifest...
-✓ Manifest validated successfully
-Initializing batch processor for stack: my-first-idp-stack
-✓ Uploaded 3 documents to InputBucket
-✓ Sent 3 messages to processing queue
-
-Monitoring Batch: my-first-test-20250110-153045-abc12345
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- Status Summary
- ─────────────────────────────────────
- ✓ Completed      2      67%
- ⟳ Running        1      33%
- ⏸ Queued         0       0%
- ✗ Failed         0       0%
- 
- Recent Completions
- ───────────────────────────────────────
-  invoice-001     ✓ Success    45.2s
-  w2-2024         ✓ Success    52.8s
-```
-
-### Step 7: Review Results
-
-#### Option A: CLI Status Check
-
-```bash
-# Check final status
-idp-cli status \
-    --stack-name my-first-idp-stack \
-    --batch-id my-first-test-20250110-153045-abc12345
-```
-
-#### Option B: Download Results Locally
-
-```bash
-# Download all results using CLI
+# 3. Download results
 idp-cli download-results \
-    --stack-name my-first-idp-stack \
-    --batch-id my-first-test-20250110-153045 \
+    --stack-name my-idp-stack \
+    --batch-id <batch-id-from-step-2> \
     --output-dir ./results/
-
-# View extraction results
-cat results/my-first-test-20250110-153045/invoice-001/sections/1/result.json | jq .
-
-# View summary
-cat results/my-first-test-20250110-153045/invoice-001/summary/summary.json | jq .
 ```
 
+**That's it!** Your documents are processed with OCR, classification, extraction, assessment, and summarization.
 
-#### Option C: View in Web UI
-
-```bash
-# Get web UI URL
-aws cloudformation describe-stacks \
-    --stack-name my-first-idp-stack \
-    --query 'Stacks[0].Outputs[?OutputKey==`ApplicationWebURL`].OutputValue' \
-    --output text
-
-# Open URL in browser
-# Login with admin email and temporary password from email
-# Navigate to "Documents" to see processed results
-```
-
-### Step 8: Iterate with Different Configurations
-
-To test different configurations, update the stack's config and then reprocess:
-
-```bash
-# Test with configuration v1
-idp-cli deploy \
-    --stack-name my-first-idp-stack \
-    --custom-config ./config-v1.yaml \
-    --wait
-
-idp-cli run-inference \
-    --stack-name my-first-idp-stack \
-    --manifest ~/my-documents.csv \
-    --batch-prefix test-v1 \
-    --monitor
-
-# Test with configuration v2
-idp-cli deploy \
-    --stack-name my-first-idp-stack \
-    --custom-config ./config-v2.yaml \
-    --wait
-
-idp-cli run-inference \
-    --stack-name my-first-idp-stack \
-    --manifest ~/my-documents.csv \
-    --batch-prefix test-v2 \
-    --monitor
-
-# Compare results
-aws s3 ls s3://$BUCKET/test-v1/
-aws s3 ls s3://$BUCKET/test-v2/
-```
-
-### Troubleshooting
-
-**Issue:** "Stack validation failed"
-```bash
-# Check stack status
-aws cloudformation describe-stacks --stack-name my-first-idp-stack
-```
-
-**Issue:** "Access Denied" errors
-```bash
-# Check your AWS credentials
-aws sts get-caller-identity
-
-# Ensure you have permissions for CloudFormation, S3, Lambda, SQS
-```
+For evaluation workflows with accuracy metrics, see the [Complete Evaluation Workflow](#complete-evaluation-workflow) section.
 
 ---
 
-## Commands
+## Commands Reference
 
 ### `deploy`
 
@@ -402,169 +103,97 @@ Deploy or update an IDP CloudFormation stack.
 idp-cli deploy [OPTIONS]
 ```
 
-**Options:**
-- `--stack-name` (required): CloudFormation stack name
-- `--pattern`: IDP pattern (required for new stacks)
-  - Choices: `pattern-1`, `pattern-2`, `pattern-3`
-- `--admin-email`: Admin user email (required for new stacks)
-- `--custom-config`: Path to local config file or S3 URI
-- `--pattern-config`: Pattern configuration preset
-- `--template-url`: URL to CloudFormation template in S3
-- `--max-concurrent`: Maximum concurrent workflows (default: 100)
-- `--log-level`: Logging level (default: INFO)
-  - Choices: `DEBUG`, `INFO`, `WARN`, `ERROR`
-- `--enable-hitl`: Enable Human-in-the-Loop (default: false)
-  - Choices: `true`, `false`
-- `--parameters`: Additional parameters as `key=value,key2=value2`
-- `--wait`: Wait for stack operation to complete (flag)
-- `--region`: AWS region (optional, auto-detected from AWS config)
+**Required for New Stacks:**
+- `--stack-name`: CloudFormation stack name
+- `--pattern`: IDP pattern (`pattern-1`, `pattern-2`, or `pattern-3`)
+- `--admin-email`: Admin user email
 
-**Behavior:**
-- **New Stacks**: Requires `--pattern` and `--admin-email`
-- **Existing Stacks**: Optional parameters, automatically retrieves existing values
-- **Local Config Files**: Automatically uploaded to temporary S3 bucket with 30-day lifecycle
+**Optional Parameters:**
+- `--custom-config`: Path to local config file or S3 URI
+- `--max-concurrent`: Maximum concurrent workflows (default: 100)
+- `--log-level`: Logging level (`DEBUG`, `INFO`, `WARN`, `ERROR`)
+- `--enable-hitl`: Enable Human-in-the-Loop (`true` or `false`)
+- `--parameters`: Additional parameters as `key=value,key2=value2`
+- `--wait`: Wait for stack operation to complete
+- `--region`: AWS region (optional, auto-detected)
 
 **Examples:**
 
 ```bash
-# Create new stack with Pattern 2
+# Create new stack
 idp-cli deploy \
     --stack-name my-idp \
     --pattern pattern-2 \
     --admin-email user@example.com \
     --wait
 
-# Create with local config file (automatically uploaded)
-idp-cli deploy \
-    --stack-name my-idp \
-    --pattern pattern-2 \
-    --admin-email user@example.com \
-    --custom-config ./my-config.yaml \
-    --wait
-
-# Update existing stack - change config only
+# Update with custom config
 idp-cli deploy \
     --stack-name my-idp \
     --custom-config ./updated-config.yaml \
     --wait
 
-# Update existing stack - multiple parameters
+# Update parameters
 idp-cli deploy \
     --stack-name my-idp \
     --max-concurrent 200 \
     --log-level DEBUG \
     --wait
-
-# Create with S3 config URI
-idp-cli deploy \
-    --stack-name my-idp \
-    --pattern pattern-2 \
-    --admin-email user@example.com \
-    --custom-config s3://my-bucket/configs/config.yaml
 ```
 
-**Notes:**
-- Local config files are uploaded to: `idp-cli/custom-configurations/config_{timestamp}_{filename}`
-- Temporary bucket naming: `idp-cli-config-{account}-{region}-{suffix}`
-- Auto-cleanup: 30-day lifecycle policy on uploaded configs
-- Region auto-detected from AWS session or `~/.aws/config`
+---
 
 ### `run-inference`
 
-Process a batch of documents using the stack's current configuration.
-
-Specify documents using ONE of:
-- `--manifest`: Explicit manifest file (CSV or JSON)
-- `--dir`: Local directory (auto-generates manifest, preserves paths)
-- `--s3-uri`: S3 URI in InputBucket (auto-generates manifest)
-
-**Note:** To change the processing configuration, use `idp-cli deploy --custom-config` to update the stack first.
+Process a batch of documents.
 
 **Usage:**
 ```bash
 idp-cli run-inference [OPTIONS]
 ```
 
+**Document Source (choose ONE):**
+- `--manifest`: Path to manifest file (CSV or JSON)
+- `--dir`: Local directory containing documents
+- `--s3-uri`: S3 URI in InputBucket
+
 **Options:**
 - `--stack-name` (required): CloudFormation stack name
-- **Document Source** (choose ONE):
-  - `--manifest`: Path to manifest file (CSV or JSON)
-  - `--dir`: Local directory containing documents
-  - `--s3-uri`: S3 URI
-- `--batch-id`: Custom batch ID (optional, auto-generated if not provided)
-- `--batch-prefix`: Batch ID prefix for auto-generation (default: `cli-batch`, only used if --batch-id not provided)
+- `--batch-id`: Custom batch ID (auto-generated if omitted)
+- `--batch-prefix`: Prefix for auto-generated batch ID (default: `cli-batch`)
 - `--file-pattern`: File pattern for directory/S3 scanning (default: `*.pdf`)
 - `--recursive/--no-recursive`: Include subdirectories (default: recursive)
-  - Examples: `all`, `extraction,assessment`, `classification,extraction,evaluation`
-- `--monitor`: Monitor progress until completion (flag)
+- `--monitor`: Monitor progress until completion
 - `--refresh-interval`: Seconds between status checks (default: 5)
 - `--region`: AWS region (optional)
 
 **Examples:**
 
 ```bash
-# Process from explicit manifest file
+# Process from local directory
 idp-cli run-inference \
-    --stack-name my-idp-stack \
-    --manifest docs.csv \
-    --monitor
-
-# Process all PDFs in local directory
-idp-cli run-inference \
-    --stack-name my-idp-stack \
+    --stack-name my-stack \
     --dir ./documents/ \
     --monitor
 
-# Process S3 URI (files already in InputBucket)
+# Process from manifest with baselines (enables evaluation)
 idp-cli run-inference \
-    --stack-name my-idp-stack \
+    --stack-name my-stack \
+    --manifest documents-with-baselines.csv \
+    --monitor
+
+# Process S3 URI
+idp-cli run-inference \
+    --stack-name my-stack \
     --s3-uri archive/2024/ \
     --monitor
-
-# Process with file pattern filtering
-idp-cli run-inference \
-    --stack-name my-idp-stack \
-    --dir ./invoices/ \
-    --file-pattern "invoice*.pdf" \
-    --monitor
-
-# Process specific steps only
-idp-cli run-inference \
-    --stack-name my-idp-stack \
-    --dir ./docs/ \
-
-# Non-recursive (top-level files only)
-idp-cli run-inference \
-    --stack-name my-idp-stack \
-    --dir ./documents/ \
-    --no-recursive \
-    --monitor
 ```
 
-**Path Preservation:**
-
-When using `--dir`, the CLI preserves the directory structure in S3:
-
-```
-Local structure:
-./dataset/
-├── W2s/
-│   └── w2-john.pdf
-└── 1099s/
-    └── 1099-vendor.pdf
-
-Uploaded to S3 InputBucket:
-{batch-id}/W2s/w2-john.pdf
-{batch-id}/1099s/1099-vendor.pdf
-
-Document IDs:
-W2s/w2-john
-1099s/1099-vendor
-```
+---
 
 ### `status`
 
-Check the status of a batch processing job.
+Check batch processing status.
 
 **Usage:**
 ```bash
@@ -574,48 +203,24 @@ idp-cli status [OPTIONS]
 **Options:**
 - `--stack-name` (required): CloudFormation stack name
 - `--batch-id` (required): Batch identifier
-- `--wait`: Wait for all documents to complete (flag)
+- `--wait`: Wait for all documents to complete
 - `--refresh-interval`: Seconds between status checks (default: 5)
-- `--region`: AWS region (optional)
-
-**Examples:**
-
-```bash
-# Check current status once
-idp-cli status \
-    --stack-name my-idp-stack \
-    --batch-id cli-batch-20250110-153045-abc12345
-
-# Monitor until completion
-idp-cli status \
-    --stack-name my-idp-stack \
-    --batch-id cli-batch-20250110-153045-abc12345 \
-    --wait
-```
-
-### `list-batches`
-
-List recent batch processing jobs.
-
-**Usage:**
-```bash
-idp-cli list-batches [OPTIONS]
-```
-
-**Options:**
-- `--stack-name` (required): CloudFormation stack name
-- `--limit`: Maximum number of batches to list (default: 10)
 - `--region`: AWS region (optional)
 
 **Example:**
 
 ```bash
-idp-cli list-batches --stack-name my-idp-stack --limit 5
+idp-cli status \
+    --stack-name my-stack \
+    --batch-id cli-batch-20251015-143000 \
+    --wait
 ```
+
+---
 
 ### `download-results`
 
-Download processing results from OutputBucket to local directory.
+Download processing results to local directory.
 
 **Usage:**
 ```bash
@@ -626,7 +231,7 @@ idp-cli download-results [OPTIONS]
 - `--stack-name` (required): CloudFormation stack name
 - `--batch-id` (required): Batch identifier
 - `--output-dir` (required): Local directory to download to
-- `--file-types`: File types to download (default: all)
+- `--file-types`: File types to download (default: `all`)
   - Options: `pages`, `sections`, `summary`, `evaluation`, or `all`
 - `--region`: AWS region (optional)
 
@@ -639,7 +244,7 @@ idp-cli download-results \
     --batch-id cli-batch-20251015-143000 \
     --output-dir ./results/
 
-# Download only extraction results (sections)
+# Download only extraction results
 idp-cli download-results \
     --stack-name my-stack \
     --batch-id cli-batch-20251015-143000 \
@@ -649,26 +254,17 @@ idp-cli download-results \
 # Download evaluation results only
 idp-cli download-results \
     --stack-name my-stack \
-    --batch-id cli-batch-20251015-143000 \
-    --output-dir ./results/ \
+    --batch-id eval-batch-20251015 \
+    --output-dir ./eval-results/ \
     --file-types evaluation
-
-# Download sections and evaluations
-idp-cli download-results \
-    --stack-name my-stack \
-    --batch-id cli-batch-20251015-143000 \
-    --output-dir ./results/ \
-    --file-types sections,evaluation
 ```
 
 **Output Structure:**
 
-Results are downloaded preserving the S3 directory structure:
-
 ```
 ./results/
 └── cli-batch-20251015-143000/
-    └── document.pdf/
+    └── invoice.pdf/
         ├── pages/
         │   └── 1/
         │       ├── image.jpg
@@ -676,21 +272,21 @@ Results are downloaded preserving the S3 directory structure:
         │       └── result.json
         ├── sections/
         │   └── 1/
-        │       ├── result.json
+        │       ├── result.json          # Extracted structured data
         │       └── summary.json
         ├── summary/
         │   ├── fulltext.txt
         │   └── summary.json
-        └── evaluation/
-            ├── report.json
-            └── report.md
+        └── evaluation/                  # Only present if baseline provided
+            ├── report.json              # Detailed metrics
+            └── report.md                # Human-readable report
 ```
+
+---
 
 ### `generate-manifest`
 
-Generate a manifest file from directory or S3 URI. The generated manifest can be edited to add baseline sources or customize document IDs before processing.
-
-Supports automatic baseline matching when document IDs match baseline directory names.
+Generate a manifest file from directory or S3 URI.
 
 **Usage:**
 ```bash
@@ -710,66 +306,19 @@ idp-cli generate-manifest [OPTIONS]
 **Examples:**
 
 ```bash
-# Generate from local directory
-idp-cli generate-manifest --dir ./documents/ --output manifest.csv
+# Generate from directory
+idp-cli generate-manifest \
+    --dir ./documents/ \
+    --output manifest.csv
 
-# With automatic baseline matching
-idp-cli generate-manifest --dir ./documents/ --baseline-dir ./baselines/ --output manifest.csv
-
-# Generate from S3 URI
-idp-cli generate-manifest --s3-uri s3://bucket/prefix/ --output manifest.csv
-
-# With file pattern
-idp-cli generate-manifest --dir ./docs/ --output manifest.csv --file-pattern "W2*.pdf"
+# Generate with automatic baseline matching
+idp-cli generate-manifest \
+    --dir ./documents/ \
+    --baseline-dir ./validated-baselines/ \
+    --output manifest-with-baselines.csv
 ```
 
-**Automatic Baseline Matching:**
-
-When using `--baseline-dir`, baselines are matched by document ID:
-
-```
-Documents Directory:
-./documents/
-├── invoice-001.pdf    → doc_id: invoice-001
-└── w2-form.pdf       → doc_id: w2-form
-
-Baselines Directory:
-./baselines/
-├── invoice-001/      ← Matches invoice-001.pdf
-│   └── sections/
-│       └── 1/result.json
-└── w2-form/         ← Matches w2-form.pdf
-    └── sections/
-        └── 1/result.json
-
-Generated Manifest:
-document_path,document_id,baseline_source
-/local/documents/invoice-001.pdf,invoice-001,/local/baselines/invoice-001/
-/local/documents/w2-form.pdf,w2-form,/local/baselines/w2-form/
-```
-
-**Workflow:**
-
-```bash
-# Step 1: Generate manifest (baselines auto-matched)
-idp-cli generate-manifest --dir ./documents/ --baseline-dir ./baselines/ --output manifest.csv
-
-# Step 2: Process with evaluations (no editing needed!)
-idp-cli run-inference --stack-name my-stack --manifest manifest.csv --monitor
-```
-
-**Or Manual Workflow:**
-
-```bash
-# Step 1: Generate manifest without baselines
-idp-cli generate-manifest --dir ./documents/ --output manifest.csv
-
-# Step 2: Edit manifest to add baseline_source
-vi manifest.csv
-
-# Step 3: Process with edited manifest
-idp-cli run-inference --stack-name my-stack --manifest manifest.csv --monitor
-```
+---
 
 ### `validate-manifest`
 
@@ -777,309 +326,516 @@ Validate a manifest file without processing.
 
 **Usage:**
 ```bash
-idp-cli validate-manifest [OPTIONS]
-```
-
-**Options:**
-- `--manifest` (required): Path to manifest file to validate
-
-**Example:**
-
-```bash
 idp-cli validate-manifest --manifest documents.csv
 ```
 
-## Manifest Format
+---
 
-### CSV Format
+### `list-batches`
 
-**Required Fields:**
-- `document_path`: Local file path or full S3 URI (s3://bucket/key)
+List recent batch processing jobs.
 
-**Optional Fields:**
-- `document_id`: Unique identifier (auto-generated from filename if omitted)
-- `baseline_source`: S3 URI or local path to baseline data for automatic evaluation
-
-**Simplified Example (No Duplicates):**
-```csv
-document_path
-/home/user/docs/invoice-001.pdf
-/home/user/docs/invoice-002.pdf
-s3://external-bucket/archive/statement.pdf
+**Usage:**
+```bash
+idp-cli list-batches --stack-name my-stack --limit 10
 ```
 
-**With Custom IDs (For Duplicates or Organization):**
-```csv
-document_path,document_id
-/home/user/clientA/invoice.pdf,clientA-invoice-2024
-/home/user/clientB/invoice.pdf,clientB-invoice-2024
-s3://data-lake/docs/report.pdf,q1-report
+---
+
+## Complete Evaluation Workflow
+
+This workflow demonstrates how to process documents, manually validate results, and then reprocess with evaluation to measure accuracy.
+
+### Step 1: Deploy Your Stack
+
+Deploy an IDP stack if you haven't already:
+
+```bash
+idp-cli deploy \
+    --stack-name eval-testing \
+    --pattern pattern-2 \
+    --admin-email your.email@example.com \
+    --max-concurrent 50 \
+    --wait
 ```
 
-**With Baselines (For Automatic Evaluation):**
-```csv
-document_path,document_id,baseline_source
-/local/invoice.pdf,inv-001,s3://output-bucket/validated/invoice.pdf/
-/local/w2.pdf,w2-001,/local/baselines/w2-baseline/
-s3://data-lake/doc.pdf,doc-001,s3://my-baseline-bucket/doc-001/
+**What happens:** CloudFormation creates ~120 resources including S3 buckets, Lambda functions, Step Functions, and DynamoDB tables. This takes 10-15 minutes.
+
+---
+
+### Step 2: Initial Processing from Local Directory
+
+Process your test documents to generate initial extraction results:
+
+```bash
+# Prepare test documents
+mkdir -p ~/test-documents
+cp /path/to/your/invoice.pdf ~/test-documents/
+cp /path/to/your/w2.pdf ~/test-documents/
+cp /path/to/your/paystub.pdf ~/test-documents/
+
+# Process documents
+idp-cli run-inference \
+    --stack-name eval-testing \
+    --dir ~/test-documents/ \
+    --batch-id initial-run \
+    --monitor
 ```
 
-**Key Features:**
-- Type auto-detected from path format (local file vs S3 URI)
-- S3 URIs can be from **any bucket** (automatically copied to InputBucket)
-- `document_id` optional - auto-generated from filename if omitted
-- Duplicate filenames detected - provide explicit `document_id` values to resolve
+**What happens:** Documents are uploaded to S3, processed through OCR, classification, extraction, assessment, and summarization. Results are stored in OutputBucket.
 
-### JSON Format
+**Monitor output:**
+```
+✓ Uploaded 3 documents to InputBucket
+✓ Sent 3 messages to processing queue
 
-**Minimal Array Format:**
-```json
-[
-  {
-    "path": "/local/path/doc1.pdf"
-  },
-  {
-    "path": "s3://external-bucket/doc2.pdf"
-  }
-]
+Monitoring Batch: initial-run
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Status Summary
+ ─────────────────────────────────────
+ ✓ Completed      3     100%
+ ⏸ Queued         0       0%
+ ✗ Failed         0       0%
 ```
 
-**With Custom IDs:**
-```json
-[
-  {
-    "path": "/local/clientA/invoice.pdf",
-    "document_id": "clientA-invoice"
-  },
-  {
-    "path": "s3://data-lake/report.pdf",
-    "document_id": "q1-report"
-  }
-]
+---
+
+### Step 3: Download Extraction Results
+
+Download the extraction results (sections) for manual review:
+
+```bash
+idp-cli download-results \
+    --stack-name eval-testing \
+    --batch-id initial-run \
+    --output-dir ~/initial-results/ \
+    --file-types sections
 ```
 
-**Object Format:**
-```json
+**Result structure:**
+```
+~/initial-results/initial-run/
+├── invoice.pdf/
+│   └── sections/
+│       └── 1/
+│           └── result.json      # Extracted data to validate
+├── w2.pdf/
+│   └── sections/
+│       └── 1/
+│           └── result.json
+└── paystub.pdf/
+    └── sections/
+        └── 1/
+            └── result.json
+```
+
+---
+
+### Step 4: Manual Validation & Baseline Preparation
+
+Review and correct the extraction results to create validated baselines.
+
+**4.1 Review extraction results:**
+
+```bash
+# View extracted data for invoice
+cat ~/initial-results/initial-run/invoice.pdf/sections/1/result.json | jq .
+
+# Example output:
 {
-  "documents": [
-    {
-      "path": "/local/doc1.pdf",
-      "document_id": "doc1"
-    },
-    {
-      "path": "s3://bucket/doc2.pdf",
-      "document_id": "doc2"
-    }
-  ],
-  "config": {
-    "pattern": "pattern-2",
-    "output_prefix": "my-experiment"
+  "attributes": {
+    "Invoice Number": "INV-2024-001",
+    "Invoice Date": "2024-01-15",
+    "Total Amount": "$1,250.00",
+    "Vendor Name": "Acme Corp"
   }
 }
 ```
 
-### Auto-Detection
+**4.2 Validate and correct:**
 
-**Document Type (Automatic):**
-- `s3://...` → S3 file (copied from source bucket to InputBucket)
-- Absolute path or existing file → Local file (uploaded)
-- Invalid path → Error
-
-**Document ID (If Not Provided):**
-- Auto-generated from filename without extension
-- Example: `s3://bucket/invoice-2024.pdf` → ID: `invoice-2024`
-
-### Path Construction
-
-All documents uploaded/copied to InputBucket follow consistent pattern:
-
-**Manifest-based:**
-```
-Source: /local/invoice.pdf
-Destination: {batch-id}/invoice.pdf
-```
-
-**Directory-based (preserves structure):**
-```
-Source: ./docs/W2s/w2.pdf
-Destination: {batch-id}/W2s/w2.pdf
-```
-
-**S3 source:**
-```
-Source: s3://external-bucket/archive/doc.pdf
-Destination: {batch-id}/doc.pdf
-```
-
-### Important Notes
-
-✅ **Now Supported:**
-- Documents from **any S3 bucket** (automatically copied)
-- Local files with absolute or relative paths
-- Mixed sources in same manifest
-
-⚠️ **Duplicate Filenames:**
-- If multiple files have same name, provide explicit `document_id` values
-- Validation will catch duplicates and provide clear error message
-
-❌ **Not Supported:**
-- S3 URIs without `s3://` prefix
-- Relative paths that don't exist locally
-
-## Architecture
-
-### Processing Flow
-
-```
-CLI Script → Parse Manifest → Upload Files → Send to SQS Queue
-                                                    ↓
-                                    QueueProcessor Lambda (with concurrency control)
-                                                    ↓
-                                    Step Functions State Machine
-                                                    ↓
-                                    Document Processing Pipeline
-                                                    ↓
-                                    Results in OutputBucket
-```
-
-### Key Design Decisions
-
-1. **SQS Queue Integration**: Uses existing DocumentQueue for consistency with UI-based processing
-2. **Concurrency Control**: Leverages existing DynamoDB-based concurrency limiting
-3. **LookupFunction Reuse**: Uses existing Lambda function for status queries
-4. **Zero Code Changes**: No modifications to existing Lambda functions or infrastructure
-5. **Metadata Storage**: Batch information stored in OutputBucket under `cli-batches/`
-
-## Progress Monitoring
-
-### Fire-and-Forget Mode
-
-Submit batch and exit immediately:
+Compare extracted values against the actual documents. If you find errors, create corrected baseline files:
 
 ```bash
-idp-cli run-inference --stack-name my-stack --manifest docs.csv
+# Create baseline directory structure
+mkdir -p ~/validated-baselines/invoice.pdf/sections/1/
+mkdir -p ~/validated-baselines/w2.pdf/sections/1/
+mkdir -p ~/validated-baselines/paystub.pdf/sections/1/
+
+# Copy and edit result files
+cp ~/initial-results/initial-run/invoice.pdf/sections/1/result.json \
+   ~/validated-baselines/invoice.pdf/sections/1/result.json
+
+# Edit the baseline to correct any errors
+vi ~/validated-baselines/invoice.pdf/sections/1/result.json
+
+# Repeat for other documents...
 ```
 
-Output:
+**Baseline directory structure:**
 ```
-✓ Uploaded 10 documents to InputBucket
-✓ Sent 10 messages to processing queue
-
-Batch ID: cli-batch-20250110-153045-abc12345
-
-To monitor progress:
-  idp-cli status --stack-name my-stack --batch-id cli-batch-20250110-153045-abc12345
+~/validated-baselines/
+├── invoice.pdf/
+│   └── sections/
+│       └── 1/
+│           └── result.json      # Corrected/validated data
+├── w2.pdf/
+│   └── sections/
+│       └── 1/
+│           └── result.json
+└── paystub.pdf/
+    └── sections/
+        └── 1/
+            └── result.json
 ```
 
-### Live Monitoring Mode
+---
 
-Monitor progress with real-time updates:
+### Step 5: Create Manifest with Baseline References
+
+Create a manifest that links each document to its validated baseline:
 
 ```bash
-idp-cli run-inference --stack-name my-stack --manifest docs.csv --monitor
+cat > ~/evaluation-manifest.csv << EOF
+document_path,baseline_source
+/home/user/test-documents/invoice.pdf,/home/user/validated-baselines/invoice.pdf/
+/home/user/test-documents/w2.pdf,/home/user/validated-baselines/w2.pdf/
+/home/user/test-documents/paystub.pdf,/home/user/validated-baselines/paystub.pdf/
+EOF
 ```
 
-Display includes:
-- Overall progress bar with percentage
-- Status breakdown (completed, running, queued, failed)
-- Recent completions with durations
-- Failed documents with error messages
-- Live updates every 5 seconds (configurable)
+**Manifest format:**
+- `document_path`: Path to original document
+- `baseline_source`: Path to directory containing validated sections
 
-Press `Ctrl+C` to stop monitoring (processing continues in background)
-
-## Use Cases
-
-### Rapid Iteration Testing
-
-Test different configurations by updating the stack between batches:
+**Alternative using auto-matching:**
 
 ```bash
-# Test configuration v1
+# Generate manifest with automatic baseline matching
+idp-cli generate-manifest \
+    --dir ~/test-documents/ \
+    --baseline-dir ~/validated-baselines/ \
+    --output ~/evaluation-manifest.csv
+```
+
+---
+
+### Step 6: Process with Evaluation Enabled
+
+Reprocess documents with the baseline-enabled manifest. The accelerator will automatically run evaluation:
+
+```bash
+idp-cli run-inference \
+    --stack-name eval-testing \
+    --manifest ~/evaluation-manifest.csv \
+    --batch-id eval-run-001 \
+    --monitor
+```
+
+**What happens:** 
+1. Documents are processed through the pipeline as before
+2. **Evaluation step is automatically triggered** because baselines are provided
+3. The evaluation module compares extracted values against baseline values
+4. Detailed metrics are calculated per attribute and per document
+
+**Processing time:** Similar to initial run, plus ~5-10 seconds per document for evaluation.
+
+---
+
+### Step 7: Download and Review Evaluation Results
+
+Download the evaluation results to analyze accuracy:
+
+**⏱️ Important Timing Note:** Evaluation processing runs as a separate step after the main document processing completes. This takes an additional 2-3 minutes per document. If you download results immediately after the batch shows "Complete", the evaluation data may not be ready yet.
+
+**Best practice:**
+1. Wait 5-10 minutes after batch completion before downloading evaluation results
+2. Check that the downloaded files include the `evaluation/` directory
+3. If evaluation data is missing, wait a few more minutes and download again
+
+```bash
+# Wait for evaluation to complete (check status)
+idp-cli status \
+    --stack-name eval-testing \
+    --batch-id eval-run-001
+
+# Download evaluation results
+idp-cli download-results \
+    --stack-name eval-testing \
+    --batch-id eval-run-001 \
+    --output-dir ~/eval-results/ \
+    --file-types evaluation
+
+# Verify evaluation data is present
+ls -la ~/eval-results/eval-run-001/invoice.pdf/evaluation/
+# Should show: report.json and report.md
+```
+
+**Review evaluation report:**
+
+```bash
+# View detailed evaluation metrics
+cat ~/eval-results/eval-run-001/invoice.pdf/evaluation/report.json | jq .
+
+
+**View human-readable report:**
+
+```bash
+# Markdown report with visual formatting
+cat ~/eval-results/eval-run-001/invoice.pdf/evaluation/report.md
+
+
+---
+
+## Evaluation Analytics
+
+The IDP Accelerator provides multiple ways to analyze evaluation results across batches and at scale.
+
+### Query Aggregated Results with Athena
+
+The accelerator automatically stores evaluation metrics in Athena tables for SQL-based analysis.
+
+**Available Tables:**
+- `evaluation_results` - Per-document evaluation metrics
+- `evaluation_attributes` - Per-attribute scores
+- `evaluation_summary` - Aggregated statistics
+
+**Example Queries:**
+
+```sql
+-- Overall accuracy across all batches
+SELECT 
+    AVG(overall_accuracy) as avg_accuracy,
+    COUNT(*) as total_documents,
+    SUM(CASE WHEN overall_accuracy >= 0.95 THEN 1 ELSE 0 END) as high_accuracy_count
+FROM evaluation_results
+WHERE batch_id LIKE 'eval-run-%';
+
+-- Attribute-level accuracy
+SELECT 
+    attribute_name,
+    AVG(score) as avg_score,
+    COUNT(*) as total_occurrences,
+    SUM(CASE WHEN match = true THEN 1 ELSE 0 END) as correct_count
+FROM evaluation_attributes
+GROUP BY attribute_name
+ORDER BY avg_score DESC;
+
+-- Compare accuracy across different configurations
+SELECT 
+    batch_id,
+    AVG(overall_accuracy) as accuracy,
+    COUNT(*) as doc_count
+FROM evaluation_results
+WHERE batch_id IN ('config-v1', 'config-v2', 'config-v3')
+GROUP BY batch_id;
+```
+
+**Access Athena:**
+```bash
+# Get Athena database name from stack outputs
+aws cloudformation describe-stacks \
+    --stack-name eval-testing \
+    --query 'Stacks[0].Outputs[?OutputKey==`ReportingDatabase`].OutputValue' \
+    --output text
+
+# Query via AWS Console or CLI
+aws athena start-query-execution \
+    --query-string "SELECT * FROM evaluation_results LIMIT 10" \
+    --result-configuration OutputLocation=s3://your-results-bucket/
+```
+
+**For detailed Athena table schemas and query examples, see:**
+- [`../docs/reporting-database.md`](../docs/reporting-database.md) - Complete Athena table reference
+- [`../docs/evaluation.md`](../docs/evaluation.md) - Evaluation methodology and metrics
+
+---
+
+### Use Agent Analytics in the Web UI
+
+The IDP web UI provides an Agent Analytics feature for visual analysis of evaluation results.
+
+**Access the UI:**
+
+1. Get web UI URL from stack outputs:
+```bash
+aws cloudformation describe-stacks \
+    --stack-name eval-testing \
+    --query 'Stacks[0].Outputs[?OutputKey==`ApplicationWebURL`].OutputValue' \
+    --output text
+```
+
+2. Login with admin credentials (from deployment email)
+
+3. Navigate to **Analytics** → **Agent Analytics**
+
+**Available Analytics:**
+- **Accuracy Trends** - Track accuracy over time across batches
+- **Attribute Heatmaps** - Visualize which attributes perform best/worst
+- **Batch Comparisons** - Compare different configurations side-by-side
+- **Error Analysis** - Identify common error patterns
+- **Confidence Correlation** - Analyze relationship between assessment confidence and accuracy
+
+**Key Features:**
+- Interactive charts and visualizations
+- Filter by batch, date range, document type, or attribute
+- Export results to CSV for further analysis
+- Drill-down to individual document details
+
+**For complete Agent Analytics documentation, see:**
+- [`../docs/agent-analysis.md`](../docs/agent-analysis.md) - Agent Analytics user guide
+
+---
+
+## Manifest Format Reference
+
+### CSV Format
+
+**Required Field:**
+- `document_path`: Local file path or full S3 URI (s3://bucket/key)
+
+**Optional Field:**
+- `baseline_source`: Path or S3 URI to validated baseline for evaluation
+
+**Note:** Document IDs are auto-generated from filenames (e.g., `invoice.pdf` → `invoice`)
+
+**Examples:**
+
+```csv
+document_path
+/home/user/docs/invoice.pdf
+/home/user/docs/w2.pdf
+s3://external-bucket/statement.pdf
+```
+
+```csv
+document_path,baseline_source
+/local/invoice.pdf,s3://baselines/invoice/
+/local/w2.pdf,/local/validated-baselines/w2/
+s3://docs/statement.pdf,s3://baselines/statement/
+```
+
+### JSON Format
+
+```json
+[
+  {
+    "document_path": "/local/invoice.pdf",
+    "baseline_source": "s3://baselines/invoice/"
+  },
+  {
+    "document_path": "s3://bucket/w2.pdf",
+    "baseline_source": "/local/baselines/w2/"
+  }
+]
+```
+
+### Path Rules
+
+**Document Type (Auto-detected):**
+- `s3://...` → S3 file (copied to InputBucket)
+- Absolute/relative path → Local file (uploaded to InputBucket)
+
+**Document ID (Auto-generated):**
+- From filename without extension
+- Example: `invoice-2024.pdf` → `invoice-2024`
+- Subdirectories preserved: `W2s/john.pdf` → `W2s/john`
+
+**Important:**
+- ⚠️ Duplicate filenames not allowed
+- ✅ Use directory structure for organization (e.g., `clientA/invoice.pdf`, `clientB/invoice.pdf`)
+- ✅ S3 URIs can reference any bucket (automatically copied)
+
+---
+
+## Advanced Usage
+
+### Iterative Configuration Testing
+
+Test different extraction prompts or configurations:
+
+```bash
+# Test with configuration v1
 idp-cli deploy --stack-name my-stack --custom-config ./config-v1.yaml --wait
-idp-cli run-inference \
-    --stack-name my-stack \
-    --manifest test-set.csv \
-    --batch-prefix test-v1 \
-    --monitor
+idp-cli run-inference --stack-name my-stack --dir ./test-set/ --batch-id config-v1 --monitor
 
-# Test configuration v2
+# Download and analyze results
+idp-cli download-results --stack-name my-stack --batch-id config-v1 --output-dir ./results-v1/
+
+# Test with configuration v2
 idp-cli deploy --stack-name my-stack --custom-config ./config-v2.yaml --wait
-idp-cli run-inference \
-    --stack-name my-stack \
-    --manifest test-set.csv \
-    --batch-prefix test-v2 \
-    --monitor
+idp-cli run-inference --stack-name my-stack --dir ./test-set/ --batch-id config-v2 --monitor
 
-# Compare results in OutputBucket under test-v1/ and test-v2/
+# Compare in Athena
+# SELECT batch_id, AVG(overall_accuracy) FROM evaluation_results 
+# WHERE batch_id IN ('config-v1', 'config-v2') GROUP BY batch_id;
 ```
 
-### Selective Step Re-processing
+### Large-Scale Batch Processing
 
-Re-run specific steps with cached earlier results:
-
-```bash
-# Initial full processing
-idp-cli run-inference \
-    --stack-name my-stack \
-    --manifest docs.csv \
-    --batch-prefix baseline
-
-# Later: Update config and re-run only extraction and evaluation
-idp-cli deploy --stack-name my-stack --custom-config ./new-extraction-prompts.yaml --wait
-idp-cli run-inference \
-    --stack-name my-stack \
-    --manifest docs.csv \
-    --batch-prefix experiment-new-prompts
-```
-
-### Large-Scale Evaluation
-
-Process large document sets for accuracy testing:
+Process thousands of documents efficiently:
 
 ```bash
-# Process 1000 documents with baselines
-idp-cli run-inference \
-    --stack-name my-stack \
-    --manifest evaluation-set-1000.csv \
-    --batch-prefix eval-batch-001 \
-    --monitor
+# Generate manifest for large dataset
+idp-cli generate-manifest \
+    --dir ./production-documents/ \
+    --output large-batch-manifest.csv
 
-# Results automatically include evaluation metrics
+# Validate before processing
+idp-cli validate-manifest --manifest large-batch-manifest.csv
+
+# Process in background (no --monitor flag)
+idp-cli run-inference \
+    --stack-name production-stack \
+    --manifest large-batch-manifest.csv \
+    --batch-id production-batch-001
+
+# Check status later
+idp-cli status \
+    --stack-name production-stack \
+    --batch-id production-batch-001
 ```
 
 ### CI/CD Integration
 
-Integrate into automated testing pipelines:
+Integrate into automated pipelines:
 
 ```bash
 #!/bin/bash
-# ci-test.sh
+# ci-test.sh - Automated accuracy testing
 
-# Run batch processing
+# Run processing with evaluation
 idp-cli run-inference \
-    --stack-name $STACK_NAME \
-    --manifest test-suite.csv \
-    --batch-prefix ci-test-$BUILD_ID \
+    --stack-name ci-stack \
+    --manifest test-suite-with-baselines.csv \
+    --batch-id ci-test-$BUILD_ID \
     --monitor
 
-# Check exit code
-if [ $? -eq 0 ]; then
-    echo "Batch processing completed successfully"
-else
-    echo "Batch processing failed"
-    exit 1
-fi
+# Download evaluation results
+idp-cli download-results \
+    --stack-name ci-stack \
+    --batch-id ci-test-$BUILD_ID \
+    --output-dir ./ci-results/ \
+    --file-types evaluation
+
+# Parse results and fail if accuracy below threshold
+python check_accuracy.py ./ci-results/ --min-accuracy 0.90
+
+# Exit code 0 if passed, 1 if failed
+exit $?
 ```
+
+---
 
 ## Troubleshooting
 
 ### Stack Not Found
 
-**Error:** `Stack 'my-stack' is not in a valid state for operations`
+**Error:** `Stack 'my-stack' is not in a valid state`
 
-**Solution:** Verify stack exists and is in COMPLETE state:
+**Solution:**
 ```bash
+# Verify stack exists
 aws cloudformation describe-stacks --stack-name my-stack
 ```
 
@@ -1087,71 +843,47 @@ aws cloudformation describe-stacks --stack-name my-stack
 
 **Error:** `Access Denied` when uploading files
 
-**Solution:** Ensure your AWS credentials have permissions for:
-- S3 operations on InputBucket, OutputBucket
-- SQS SendMessage on DocumentQueue
-- Lambda InvokeFunction on LookupFunction
-
-### Document Not Found
-
-**Error:** `Document not found in InputBucket: doc.pdf`
-
-**Solution:** 
-- For `s3-key` type, ensure file exists in InputBucket
-- Use AWS Console or CLI to verify: `aws s3 ls s3://input-bucket/doc.pdf`
+**Solution:** Ensure AWS credentials have permissions for:
+- S3: PutObject, GetObject on InputBucket/OutputBucket
+- SQS: SendMessage on DocumentQueue
+- Lambda: InvokeFunction on LookupFunction
+- CloudFormation: DescribeStacks, ListStackResources
 
 ### Manifest Validation Failed
 
-**Error:** `Duplicate document IDs found`
+**Error:** `Duplicate filenames found`
 
-**Solution:** Ensure all document_id values are unique in the manifest
+**Solution:** Ensure unique filenames or use directory structure:
+```csv
+document_path
+./clientA/invoice.pdf
+./clientB/invoice.pdf
+```
 
-### Monitoring Connection Issues
+### Evaluation Not Running
 
-**Error:** Lambda invocation errors during monitoring
+**Issue:** Evaluation results missing even with baselines
+
+**Checklist:**
+1. Verify `baseline_source` column exists in manifest
+2. Confirm baseline paths are correct and accessible
+3. Check baseline directory has correct structure (`sections/1/result.json`)
+4. Review CloudWatch logs for EvaluationFunction
+
+### Monitoring Shows "UNKNOWN" Status
+
+**Issue:** Cannot retrieve document status
 
 **Solution:**
-- Check AWS credentials are valid
-- Verify network connectivity
-- Check CloudWatch logs for LookupFunction
-
-## Advanced Usage
-
-### Custom Refresh Intervals
-
-Adjust monitoring refresh rate:
-
 ```bash
-# Fast updates (every 2 seconds)
-idp-cli run-inference --stack-name my-stack --manifest docs.csv --monitor --refresh-interval 2
+# Verify LookupFunction exists
+aws lambda get-function --function-name <LookupFunctionName>
 
-# Slow updates (every 30 seconds) for long-running batches
-idp-cli run-inference --stack-name my-stack --manifest large-batch.csv --monitor --refresh-interval 30
+# Check CloudWatch logs
+aws logs tail /aws/lambda/<LookupFunctionName> --follow
 ```
 
-### Processing Documents Already in S3
-
-If documents are already uploaded to InputBucket:
-
-```csv
-document_path,document_id,type
-folder1/doc1.pdf,doc1,s3-key
-folder2/doc2.pdf,doc2,s3-key
-```
-
-```bash
-idp-cli run-inference --stack-name my-stack --manifest existing-docs.csv
-```
-
-### Mixed Local and S3 Documents
-
-Combine local uploads with existing S3 files:
-
-```csv
-document_path,document_id,type
-/local/new-doc.pdf,new-doc,local
-existing/old-doc.pdf,old-doc,s3-key
-```
+---
 
 ## Testing
 
@@ -1162,380 +894,18 @@ cd idp_cli
 pytest
 ```
 
-Run tests with coverage:
-
-```bash
-pytest --cov=. --cov-report=html
-```
-
-Run specific test file:
+Run specific tests:
 
 ```bash
 pytest tests/test_manifest_parser.py -v
 ```
 
-## Architecture Details
-
-### SQS Queue Integration
-
-The CLI sends messages to the existing DocumentQueue, which:
-1. Maintains concurrency control via DynamoDB counter
-2. Provides retry logic with exponential backoff
-3. Integrates with existing Step Functions workflow
-4. Enables consistent monitoring via CloudWatch
-
-### Metadata Storage
-
-Batch metadata is stored at:
-```
-s3://output-bucket/cli-batches/{batch-id}/metadata.json
-```
-
-Contains:
-- Batch ID and timestamp
-- List of document IDs
-- Processing statistics
-- Original manifest path and configuration
-
-### Status Queries
-
-Uses existing LookupFunction Lambda to query document status:
-- Checks DynamoDB TrackingTable
-- Retrieves Step Functions execution details
-- Returns comprehensive status information
-
-## Manifest Format Reference
-
-### Field Specifications
-
-| Field | Required | Type | Description | Example |
-|-------|----------|------|-------------|---------|
-| `document_path` or `path` | Yes | string | Local file path or S3 URI | `/home/user/doc.pdf` or `s3://bucket/doc.pdf` |
-| `document_id` or `id` | No | string | Unique identifier (auto-generated from filename if omitted) | `doc-001` |
-
-### Auto-Detection Rules
-
-**Document Type (Automatic):**
-- Starts with `s3://` → S3 file (copied from source bucket to InputBucket)
-- Absolute path or file exists → Local file (uploaded to InputBucket)
-- Invalid path → Error with descriptive message
-
-**Document ID (If Not Provided):**
-- Auto-generated from filename without extension
-- Example: `s3://bucket/invoice-2024.pdf` → `invoice-2024`
-- Example: `/local/statement.pdf` → `statement`
-
-**Duplicate Detection:**
-- Validates no duplicate document_id values
-- Validates no duplicate filenames (would cause S3 key collisions)
-- Clear error message if duplicates found
-
-## Examples
-
-### Example 1: Directory-Based Processing
-
-```bash
-# Process all PDFs in a directory (simplest approach)
-idp-cli run-inference \
-    --stack-name my-stack \
-    --dir ./tax-documents-2024/ \
-    --monitor
-
-# With subdirectories preserved:
-# Source: ./tax-documents-2024/W2s/john-w2.pdf
-# Uploaded to S3: {batch-id}/W2s/john-w2.pdf
-# Document ID: W2s/john-w2
-```
-
-**With file pattern filtering:**
-```bash
-# Process only W2 forms
-idp-cli run-inference \
-    --stack-name my-stack \
-    --dir ./tax-documents/ \
-    --file-pattern "W2*.pdf" \
-    --batch-prefix w2-batch \
-    --monitor
-
-# Process only invoices
-idp-cli run-inference \
-    --stack-name my-stack \
-    --dir ./documents/ \
-    --file-pattern "invoice_*.pdf" \
-    --monitor
-```
-
-**Non-recursive processing:**
-```bash
-# Process only top-level files (skip subdirectories)
-idp-cli run-inference \
-    --stack-name my-stack \
-    --dir ./documents/ \
-    --no-recursive \
-    --monitor
-```
-
-**With custom batch ID:**
-```bash
-# Use meaningful batch ID for easier tracking
-idp-cli run-inference \
-    --stack-name my-stack \
-    --dir ./tax-documents-2024/ \
-    --batch-id tax-returns-2024-q1 \
-    --monitor
-
-# Useful for experiments with version tracking
-idp-cli run-inference \
-    --stack-name my-stack \
-    --dir ./test-set/ \
-    --batch-id experiment-prompt-v3 \
-    --monitor
-```
-
-### Example 2: S3 Prefix Processing
-
-```bash
-# Process all documents under an S3 URI
-idp-cli run-inference \
-    --stack-name my-stack \
-    --s3-uri archive/2024/invoices/ \
-    --monitor
-
-# With file pattern
-idp-cli run-inference \
-    --stack-name my-stack \
-    --s3-uri processed-docs/ \
-    --file-pattern "*.pdf" \
-    --batch-prefix reprocess-batch \
-    --monitor
-```
-
-### Example 3: Manifest-Based Processing (Maximum Control)
-
-```bash
-# Create test manifest
-cat > test-docs.csv << EOF
-document_path,document_id,type
-/home/user/test-docs/doc1.pdf,test-doc-1,local
-/home/user/test-docs/doc2.pdf,test-doc-2,local
-EOF
-
-# Process and monitor
-idp-cli run-inference \
-    --stack-name dev-idp-stack \
-    --manifest test-docs.csv \
-    --batch-prefix dev-test \
-    --monitor
-```
-
-### Example 2: Evaluation with Baselines
-
-```bash
-# Manifest for evaluation documents
-cat > eval-set.csv << EOF
-document_path,document_id,type
-eval/doc1.pdf,doc1,s3-key
-eval/doc2.pdf,doc2,s3-key
-eval/doc3.pdf,doc3,s3-key
-EOF
-
-# Process with evaluation
-idp-cli run-inference \
-    --stack-name prod-idp-stack \
-    --manifest eval-set.csv \
-    --batch-prefix accuracy-test-001 \
-    --monitor
-```
-
-### Example 3: Extraction-Only Processing
-
-```bash
-# Skip OCR and classification (use cached results)
-idp-cli run-inference \
-    --stack-name my-stack \
-    --manifest docs-already-classified.csv \
-    --batch-prefix extraction-experiment
-```
-
-### Example 4: Background Processing
-
-```bash
-# Submit batch
-idp-cli run-inference \
-    --stack-name my-stack \
-    --manifest large-batch.csv \
-    --batch-prefix overnight-batch
-
-# Returns immediately with batch ID
-# Batch ID: cli-batch-20250110-220045-xyz98765
-
-# Check status next morning
-idp-cli status \
-    --stack-name my-stack \
-    --batch-id cli-batch-20250110-220045-xyz98765
-```
-
-## Workflow Comparison
-
-### UI-Based Workflow
-1. Upload documents via web interface
-2. Wait for processing
-3. View results in UI
-4. Manual configuration changes require UI interaction
-
-### CLI-Based Workflow
-1. Create manifest (version controlled)
-2. Run batch with specific configuration (version controlled)
-3. Monitor progress in terminal
-4. Iterate rapidly with different configurations
-5. Automate in CI/CD pipelines
-
-## Security Considerations
-
-### IAM Permissions
-
-Your AWS credentials need:
-
-**S3 Permissions:**
-```json
-{
-  "Effect": "Allow",
-  "Action": [
-    "s3:PutObject",
-    "s3:GetObject",
-    "s3:HeadObject"
-  ],
-  "Resource": [
-    "arn:aws:s3:::input-bucket/*",
-    "arn:aws:s3:::output-bucket/*"
-  ]
-}
-```
-
-**SQS Permissions:**
-```json
-{
-  "Effect": "Allow",
-  "Action": "sqs:SendMessage",
-  "Resource": "arn:aws:sqs:region:account:DocumentQueue"
-}
-```
-
-**Lambda Permissions:**
-```json
-{
-  "Effect": "Allow",
-  "Action": "lambda:InvokeFunction",
-  "Resource": "arn:aws:lambda:region:account:function:LookupFunction"
-}
-```
-
-**CloudFormation Permissions:**
-```json
-{
-  "Effect": "Allow",
-  "Action": [
-    "cloudformation:DescribeStacks",
-    "cloudformation:ListStackResources"
-  ],
-  "Resource": "*"
-}
-```
-
-### Best Practices
-
-1. **Use IAM roles** instead of access keys when possible
-2. **Limit bucket access** to only stack-created buckets
-3. **Version control** manifests and configurations
-4. **Review failed documents** before re-processing
-5. **Monitor costs** for large batch operations
-
-## Troubleshooting Common Issues
-
-### Issue: "NoSuchBucket" error
-
-**Cause:** Stack resources not found or incorrect stack name
-
-**Solution:**
-```bash
-# Verify stack name
-aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE
-
-# Check stack outputs
-aws cloudformation describe-stacks --stack-name my-stack --query 'Stacks[0].Outputs'
-```
-
-### Issue: Monitoring shows all documents as "UNKNOWN"
-
-**Cause:** LookupFunction not found or no permissions
-
-**Solution:**
-```bash
-# Verify function exists
-aws lambda get-function --function-name $(aws cloudformation describe-stacks \
-    --stack-name my-stack \
-    --query 'Stacks[0].Outputs[?OutputKey==`LambdaLookupFunctionName`].OutputValue' \
-    --output text)
-```
-
-### Issue: Documents stuck in "QUEUED" state
-
-**Cause:** QueueProcessor Lambda may have issues or concurrency limit reached
-
-**Solution:**
-```bash
-# Check queue depth
-aws sqs get-queue-attributes \
-    --queue-url <queue-url> \
-    --attribute-names ApproximateNumberOfMessages
-
-# Check CloudWatch logs for QueueProcessor
-aws logs tail /aws/lambda/<QueueProcessor-function-name> --follow
-```
-
-## Contributing
-
-To contribute improvements:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make changes with tests
-4. Run test suite: `pytest`
-5. Submit pull request
-
-### Development Setup
-
-```bash
-cd idp_cli
-pip install -e ".[test]"
-pytest
-```
-
-### Adding New Features
-
-Follow these patterns:
-- Add new module in `idp_cli/`
-- Add corresponding tests in `tests/`
-- Update this README with usage examples
-- Ensure zero changes to existing Lambda functions
-
-## License
-
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-SPDX-License-Identifier: MIT-0
+---
 
 ## Support
 
 For issues or questions:
-- Open an issue on GitHub
 - Check CloudWatch logs for Lambda functions
 - Review AWS Console for resource status
+- Open an issue on GitHub
 
-## Version History
-
-### v1.0.0 (2025-01-10)
-- Initial release
-- Batch document processing
-- Live progress monitoring
-- CSV and JSON manifest support
-- Comprehensive test suite

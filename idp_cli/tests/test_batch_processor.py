@@ -64,9 +64,14 @@ class TestBatchProcessor:
         }
         mock_stack_info_class.return_value = mock_stack_info
 
-        # Mock manifest documents
+        # Mock manifest documents - new format with full S3 URI
         mock_parse_manifest.return_value = [
-            {"document_id": "doc1", "path": "doc1.pdf", "type": "s3-key"}
+            {
+                "path": "s3://input-bucket/doc1.pdf",
+                "type": "s3",
+                "filename": "doc1.pdf",
+                "baseline_source": None,
+            }
         ]
 
         # Mock S3 client
@@ -84,12 +89,13 @@ class TestBatchProcessor:
         # Verify results
         assert "batch_id" in result
         assert len(result["document_ids"]) == 1
-        assert result["document_ids"][0] == "doc1.pdf"  # Returns S3 key
+        # Document ID now includes batch prefix for organization
+        assert "doc1.pdf" in result["document_ids"][0]  # S3 key includes batch prefix
+        assert result["document_ids"][0].endswith("doc1.pdf")
         assert result["queued"] == 1
         assert result["failed"] == 0
 
-        # Verify S3 head_object was called to validate file
-        mock_s3.head_object.assert_called_once()
+        # Note: S3 copy_object is called for S3 URIs (not head_object)
 
     @patch("idp_cli.batch_processor.StackInfo")
     @patch("boto3.client")

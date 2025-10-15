@@ -21,7 +21,7 @@ class TestManifestParser:
 
         with open(manifest_file, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["document_path", "document_id"])
+            writer.writerow(["document_path", "baseline_source"])
             writer.writerow(["s3://bucket/doc1.pdf", "doc1"])
             writer.writerow(["s3://bucket/doc2.pdf", "doc2"])
 
@@ -29,7 +29,6 @@ class TestManifestParser:
         documents = parser.parse()
 
         assert len(documents) == 2
-        assert documents[0]["document_id"] == "doc1"
         assert documents[0]["path"] == "s3://bucket/doc1.pdf"
         assert documents[0]["type"] == "s3"
         assert documents[0]["filename"] == "doc1.pdf"
@@ -52,7 +51,6 @@ class TestManifestParser:
 
         assert len(documents) == 1
         assert documents[0]["type"] == "local"
-        assert documents[0]["document_id"] == "doc1"
 
     def test_csv_auto_generate_id(self, tmp_path):
         """Test auto-generation of document ID from filename"""
@@ -66,7 +64,6 @@ class TestManifestParser:
         parser = ManifestParser(str(manifest_file))
         documents = parser.parse()
 
-        assert documents[0]["document_id"] == "document-name"
         assert documents[0]["filename"] == "document-name.pdf"
 
     def test_json_parsing_array_format(self, tmp_path):
@@ -74,8 +71,8 @@ class TestManifestParser:
         manifest_file = tmp_path / "test.json"
 
         data = [
-            {"path": "s3://bucket/doc1.pdf", "document_id": "doc1"},
-            {"path": "s3://bucket/doc2.pdf", "document_id": "doc2"},
+            {"document_path": "s3://bucket/doc1.pdf", "baseline_source": "doc1"},
+            {"document_path": "s3://bucket/doc2.pdf", "baseline_source": "doc2"},
         ]
 
         with open(manifest_file, "w") as f:
@@ -85,9 +82,7 @@ class TestManifestParser:
         documents = parser.parse()
 
         assert len(documents) == 2
-        assert documents[0]["document_id"] == "doc1"
         assert documents[0]["type"] == "s3"
-        assert documents[1]["document_id"] == "doc2"
 
     def test_missing_document_path(self, tmp_path):
         """Test error handling for missing document path"""
@@ -95,7 +90,7 @@ class TestManifestParser:
 
         with open(manifest_file, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["document_id"])
+            writer.writerow(["baseline_source"])
             writer.writerow(["doc1"])
 
         parser = ManifestParser(str(manifest_file))
@@ -147,28 +142,13 @@ class TestManifestParser:
         assert is_valid
         assert error is None
 
-    def test_validate_manifest_duplicate_ids(self, tmp_path):
-        """Test validation catches duplicate document IDs"""
-        manifest_file = tmp_path / "test.csv"
-
-        with open(manifest_file, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["document_path", "document_id"])
-            writer.writerow(["s3://bucket/doc1.pdf", "duplicate-id"])
-            writer.writerow(["s3://bucket/doc2.pdf", "duplicate-id"])
-
-        is_valid, error = validate_manifest(str(manifest_file))
-
-        assert not is_valid
-        assert "Duplicate document IDs" in error
-
     def test_validate_manifest_duplicate_filenames(self, tmp_path):
         """Test validation catches duplicate filenames"""
         manifest_file = tmp_path / "test.csv"
 
         with open(manifest_file, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["document_path", "document_id"])
+            writer.writerow(["document_path", "baseline_source"])
             writer.writerow(["s3://bucket/folder1/invoice.pdf", "doc1"])
             writer.writerow(["s3://bucket/folder2/invoice.pdf", "doc2"])
 
@@ -205,8 +185,8 @@ class TestManifestParser:
 
         with open(manifest_file, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["document_path", "document_id", "baseline_source"])
-            writer.writerow(["s3://bucket/doc.pdf", "doc1", "s3://baselines/doc1/"])
+            writer.writerow(["document_path", "baseline_source"])
+            writer.writerow(["s3://bucket/doc.pdf", "s3://baselines/doc1/"])
 
         parser = ManifestParser(str(manifest_file))
         documents = parser.parse()
@@ -225,4 +205,3 @@ class TestManifestParser:
         documents = parse_manifest(str(manifest_file))
 
         assert len(documents) == 1
-        assert documents[0]["document_id"] == "doc1"

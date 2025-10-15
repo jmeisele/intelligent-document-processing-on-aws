@@ -714,14 +714,7 @@ def generate_manifest(
 
             for file_path in glob_module.glob(search_pattern, recursive=recursive):
                 if os.path.isfile(file_path):
-                    documents.append(
-                        {
-                            "document_path": file_path,
-                            "document_id": os.path.splitext(
-                                os.path.basename(file_path)
-                            )[0],
-                        }
-                    )
+                    documents.append({"document_path": file_path})
         else:  # s3_uri
             console.print(f"[bold blue]Scanning S3 URI: {s3_uri}[/bold blue]")
 
@@ -764,9 +757,8 @@ def generate_manifest(
                         continue
 
                     full_uri = f"s3://{bucket}/{key}"
-                    doc_id = os.path.splitext(filename)[0]
 
-                    documents.append({"document_path": full_uri, "document_id": doc_id})
+                    documents.append({"document_path": full_uri})
 
         if not documents:
             console.print("[yellow]No documents found[/yellow]")
@@ -806,28 +798,31 @@ def generate_manifest(
                 console.print(f"Found {len(baseline_map)} baseline directories")
 
                 # Show matching statistics
-                matched = sum(
-                    1 for doc in documents if doc["document_id"] in baseline_map
-                )
+                matched = 0
+                for doc in documents:
+                    filename = os.path.basename(doc["document_path"])
+                    doc_id = os.path.splitext(filename)[0]
+                    if doc_id in baseline_map:
+                        matched += 1
+
                 console.print(
                     f"Matched {matched}/{len(documents)} documents to baselines"
                 )
                 console.print()
 
-        # Write manifest
+        # Write manifest (2 columns only)
         with open(output, "w", newline="") as f:
-            writer = csv.DictWriter(
-                f, fieldnames=["document_path", "document_id", "baseline_source"]
-            )
+            writer = csv.DictWriter(f, fieldnames=["document_path", "baseline_source"])
             writer.writeheader()
             for doc in documents:
-                doc_id = doc["document_id"]
+                # Get filename and derive ID for baseline matching
+                filename = os.path.basename(doc["document_path"])
+                doc_id = os.path.splitext(filename)[0]
                 baseline_source = baseline_map.get(doc_id, "")
 
                 writer.writerow(
                     {
                         "document_path": doc["document_path"],
-                        "document_id": doc_id,
                         "baseline_source": baseline_source,
                     }
                 )

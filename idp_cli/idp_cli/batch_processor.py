@@ -229,10 +229,10 @@ class BatchProcessor:
                     try:
                         self._upload_baseline(doc, batch_id, base_dir)
                         results["baselines_uploaded"] += 1
-                        logger.info(f"Uploaded baseline for {doc['document_id']}")
+                        logger.info(f"Uploaded baseline for {doc['filename']}")
                     except Exception as e:
                         logger.error(
-                            f"Failed to upload baseline for {doc['document_id']}: {e}"
+                            f"Failed to upload baseline for {doc['filename']}: {e}"
                         )
                         # Continue processing document even if baseline fails
 
@@ -249,9 +249,10 @@ class BatchProcessor:
                     results["uploaded"] += 1
 
             except Exception as e:
-                logger.error(
-                    f"Failed to process document {doc.get('document_id', 'unknown')}: {e}"
+                filename = doc.get(
+                    "filename", os.path.basename(doc.get("path", "unknown"))
                 )
+                logger.error(f"Failed to process document {filename}: {e}")
                 results["failed"] += 1
 
         # Store batch metadata
@@ -393,18 +394,18 @@ class BatchProcessor:
         if doc["type"] == "local":
             # Upload local file with path preservation
             s3_key = self._upload_local_file_with_path(doc, batch_id, base_dir)
-            logger.info(f"Uploaded {doc['document_id']} to {s3_key}")
+            logger.info(f"Uploaded {doc['filename']} to {s3_key}")
             return s3_key
         elif doc["type"] == "s3":
             # Copy from external S3 location to InputBucket
             s3_key = self._copy_s3_file(doc, batch_id)
-            logger.info(f"Copied {doc['document_id']} from {doc['path']} to {s3_key}")
+            logger.info(f"Copied {doc['filename']} from {doc['path']} to {s3_key}")
             return s3_key
         elif doc["type"] == "s3-key":
             # Document already in InputBucket
             s3_key = doc["path"]
             self._validate_s3_key(s3_key)
-            logger.info(f"Referenced existing {doc['document_id']} at {s3_key}")
+            logger.info(f"Referenced existing {doc['filename']} at {s3_key}")
             return s3_key
         else:
             raise ValueError(f"Unknown document type: {doc['type']}")
@@ -468,18 +469,18 @@ class BatchProcessor:
         if doc["type"] == "local":
             # Upload local file to InputBucket
             s3_key = self._upload_local_file(doc, batch_id)
-            logger.info(f"Uploaded {doc['document_id']} to {s3_key}")
+            logger.info(f"Uploaded {doc['filename']} to {s3_key}")
             return s3_key
         elif doc["type"] == "s3":
             # Copy from external S3 location to InputBucket
             s3_key = self._copy_s3_file(doc, batch_id)
-            logger.info(f"Copied {doc['document_id']} from {doc['path']} to {s3_key}")
+            logger.info(f"Copied {doc['filename']} from {doc['path']} to {s3_key}")
             return s3_key
         elif doc["type"] == "s3-key":
             # Document already in InputBucket, validate it exists
             s3_key = doc["path"]
             self._validate_s3_key(s3_key)
-            logger.info(f"Referenced existing {doc['document_id']} at {s3_key}")
+            logger.info(f"Referenced existing {doc['filename']} at {s3_key}")
             return s3_key
         else:
             raise ValueError(f"Unknown document type: {doc['type']}")
