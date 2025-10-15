@@ -566,6 +566,73 @@ def list_batches(stack_name: str, limit: int, region: Optional[str]):
 
 
 @cli.command()
+@click.option("--stack-name", required=True, help="CloudFormation stack name")
+@click.option("--batch-id", required=True, help="Batch identifier")
+@click.option(
+    "--output-dir",
+    required=True,
+    type=click.Path(),
+    help="Output directory for downloaded results",
+)
+@click.option(
+    "--file-types",
+    default="all",
+    help="File types to download: pages, sections, summary, or 'all' (default: all)",
+)
+@click.option("--region", help="AWS region (optional)")
+def download_results(
+    stack_name: str,
+    batch_id: str,
+    output_dir: str,
+    file_types: str,
+    region: Optional[str],
+):
+    """
+    Download processing results from OutputBucket
+
+    Examples:
+
+      # Download all results
+      idp-cli download-results --stack-name my-stack --batch-id cli-batch-20251015-143000 --output-dir ./results/
+
+      # Download only extraction results (sections)
+      idp-cli download-results --stack-name my-stack --batch-id <id> --output-dir ./results/ --file-types sections
+
+      # Download pages and summaries
+      idp-cli download-results --stack-name my-stack --batch-id <id> --output-dir ./results/ --file-types pages,summary
+    """
+    try:
+        console.print(
+            f"[bold blue]Downloading results for batch: {batch_id}[/bold blue]"
+        )
+
+        processor = BatchProcessor(stack_name=stack_name, region=region)
+
+        # Parse file types
+        if file_types == "all":
+            types_list = ["pages", "sections", "summary"]
+        else:
+            types_list = [t.strip() for t in file_types.split(",")]
+
+        # Download results
+        result = processor.download_batch_results(
+            batch_id=batch_id, output_dir=output_dir, file_types=types_list
+        )
+
+        console.print(
+            f"\n[green]✓ Downloaded {result['files_downloaded']} files to {output_dir}[/green]"
+        )
+        console.print(f"  Documents: {result['documents_downloaded']}")
+        console.print(f"  Output: {output_dir}/{batch_id}/")
+        console.print()
+
+    except Exception as e:
+        logger.error(f"Error downloading results: {e}", exc_info=True)
+        console.print(f"[red]✗ Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.command()
 @click.option(
     "--manifest",
     required=True,

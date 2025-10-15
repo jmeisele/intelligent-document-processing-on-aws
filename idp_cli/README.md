@@ -308,30 +308,22 @@ idp-cli status \
     --batch-id my-first-test-20250110-153045-abc12345
 ```
 
-#### Option B: Download Results from S3
+#### Option B: Download Results Locally
 
 ```bash
-# Get output bucket name
-BUCKET=$(aws cloudformation describe-stacks \
+# Download all results using CLI
+idp-cli download-results \
     --stack-name my-first-idp-stack \
-    --query 'Stacks[0].Outputs[?OutputKey==`S3OutputBucketName`].OutputValue' \
-    --output text)
-
-# Download all results
-aws s3 cp s3://$BUCKET/my-first-test/ ./results/ --recursive
+    --batch-id my-first-test-20250110-153045 \
+    --output-dir ./results/
 
 # View extraction results
-cat results/invoice-001/extraction_result.json | jq .
+cat results/my-first-test-20250110-153045/invoice-001/sections/1/result.json | jq .
 
-# View assessment results
-cat results/invoice-001/assessment_result.json | jq .
+# View summary
+cat results/my-first-test-20250110-153045/invoice-001/summary/summary.json | jq .
 ```
 
-**Result files created for each document:**
-- `extraction_result.json` - Extracted data fields
-- `assessment_result.json` - Confidence scores
-- `evaluation_result.json` - Accuracy metrics (if baseline provided)
-- `summary_report.json` - Document summary
 
 #### Option C: View in Web UI
 
@@ -619,6 +611,69 @@ idp-cli list-batches [OPTIONS]
 
 ```bash
 idp-cli list-batches --stack-name my-idp-stack --limit 5
+```
+
+### `download-results`
+
+Download processing results from OutputBucket to local directory.
+
+**Usage:**
+```bash
+idp-cli download-results [OPTIONS]
+```
+
+**Options:**
+- `--stack-name` (required): CloudFormation stack name
+- `--batch-id` (required): Batch identifier
+- `--output-dir` (required): Local directory to download to
+- `--file-types`: File types to download (default: all)
+  - Options: `pages`, `sections`, `summary`, or `all`
+- `--region`: AWS region (optional)
+
+**Examples:**
+
+```bash
+# Download all results
+idp-cli download-results \
+    --stack-name my-stack \
+    --batch-id cli-batch-20251015-143000 \
+    --output-dir ./results/
+
+# Download only extraction results (sections)
+idp-cli download-results \
+    --stack-name my-stack \
+    --batch-id cli-batch-20251015-143000 \
+    --output-dir ./results/ \
+    --file-types sections
+
+# Download pages and summaries
+idp-cli download-results \
+    --stack-name my-stack \
+    --batch-id cli-batch-20251015-143000 \
+    --output-dir ./results/ \
+    --file-types pages,summary
+```
+
+**Output Structure:**
+
+Results are downloaded preserving the S3 directory structure:
+
+```
+./results/
+└── cli-batch-20251015-143000/
+    └── document.pdf/
+        ├── pages/
+        │   └── 1/
+        │       ├── image.jpg
+        │       ├── rawText.json
+        │       └── result.json
+        ├── sections/
+        │   └── 1/
+        │       ├── result.json
+        │       └── summary.json
+        └── summary/
+            ├── fulltext.txt
+            └── summary.json
 ```
 
 ### `validate`

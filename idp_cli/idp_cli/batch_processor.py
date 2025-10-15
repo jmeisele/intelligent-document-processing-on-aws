@@ -745,3 +745,96 @@ class BatchProcessor:
         except Exception as e:
             logger.error(f"Error listing batches: {e}")
             return []
+
+    def download_batch_results(
+        self, batch_id: str, output_dir: str, file_types: List[str]
+    ) -> Dict:
+        """
+        Download batch processing results from OutputBucket with progress display
+
+        Args:
+            batch_id: Batch identifier
+            output_dir: Local directory to download to
+            file_types: List of file types to download (pages, sections, summary)
+
+        Returns:
+            Dictionary with download statistics
+        """
+        from rich.console import Console
+        from rich.progress import (
+            BarColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+        )
+
+        console = Console()
+        output_bucket = self.resources["OutputBucket"]
+
+        # Create output directory
+        os.makedirs(output_dir, exist_ok=True)
+
+        # First pass: count files to download
+        batch_prefix = f"{batch_id}/"
+        paginator = self.s3.get_paginator("list_objects_v2")
+        pages = paginator.paginate(Bucket=output_bucket, Prefix=batch_prefix)
+
+        files_to_download = []
+        for page in pages:
+            for obj in page.get("Contents", []):
+                s3_key = obj["Key"]
+
+                # Skip if not in requested file types
+                if "all" not in file_types:
+                    if not any(f"/{file_type}/" in s3_key for file_type in file_types):
+                        continue
+
+                files_to_download.append(s3_key)
+
+        total_files = len(files_to_download)
+        console.print(f"Found {total_files} files to download")
+        console.print()
+
+        # Download with progress bar
+        files_downloaded = 0
+        documents_downloaded = set()
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("•"),
+            TextColumn("{task.completed}/{task.total} files"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Downloading results...", total=total_files)
+
+            for s3_key in files_to_download:
+                # Construct local file path
+                local_path = os.path.join(output_dir, s3_key)
+
+                # Create directory if needed
+                local_dir = os.path.dirname(local_path)
+                os.makedirs(local_dir, exist_ok=True)
+
+                # Download file
+                self.s3.download_file(
+                    Bucket=output_bucket, Key=s3_key, Filename=local_path
+                )
+
+                files_downloaded += 1
+
+                # Track document
+                doc_key = s3_key.split("/")[1] if "/" in s3_key else s3_key
+                documents_downloaded.add(doc_key)
+
+                # Update progress
+                progress.update(task, advance=1)
+                logger.debug(f"Downloaded: {s3_key}")
+
+        return {
+            "files_downloaded": files_downloaded,
+            "documents_downloaded": len(documents_downloaded),
+            "output_dir": output_dir,
+        }
