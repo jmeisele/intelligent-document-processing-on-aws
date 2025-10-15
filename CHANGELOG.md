@@ -5,6 +5,8 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+### Added
+
 ## [0.3.20]
 
 ### Added
@@ -12,6 +14,15 @@ SPDX-License-Identifier: MIT-0
 - **Agentic extraction preview with Strands agents** delivering structured field validation, configurable review flows, and sample notebooks/assets for Pattern-2 lending documents.
   - Agentic extraction utilises Strands Agent framework to produce structured outputs in an iterative and self reviewing agent loop. It utilises tools for interacting with the output which will be extended in the future.
   - Through the library this already allows users to utilise the `structured_output` function from the `lib/idp_common_pkg/idp_common/extraction/agentic_idp.py` to request extractions using Pydantic Models with custom validators defined. We intend to enable deeper validation customizations through the UI as well in the future.
+
+- **IDP CLI - Command Line Interface for Batch Document Processing**
+  - Added CLI tool (`idp_cli/`) for programmatic batch document processing and stack management
+  - **Key Features**: Deploy and update CloudFormation stacks, process documents from local directories or S3 URIs, live progress monitoring with rich terminal UI, download processing results locally, validate manifests before processing, generate manifests from directories with automatic baseline matching
+  - **Evaluation Framework**: Workflow for accuracy testing including initial processing, manual validation, baseline creation, and automated evaluation with detailed metrics
+  - **Analytics Integration**: Query aggregated results via Athena SQL or use Agent Analytics in Web UI for visual analysis
+  - **Manifest Formats**: Support for CSV and JSON manifests with auto-generated document IDs from filenames and optional baseline references for evaluation
+  - **Use Cases**: Rapid configuration iteration, large-scale batch processing, CI/CD integration, automated accuracy testing
+  - **Documentation**: README with Quick Start, Commands Reference, Evaluation Workflow, and troubleshooting guides
 
 ### Changed
 
