@@ -61,7 +61,6 @@ class BatchProcessor:
     def process_batch(
         self,
         manifest_path: str,
-        steps: str = "all",
         output_prefix: str = "cli-batch",
         batch_id: Optional[str] = None,
     ) -> Dict:
@@ -70,7 +69,6 @@ class BatchProcessor:
 
         Args:
             manifest_path: Path to manifest file (CSV or JSON)
-            steps: Comma-separated list of steps to execute, or 'all'
             output_prefix: Prefix for output organization
             batch_id: Optional custom batch ID (auto-generated if not provided)
 
@@ -90,7 +88,7 @@ class BatchProcessor:
 
         # Process documents
         return self._process_documents(
-            documents, batch_id, steps, output_prefix, manifest_path
+            documents, batch_id, output_prefix, manifest_path
         )
 
     def process_batch_from_directory(
@@ -98,7 +96,6 @@ class BatchProcessor:
         dir_path: str,
         file_pattern: str = "*.pdf",
         recursive: bool = True,
-        steps: str = "all",
         output_prefix: str = "cli-batch",
         batch_id: Optional[str] = None,
     ) -> Dict:
@@ -109,7 +106,6 @@ class BatchProcessor:
             dir_path: Path to local directory
             file_pattern: Glob pattern for files (default: *.pdf)
             recursive: Include subdirectories
-            steps: Comma-separated list of steps to execute, or 'all'
             output_prefix: Prefix for output organization
             batch_id: Optional custom batch ID (auto-generated if not provided)
 
@@ -134,65 +130,68 @@ class BatchProcessor:
 
         # Process documents
         return self._process_documents(
-            documents, batch_id, steps, output_prefix, dir_path, base_dir=dir_path
+            documents, batch_id, output_prefix, dir_path, base_dir=dir_path
         )
 
-    def process_batch_from_s3_prefix(
+    def process_batch_from_s3_uri(
         self,
-        s3_prefix: str,
+        s3_uri: str,
         file_pattern: str = "*.pdf",
         recursive: bool = True,
-        steps: str = "all",
         output_prefix: str = "cli-batch",
         batch_id: Optional[str] = None,
     ) -> Dict:
         """
-        Process batch of documents from S3 prefix
+        Process batch of documents from S3 URI
 
         Args:
-            s3_prefix: S3 prefix within InputBucket
+            s3_uri: S3 URI (e.g., s3://bucket/prefix/) - can be any bucket
             file_pattern: Pattern for files (default: *.pdf)
             recursive: Include sub-prefixes
-            steps: Comma-separated list of steps to execute, or 'all'
             output_prefix: Prefix for output organization
             batch_id: Optional custom batch ID (auto-generated if not provided)
 
         Returns:
             Dictionary with batch processing results
         """
-        logger.info(f"Scanning S3 prefix: {s3_prefix}")
+        logger.info(f"Scanning S3 URI: {s3_uri}")
 
         # Generate or use provided batch ID
         if not batch_id:
             batch_id = self._generate_batch_id(output_prefix)
         logger.info(f"Batch ID: {batch_id}")
 
-        # Scan S3 prefix and create manifest
-        input_bucket = self.resources["InputBucket"]
-        documents = self._scan_s3_prefix(
-            input_bucket, s3_prefix, file_pattern, recursive
+        # Parse S3 URI to get bucket and prefix
+        if not s3_uri.startswith("s3://"):
+            raise ValueError(f"Invalid S3 URI: {s3_uri}. Must start with s3://")
+
+        uri_parts = s3_uri[5:].split("/", 1)
+        source_bucket = uri_parts[0]
+        source_prefix = uri_parts[1] if len(uri_parts) > 1 else ""
+
+        # Scan S3 URI and create manifest
+        documents = self._scan_s3_uri(
+            source_bucket, source_prefix, file_pattern, recursive
         )
-        logger.info(f"Found {len(documents)} documents in S3 prefix")
+        logger.info(f"Found {len(documents)} documents in S3 URI")
 
         if not documents:
             raise ValueError(
-                f"No documents found matching pattern '{file_pattern}' in s3://{input_bucket}/{s3_prefix}"
+                f"No documents found matching pattern '{file_pattern}' in {s3_uri}"
             )
 
         # Process documents
         return self._process_documents(
             documents,
             batch_id,
-            steps,
             output_prefix,
-            f"s3://{input_bucket}/{s3_prefix}",
+            s3_uri,
         )
 
     def _process_documents(
         self,
         documents: List[Dict],
         batch_id: str,
-        steps: str,
         output_prefix: str,
         source: str,
         base_dir: Optional[str] = None,
@@ -220,7 +219,6 @@ class BatchProcessor:
             "baselines_uploaded": 0,
             "source": source,
             "output_prefix": output_prefix,
-            "steps": steps,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -308,11 +306,11 @@ class BatchProcessor:
 
         return documents
 
-    def _scan_s3_prefix(
+    def _scan_s3_uri(
         self, bucket: str, prefix: str, pattern: str, recursive: bool
     ) -> List[Dict]:
         """
-        Scan S3 prefix for documents
+        Scan S3 URI for documents
 
         Args:
             bucket: S3 bucket name
@@ -357,17 +355,25 @@ class BatchProcessor:
                     if not fnmatch.fnmatch(filename, pattern):
                         continue
 
-                    # Use S3 key (without extension) as document ID
-                    doc_id = os.path.splitext(key)[0]
+                    # Use filename (without extension) as document ID
+                    doc_id = os.path.splitext(filename)[0]
+
+                    # Return full S3 URI for copying
+                    full_uri = f"s3://{bucket}/{key}"
 
                     documents.append(
-                        {"document_id": doc_id, "path": key, "type": "s3-key"}
+                        {
+                            "document_id": doc_id,
+                            "path": full_uri,
+                            "filename": filename,
+                            "type": "s3",  # Will be copied to InputBucket
+                        }
                     )
 
             return documents
 
         except Exception as e:
-            logger.error(f"Error scanning S3 prefix: {e}")
+            logger.error(f"Error scanning S3 URI: {e}")
             raise
 
     def _process_document_with_base(
@@ -388,6 +394,11 @@ class BatchProcessor:
             # Upload local file with path preservation
             s3_key = self._upload_local_file_with_path(doc, batch_id, base_dir)
             logger.info(f"Uploaded {doc['document_id']} to {s3_key}")
+            return s3_key
+        elif doc["type"] == "s3":
+            # Copy from external S3 location to InputBucket
+            s3_key = self._copy_s3_file(doc, batch_id)
+            logger.info(f"Copied {doc['document_id']} from {doc['path']} to {s3_key}")
             return s3_key
         elif doc["type"] == "s3-key":
             # Document already in InputBucket

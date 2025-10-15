@@ -222,34 +222,52 @@ def deploy(
             )
 
         # Show results
-        if result.get("success"):
-            console.print(
-                f"\n[green]✓ Stack {result['operation']} completed successfully![/green]\n"
-            )
+        # Success if operation completed successfully OR was successfully initiated
+        is_success = result.get("success") or result.get("status") == "INITIATED"
 
-            # Show outputs
-            outputs = result.get("outputs", {})
-            if outputs:
-                console.print("[bold]Important Outputs:[/bold]")
+        if is_success:
+            if result.get("success"):
+                # Completed (with --wait)
                 console.print(
-                    f"  Application URL: [cyan]{outputs.get('ApplicationWebURL', 'N/A')}[/cyan]"
+                    f"\n[green]✓ Stack {result['operation']} completed successfully![/green]\n"
                 )
+
+                # Show outputs
+                outputs = result.get("outputs", {})
+                if outputs:
+                    console.print("[bold]Important Outputs:[/bold]")
+                    console.print(
+                        f"  Application URL: [cyan]{outputs.get('ApplicationWebURL', 'N/A')}[/cyan]"
+                    )
+                    console.print(
+                        f"  Input Bucket: {outputs.get('S3InputBucketName', 'N/A')}"
+                    )
+                    console.print(
+                        f"  Output Bucket: {outputs.get('S3OutputBucketName', 'N/A')}"
+                    )
+                    console.print()
+
+                console.print("[bold]Next Steps:[/bold]")
+                console.print("1. Check your email for temporary admin password")
+                console.print("2. Enable Bedrock model access (see README)")
+                console.print("3. Process documents:")
                 console.print(
-                    f"  Input Bucket: {outputs.get('S3InputBucketName', 'N/A')}"
-                )
-                console.print(
-                    f"  Output Bucket: {outputs.get('S3OutputBucketName', 'N/A')}"
+                    f"   [cyan]idp-cli run-inference --stack-name {stack_name} --manifest docs.csv[/cyan]"
                 )
                 console.print()
-
-            console.print("[bold]Next Steps:[/bold]")
-            console.print("1. Check your email for temporary admin password")
-            console.print("2. Enable Bedrock model access (see README)")
-            console.print("3. Process documents:")
-            console.print(
-                f"   [cyan]idp-cli run-inference --stack-name {stack_name} --manifest docs.csv[/cyan]"
-            )
-            console.print()
+            else:
+                # Initiated (without --wait)
+                console.print(
+                    f"\n[green]✓ Stack {result['operation']} initiated successfully![/green]\n"
+                )
+                console.print("[bold]Monitor progress:[/bold]")
+                console.print(f"  AWS Console: CloudFormation → Stacks → {stack_name}")
+                console.print()
+                console.print("[bold]Or use --wait flag to monitor in CLI:[/bold]")
+                console.print(
+                    f"  [cyan]idp-cli deploy --stack-name {stack_name} --wait[/cyan]"
+                )
+                console.print()
         else:
             console.print(f"\n[red]✗ Stack {result['operation']} failed![/red]")
             console.print(f"Status: {result.get('status')}")
@@ -278,7 +296,7 @@ def deploy(
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
     help="Local directory containing documents to process",
 )
-@click.option("--s3-prefix", help="S3 prefix within InputBucket to process")
+@click.option("--s3-uri", help="S3 URI to process (e.g., s3://bucket/prefix/)")
 @click.option("--batch-id", help="Custom batch ID (auto-generated if not provided)")
 @click.option(
     "--file-pattern",
@@ -294,11 +312,6 @@ def deploy(
     "--config",
     type=click.Path(exists=True),
     help="Path to configuration YAML file (optional)",
-)
-@click.option(
-    "--steps",
-    default="all",
-    help="Steps to execute: all, or comma-separated list (e.g., extraction,assessment)",
 )
 @click.option(
     "--batch-prefix",
@@ -317,12 +330,11 @@ def run_inference(
     stack_name: str,
     manifest: Optional[str],
     directory: Optional[str],
-    s3_prefix: Optional[str],
+    s3_uri: Optional[str],
     batch_id: Optional[str],
     file_pattern: str,
     recursive: bool,
     config: Optional[str],
-    steps: str,
     batch_prefix: str,
     monitor: bool,
     refresh_interval: int,
@@ -334,7 +346,7 @@ def run_inference(
     Specify documents using ONE of:
       --manifest: Explicit manifest file (CSV or JSON)
       --dir: Local directory (auto-generates manifest)
-      --s3-prefix: S3 prefix in InputBucket (auto-generates manifest)
+      --s3-uri: S3 URI (auto-generates manifest, any bucket)
 
     Examples:
 
@@ -347,28 +359,25 @@ def run_inference(
       # Process with custom batch ID
       idp-cli run-inference --stack-name my-stack --dir ./docs/ --batch-id my-experiment-v1 --monitor
 
-      # Process S3 prefix (preserves directory structure)
-      idp-cli run-inference --stack-name my-stack --s3-prefix archive/2024/ --monitor
+      # Process S3 URI (any bucket)
+      idp-cli run-inference --stack-name my-stack --s3-uri s3://data-lake/archive/2024/ --monitor
 
       # Process with file pattern
       idp-cli run-inference --stack-name my-stack --dir ./docs/ --file-pattern "invoice*.pdf"
-
-      # Process specific steps only
-      idp-cli run-inference --stack-name my-stack --dir ./docs/ --steps extraction,assessment
     """
     try:
         # Validate mutually exclusive options
-        sources = [manifest, directory, s3_prefix]
+        sources = [manifest, directory, s3_uri]
         sources_provided = sum(1 for s in sources if s is not None)
 
         if sources_provided == 0:
             console.print(
-                "[red]✗ Error: Must specify one of: --manifest, --dir, or --s3-prefix[/red]"
+                "[red]✗ Error: Must specify one of: --manifest, --dir, or --s3-uri[/red]"
             )
             sys.exit(1)
         elif sources_provided > 1:
             console.print(
-                "[red]✗ Error: Cannot specify more than one of: --manifest, --dir, --s3-prefix[/red]"
+                "[red]✗ Error: Cannot specify more than one of: --manifest, --dir, --s3-uri[/red]"
             )
             sys.exit(1)
 
@@ -394,7 +403,6 @@ def run_inference(
             if manifest:
                 batch_result = processor.process_batch(
                     manifest_path=manifest,
-                    steps=steps,
                     output_prefix=batch_prefix,
                     batch_id=batch_id,
                 )
@@ -403,16 +411,14 @@ def run_inference(
                     dir_path=directory,
                     file_pattern=file_pattern,
                     recursive=recursive,
-                    steps=steps,
                     output_prefix=batch_prefix,
                     batch_id=batch_id,
                 )
-            else:  # s3_prefix
-                batch_result = processor.process_batch_from_s3_prefix(
-                    s3_prefix=s3_prefix,
+            else:  # s3_uri
+                batch_result = processor.process_batch_from_s3_uri(
+                    s3_uri=s3_uri,
                     file_pattern=file_pattern,
                     recursive=recursive,
-                    steps=steps,
                     output_prefix=batch_prefix,
                     batch_id=batch_id,
                 )

@@ -138,7 +138,7 @@ idp-cli run-inference \
 # Process files already in InputBucket under a prefix
 idp-cli run-inference \
     --stack-name my-idp-stack \
-    --s3-prefix archive/2024/ \
+    --s3-uri archive/2024/ \
     --monitor
 ```
 
@@ -161,7 +161,7 @@ idp-cli run-inference \
 
 **Which method to use:**
 - Use `--dir` for quick ad-hoc processing of local folders
-- Use `--s3-prefix` when files are already in S3
+- Use `--s3-uri` when files are already in S3
 - Use `--manifest` when you need precise control over document IDs or custom metadata
 
 ### 5. Check Processing Status
@@ -484,7 +484,7 @@ Process a batch of documents using the stack's current configuration.
 Specify documents using ONE of:
 - `--manifest`: Explicit manifest file (CSV or JSON)
 - `--dir`: Local directory (auto-generates manifest, preserves paths)
-- `--s3-prefix`: S3 prefix in InputBucket (auto-generates manifest)
+- `--s3-uri`: S3 URI in InputBucket (auto-generates manifest)
 
 **Note:** To change the processing configuration, use `idp-cli deploy --custom-config` to update the stack first.
 
@@ -498,12 +498,11 @@ idp-cli run-inference [OPTIONS]
 - **Document Source** (choose ONE):
   - `--manifest`: Path to manifest file (CSV or JSON)
   - `--dir`: Local directory containing documents
-  - `--s3-prefix`: S3 prefix within InputBucket
+  - `--s3-uri`: S3 URI within InputBucket
 - `--batch-id`: Custom batch ID (optional, auto-generated if not provided)
 - `--batch-prefix`: Batch ID prefix for auto-generation (default: `cli-batch`, only used if --batch-id not provided)
 - `--file-pattern`: File pattern for directory/S3 scanning (default: `*.pdf`)
 - `--recursive/--no-recursive`: Include subdirectories (default: recursive)
-- `--steps`: Steps to execute (default: `all`)
   - Examples: `all`, `extraction,assessment`, `classification,extraction,evaluation`
 - `--monitor`: Monitor progress until completion (flag)
 - `--refresh-interval`: Seconds between status checks (default: 5)
@@ -524,10 +523,10 @@ idp-cli run-inference \
     --dir ./documents/ \
     --monitor
 
-# Process S3 prefix (files already in InputBucket)
+# Process S3 URI (files already in InputBucket)
 idp-cli run-inference \
     --stack-name my-idp-stack \
-    --s3-prefix archive/2024/ \
+    --s3-uri archive/2024/ \
     --monitor
 
 # Process with file pattern filtering
@@ -541,7 +540,6 @@ idp-cli run-inference \
 idp-cli run-inference \
     --stack-name my-idp-stack \
     --dir ./docs/ \
-    --steps extraction,assessment,evaluation
 
 # Non-recursive (top-level files only)
 idp-cli run-inference \
@@ -882,7 +880,6 @@ idp-cli deploy --stack-name my-stack --custom-config ./new-extraction-prompts.ya
 idp-cli run-inference \
     --stack-name my-stack \
     --manifest docs.csv \
-    --steps extraction,assessment,evaluation \
     --batch-prefix experiment-new-prompts
 ```
 
@@ -1148,16 +1145,16 @@ idp-cli run-inference \
 ### Example 2: S3 Prefix Processing
 
 ```bash
-# Process all documents under an S3 prefix
+# Process all documents under an S3 URI
 idp-cli run-inference \
     --stack-name my-stack \
-    --s3-prefix archive/2024/invoices/ \
+    --s3-uri archive/2024/invoices/ \
     --monitor
 
 # With file pattern
 idp-cli run-inference \
     --stack-name my-stack \
-    --s3-prefix processed-docs/ \
+    --s3-uri processed-docs/ \
     --file-pattern "*.pdf" \
     --batch-prefix reprocess-batch \
     --monitor
@@ -1196,7 +1193,6 @@ EOF
 idp-cli run-inference \
     --stack-name prod-idp-stack \
     --manifest eval-set.csv \
-    --steps all \
     --batch-prefix accuracy-test-001 \
     --monitor
 ```
@@ -1208,7 +1204,6 @@ idp-cli run-inference \
 idp-cli run-inference \
     --stack-name my-stack \
     --manifest docs-already-classified.csv \
-    --steps extraction,assessment \
     --batch-prefix extraction-experiment
 ```
 

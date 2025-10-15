@@ -78,7 +78,7 @@ class TestBatchProcessor:
         processor = BatchProcessor("test-stack")
 
         result = processor.process_batch(
-            manifest_path="test.csv", steps="all", output_prefix="test-batch"
+            manifest_path="test.csv", output_prefix="test-batch"
         )
 
         # Verify results
