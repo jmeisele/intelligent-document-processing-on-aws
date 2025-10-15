@@ -490,7 +490,7 @@ idp-cli run-inference [OPTIONS]
 - **Document Source** (choose ONE):
   - `--manifest`: Path to manifest file (CSV or JSON)
   - `--dir`: Local directory containing documents
-  - `--s3-uri`: S3 URI within InputBucket
+  - `--s3-uri`: S3 URI
 - `--batch-id`: Custom batch ID (optional, auto-generated if not provided)
 - `--batch-prefix`: Batch ID prefix for auto-generation (default: `cli-batch`, only used if --batch-id not provided)
 - `--file-pattern`: File pattern for directory/S3 scanning (default: `*.pdf`)
@@ -676,13 +676,64 @@ Results are downloaded preserving the S3 directory structure:
             └── summary.json
 ```
 
-### `validate`
+### `generate-manifest`
+
+Generate a manifest file from directory or S3 URI. The generated manifest can be edited to add baseline sources or customize document IDs before processing.
+
+**Usage:**
+```bash
+idp-cli generate-manifest [OPTIONS]
+```
+
+**Options:**
+- **Source** (choose ONE):
+  - `--dir`: Local directory to scan
+  - `--s3-uri`: S3 URI to scan
+- `--output` (required): Output manifest file path (CSV)
+- `--file-pattern`: File pattern (default: `*.pdf`)
+- `--recursive/--no-recursive`: Include subdirectories (default: recursive)
+- `--region`: AWS region (optional)
+
+**Examples:**
+
+```bash
+# Generate from local directory
+idp-cli generate-manifest --dir ./documents/ --output manifest.csv
+
+# Generate from S3 URI
+idp-cli generate-manifest --s3-uri s3://bucket/prefix/ --output manifest.csv
+
+# With file pattern
+idp-cli generate-manifest --dir ./docs/ --output manifest.csv --file-pattern "W2*.pdf"
+```
+
+**Workflow:**
+
+```bash
+# Step 1: Generate manifest
+idp-cli generate-manifest --dir ./documents/ --output manifest.csv
+
+# Step 2: Edit manifest (add baseline_source, customize IDs)
+vi manifest.csv
+
+# Step 3: Process with edited manifest
+idp-cli run-inference --stack-name my-stack --manifest manifest.csv --monitor
+```
+
+**Generated Manifest Format:**
+```csv
+document_path,document_id,baseline_source
+/local/doc1.pdf,doc1,
+/local/doc2.pdf,doc2,
+```
+
+### `validate-manifest`
 
 Validate a manifest file without processing.
 
 **Usage:**
 ```bash
-idp-cli validate [OPTIONS]
+idp-cli validate-manifest [OPTIONS]
 ```
 
 **Options:**
@@ -691,7 +742,7 @@ idp-cli validate [OPTIONS]
 **Example:**
 
 ```bash
-idp-cli validate --manifest documents.csv
+idp-cli validate-manifest --manifest documents.csv
 ```
 
 ## Manifest Format

@@ -634,18 +634,182 @@ def download_results(
 
 @cli.command()
 @click.option(
+    "--dir",
+    "directory",
+    type=click.Path(exists=True, file_okay=False),
+    help="Local directory to scan",
+)
+@click.option("--s3-uri", help="S3 URI to scan (e.g., s3://bucket/prefix/)")
+@click.option(
+    "--output", required=True, type=click.Path(), help="Output manifest file path (CSV)"
+)
+@click.option("--file-pattern", default="*.pdf", help="File pattern (default: *.pdf)")
+@click.option(
+    "--recursive/--no-recursive",
+    default=True,
+    help="Include subdirectories (default: recursive)",
+)
+@click.option("--region", help="AWS region (optional)")
+def generate_manifest(
+    directory: Optional[str],
+    s3_uri: Optional[str],
+    output: str,
+    file_pattern: str,
+    recursive: bool,
+    region: Optional[str],
+):
+    """
+    Generate a manifest file from directory or S3 URI
+
+    The manifest can then be edited to add baseline_source or customize document_id values.
+
+    Examples:
+
+      # Generate from local directory
+      idp-cli generate-manifest --dir ./documents/ --output manifest.csv
+
+      # Generate from S3 URI
+      idp-cli generate-manifest --s3-uri s3://bucket/prefix/ --output manifest.csv
+
+      # With file pattern
+      idp-cli generate-manifest --dir ./docs/ --output manifest.csv --file-pattern "W2*.pdf"
+    """
+    try:
+        import csv
+
+        # Validate mutually exclusive options
+        if not directory and not s3_uri:
+            console.print("[red]✗ Error: Must specify either --dir or --s3-uri[/red]")
+            sys.exit(1)
+        if directory and s3_uri:
+            console.print("[red]✗ Error: Cannot specify both --dir and --s3-uri[/red]")
+            sys.exit(1)
+
+        # Import here to avoid circular dependency during scanning
+
+        documents = []
+
+        if directory:
+            console.print(f"[bold blue]Scanning directory: {directory}[/bold blue]")
+
+            # Import scan method directly
+            import glob as glob_module
+            import os
+
+            dir_path = os.path.abspath(directory)
+            if recursive:
+                search_pattern = os.path.join(dir_path, "**", file_pattern)
+            else:
+                search_pattern = os.path.join(dir_path, file_pattern)
+
+            for file_path in glob_module.glob(search_pattern, recursive=recursive):
+                if os.path.isfile(file_path):
+                    documents.append(
+                        {
+                            "document_path": file_path,
+                            "document_id": os.path.splitext(
+                                os.path.basename(file_path)
+                            )[0],
+                        }
+                    )
+        else:  # s3_uri
+            console.print(f"[bold blue]Scanning S3 URI: {s3_uri}[/bold blue]")
+
+            # Parse S3 URI
+            if not s3_uri.startswith("s3://"):
+                console.print("[red]✗ Error: Invalid S3 URI[/red]")
+                sys.exit(1)
+
+            uri_parts = s3_uri[5:].split("/", 1)
+            bucket = uri_parts[0]
+            prefix = uri_parts[1] if len(uri_parts) > 1 else ""
+
+            # List S3 objects
+            import fnmatch
+
+            import boto3
+
+            s3 = boto3.client("s3", region_name=region)
+            paginator = s3.get_paginator("list_objects_v2")
+
+            if prefix and not prefix.endswith("/"):
+                prefix = prefix + "/"
+
+            pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+
+            for page in pages:
+                for obj in page.get("Contents", []):
+                    key = obj["Key"]
+
+                    if key.endswith("/"):
+                        continue
+
+                    if not recursive:
+                        rel_key = key[len(prefix) :]
+                        if "/" in rel_key:
+                            continue
+
+                    filename = os.path.basename(key)
+                    if not fnmatch.fnmatch(filename, file_pattern):
+                        continue
+
+                    full_uri = f"s3://{bucket}/{key}"
+                    doc_id = os.path.splitext(filename)[0]
+
+                    documents.append({"document_path": full_uri, "document_id": doc_id})
+
+        if not documents:
+            console.print("[yellow]No documents found[/yellow]")
+            sys.exit(1)
+
+        console.print(f"Found {len(documents)} documents")
+
+        # Write manifest
+        with open(output, "w", newline="") as f:
+            writer = csv.DictWriter(
+                f, fieldnames=["document_path", "document_id", "baseline_source"]
+            )
+            writer.writeheader()
+            for doc in documents:
+                writer.writerow(
+                    {
+                        "document_path": doc["document_path"],
+                        "document_id": doc["document_id"],
+                        "baseline_source": "",  # Empty for user to fill
+                    }
+                )
+
+        console.print(f"[green]✓ Generated manifest: {output}[/green]")
+        console.print()
+        console.print("[bold]Next steps:[/bold]")
+        console.print(
+            "1. Edit manifest to add baseline_source or customize document_id"
+        )
+        console.print(
+            f"2. Process: [cyan]idp-cli run-inference --stack-name <stack> --manifest {output}[/cyan]"
+        )
+        console.print()
+
+    except Exception as e:
+        logger.error(f"Error generating manifest: {e}", exc_info=True)
+        console.print(f"[red]✗ Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.command(name="validate-manifest")
+@click.option(
     "--manifest",
     required=True,
     type=click.Path(exists=True),
     help="Path to manifest file to validate",
 )
-def validate(manifest: str):
+def validate_manifest_cmd(manifest: str):
     """
     Validate a manifest file without processing
 
     Example:
 
-      idp-cli validate --manifest documents.csv
+      idp-cli validate-manifest --manifest documents.csv
     """
     try:
         is_valid, error = validate_manifest(manifest)
