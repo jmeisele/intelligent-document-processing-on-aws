@@ -29,7 +29,9 @@ uninstall:
 	poetry run idpcli uninstall \
 	--stack-name=$(IDP_STACK_NAME) \
 	--account-id=$(IDP_ACCOUNT_ID) \
-	--cfn-prefix=$(IDP_CFN_PREFIX) \
+	--cfn-prefix=$(IDP_CFN_PREFIX)
+	# Clean up CloudWatch Logs resource policy after uninstall
+	cd $(IDP_CWD) && python3 scripts/cleanup-logs.py || echo "Log cleanup failed but continuing" \
 
 smoketest:
 	poetry run idpcli smoketest \
