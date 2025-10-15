@@ -24,6 +24,7 @@ https://github.com/user-attachments/assets/3d448a74-ba5b-4a4a-96ad-ec03ac0b4d7d
 - [Quick Start](#quick-start)
 - [Commands Reference](#commands-reference)
   - [deploy](#deploy)
+  - [delete](#delete)
   - [run-inference](#run-inference)
   - [status](#status)
   - [download-results](#download-results)
@@ -145,6 +146,76 @@ idp-cli deploy \
     --max-concurrent 200 \
     --log-level DEBUG \
     --wait
+```
+
+---
+
+### `delete`
+
+Delete an IDP CloudFormation stack.
+
+**⚠️ WARNING:** This permanently deletes all stack resources.
+
+**Usage:**
+```bash
+idp-cli delete [OPTIONS]
+```
+
+**Options:**
+- `--stack-name` (required): CloudFormation stack name
+- `--force`: Skip confirmation prompt
+- `--empty-buckets`: Empty S3 buckets before deletion (required if buckets contain data)
+- `--wait / --no-wait`: Wait for deletion to complete (default: wait)
+- `--region`: AWS region (optional)
+
+**S3 Bucket Behavior:**
+- **LoggingBucket**: `DeletionPolicy: Retain` - Always kept
+- **All other buckets**: `DeletionPolicy: RetainExceptOnCreate` - Deleted if empty
+- CloudFormation can ONLY delete S3 buckets if they're empty
+- Use `--empty-buckets` to automatically empty buckets before deletion
+
+**Examples:**
+
+```bash
+# Interactive deletion with confirmation
+idp-cli delete --stack-name test-stack
+
+# Automated deletion (CI/CD)
+idp-cli delete --stack-name test-stack --force
+
+# Delete with automatic bucket emptying
+idp-cli delete --stack-name test-stack --empty-buckets --force
+
+# Delete without waiting
+idp-cli delete --stack-name test-stack --force --no-wait
+```
+
+**What you'll see:**
+```
+⚠️  WARNING: Stack Deletion
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Stack: test-stack
+Region: us-east-1
+
+S3 Buckets:
+  • InputBucket: 20 objects (45.3 MB)
+  • OutputBucket: 20 objects (123.7 MB)
+  • WorkingBucket: empty
+
+⚠️  Buckets contain data!
+This action cannot be undone.
+
+Are you sure you want to delete this stack? [y/N]: _
+```
+
+**Use Cases:**
+- Cleanup test/development environments to avoid charges
+- CI/CD pipelines that provision and teardown stacks
+- Automated testing with temporary stack creation
+
+**Note:** LoggingBucket is retained by design. To delete it manually:
+```bash
+aws s3 rb s3://<logging-bucket-name> --force
 ```
 
 ---
@@ -914,4 +985,3 @@ For issues or questions:
 - Check CloudWatch logs for Lambda functions
 - Review AWS Console for resource status
 - Open an issue on GitHub
-

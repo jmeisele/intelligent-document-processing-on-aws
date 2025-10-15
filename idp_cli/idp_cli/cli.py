@@ -285,6 +285,162 @@ def deploy(
 
 @cli.command()
 @click.option("--stack-name", required=True, help="CloudFormation stack name")
+@click.option("--force", is_flag=True, help="Skip confirmation prompt")
+@click.option(
+    "--empty-buckets",
+    is_flag=True,
+    help="Empty S3 buckets before deletion (required if buckets contain data)",
+)
+@click.option(
+    "--wait/--no-wait",
+    default=True,
+    help="Wait for deletion to complete (default: wait)",
+)
+@click.option("--region", help="AWS region (optional)")
+def delete(
+    stack_name: str,
+    force: bool,
+    empty_buckets: bool,
+    wait: bool,
+    region: Optional[str],
+):
+    """
+    Delete an IDP CloudFormation stack
+
+    ⚠️  WARNING: This permanently deletes all stack resources.
+
+    S3 buckets configured with RetainExceptOnCreate will be deleted if empty.
+    Use --empty-buckets to automatically empty buckets before deletion.
+
+    Examples:
+
+      # Interactive deletion with confirmation
+      idp-cli delete --stack-name test-stack
+
+      # Automated deletion (skip confirmation)
+      idp-cli delete --stack-name test-stack --force
+
+      # Delete with automatic bucket emptying
+      idp-cli delete --stack-name test-stack --empty-buckets --force
+
+      # Delete without waiting for completion
+      idp-cli delete --stack-name test-stack --force --no-wait
+    """
+    try:
+        deployer = StackDeployer(region=region)
+
+        # Check if stack exists
+        if not deployer._stack_exists(stack_name):
+            console.print(f"[red]✗ Stack '{stack_name}' does not exist[/red]")
+            sys.exit(1)
+
+        # Get bucket information
+        console.print(f"[bold blue]Analyzing stack: {stack_name}[/bold blue]")
+        bucket_info = deployer.get_bucket_info(stack_name)
+
+        # Show warning with bucket details
+        console.print()
+        console.print("[bold red]⚠️  WARNING: Stack Deletion[/bold red]")
+        console.print("━" * 60)
+        console.print(f"Stack: [cyan]{stack_name}[/cyan]")
+        console.print(f"Region: {region or 'default'}")
+
+        if bucket_info:
+            console.print()
+            console.print("[bold]S3 Buckets:[/bold]")
+            has_data = False
+            for bucket in bucket_info:
+                obj_count = bucket.get("object_count", 0)
+                size = bucket.get("size_display", "Unknown")
+                logical_id = bucket.get("logical_id", "Unknown")
+
+                if obj_count > 0:
+                    has_data = True
+                    console.print(
+                        f"  • {logical_id}: [yellow]{obj_count} objects ({size})[/yellow]"
+                    )
+                else:
+                    console.print(f"  • {logical_id}: [green]empty[/green]")
+
+            if has_data and not empty_buckets:
+                console.print()
+                console.print("[bold red]⚠️  Buckets contain data![/bold red]")
+                console.print("Deletion will FAIL unless you:")
+                console.print("  1. Use --empty-buckets flag to auto-delete data, OR")
+                console.print("  2. Manually empty buckets first")
+
+        console.print()
+        console.print("[bold red]This action cannot be undone.[/bold red]")
+        console.print("━" * 60)
+        console.print()
+
+        # Confirmation unless --force
+        if not force:
+            response = click.confirm(
+                "Are you sure you want to delete this stack?", default=False
+            )
+            if not response:
+                console.print("[yellow]Deletion cancelled[/yellow]")
+                return
+
+            # Double confirmation if --empty-buckets
+            if empty_buckets:
+                console.print()
+                console.print(
+                    "[bold red]⚠️  You are about to permanently delete all bucket data![/bold red]"
+                )
+                response = click.confirm(
+                    "Are you ABSOLUTELY sure you want to empty buckets and delete the stack?",
+                    default=False,
+                )
+                if not response:
+                    console.print("[yellow]Deletion cancelled[/yellow]")
+                    return
+
+        # Perform deletion
+        console.print()
+        with console.status("[bold red]Deleting stack..."):
+            result = deployer.delete_stack(
+                stack_name=stack_name,
+                empty_buckets=empty_buckets,
+                wait=wait,
+            )
+
+        # Show results
+        if result.get("success"):
+            console.print("\n[green]✓ Stack deleted successfully![/green]")
+            console.print(f"Stack: {stack_name}")
+            console.print(f"Status: {result.get('status')}")
+
+            # Note about LoggingBucket
+            console.print()
+            console.print(
+                "[bold]Note:[/bold] LoggingBucket (if exists) is retained by design."
+            )
+            console.print("Delete it manually if no longer needed:")
+            console.print("  [cyan]aws s3 rb s3://<logging-bucket-name> --force[/cyan]")
+            console.print()
+        else:
+            console.print("\n[red]✗ Stack deletion failed![/red]")
+            console.print(f"Status: {result.get('status')}")
+            console.print(f"Error: {result.get('error', 'Unknown')}")
+
+            if "bucket" in result.get("error", "").lower():
+                console.print()
+                console.print(
+                    "[yellow]Tip: Try again with --empty-buckets flag[/yellow]"
+                )
+
+            sys.exit(1)
+
+    except Exception as e:
+        logger.error(f"Error deleting stack: {e}", exc_info=True)
+        console.print(f"[red]✗ Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.command()
+@click.option("--stack-name", required=True, help="CloudFormation stack name")
 @click.option(
     "--manifest",
     type=click.Path(exists=True),

@@ -299,6 +299,220 @@ class StackDeployer:
             logger.error(f"Error getting stack events: {e}")
             return []
 
+    def delete_stack(
+        self,
+        stack_name: str,
+        empty_buckets: bool = False,
+        wait: bool = True,
+    ) -> Dict:
+        """
+        Delete CloudFormation stack
+
+        Args:
+            stack_name: Name of stack to delete
+            empty_buckets: Whether to empty S3 buckets before deletion
+            wait: Whether to wait for deletion to complete
+
+        Returns:
+            Dictionary with deletion result
+        """
+        logger.info(f"Deleting stack: {stack_name}")
+
+        # Check if stack exists
+        if not self._stack_exists(stack_name):
+            raise ValueError(f"Stack '{stack_name}' does not exist")
+
+        # Get stack resources to find buckets
+        bucket_info = self._get_stack_buckets(stack_name)
+
+        # Empty buckets if requested
+        if empty_buckets and bucket_info:
+            self._empty_buckets(bucket_info)
+
+        # Delete stack
+        try:
+            self.cfn.delete_stack(StackName=stack_name)
+            logger.info(f"Stack deletion initiated: {stack_name}")
+
+            result = {
+                "stack_name": stack_name,
+                "operation": "DELETE",
+                "status": "INITIATED",
+            }
+
+            if wait:
+                result = self._wait_for_deletion(stack_name)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error deleting stack: {e}")
+            raise
+
+    def _get_stack_buckets(self, stack_name: str) -> List[Dict]:
+        """
+        Get S3 buckets from stack
+
+        Args:
+            stack_name: Stack name
+
+        Returns:
+            List of bucket information dictionaries
+        """
+        buckets = []
+
+        try:
+            # Get stack resources
+            paginator = self.cfn.get_paginator("list_stack_resources")
+            pages = paginator.paginate(StackName=stack_name)
+
+            for page in pages:
+                for resource in page.get("StackResourceSummaries", []):
+                    if resource.get("ResourceType") == "AWS::S3::Bucket":
+                        bucket_name = resource.get("PhysicalResourceId")
+                        if bucket_name:
+                            buckets.append(
+                                {
+                                    "logical_id": resource.get("LogicalResourceId"),
+                                    "bucket_name": bucket_name,
+                                }
+                            )
+
+            return buckets
+
+        except Exception as e:
+            logger.error(f"Error getting stack buckets: {e}")
+            return []
+
+    def _empty_buckets(self, bucket_info: List[Dict]) -> None:
+        """
+        Empty S3 buckets
+
+        Args:
+            bucket_info: List of bucket information dictionaries
+        """
+        s3 = boto3.resource("s3", region_name=self.region)
+
+        for bucket_dict in bucket_info:
+            bucket_name = bucket_dict["bucket_name"]
+            logical_id = bucket_dict["logical_id"]
+
+            try:
+                logger.info(f"Emptying bucket {logical_id}: {bucket_name}")
+                bucket = s3.Bucket(bucket_name)
+
+                # Delete all objects and versions
+                bucket.object_versions.all().delete()
+                logger.info(f"Emptied bucket: {bucket_name}")
+
+            except Exception as e:
+                logger.error(f"Error emptying bucket {bucket_name}: {e}")
+                raise Exception(
+                    f"Failed to empty bucket {bucket_name}. You may need to empty it manually."
+                )
+
+    def _wait_for_deletion(self, stack_name: str) -> Dict:
+        """
+        Wait for stack deletion to complete
+
+        Args:
+            stack_name: Stack name
+
+        Returns:
+            Dictionary with final status
+        """
+        from rich.console import Console
+        from rich.progress import Progress, SpinnerColumn, TextColumn
+
+        console = Console()
+        logger.info("Waiting for DELETE to complete...")
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task(f"[cyan]DELETE stack: {stack_name}", total=None)
+
+            while True:
+                try:
+                    response = self.cfn.describe_stacks(StackName=stack_name)
+                    stacks = response.get("Stacks", [])
+
+                    if not stacks:
+                        # Stack no longer exists - deletion complete
+                        return {
+                            "stack_name": stack_name,
+                            "operation": "DELETE",
+                            "status": "DELETE_COMPLETE",
+                            "success": True,
+                        }
+
+                    stack = stacks[0]
+                    status = stack.get("StackStatus", "")
+
+                    # Update progress with current status
+                    progress.update(task, description=f"[cyan]DELETE: {status}")
+
+                    if status == "DELETE_FAILED":
+                        return {
+                            "stack_name": stack_name,
+                            "operation": "DELETE",
+                            "status": status,
+                            "success": False,
+                            "error": self._get_stack_failure_reason(stack_name),
+                        }
+
+                    # Wait before next check
+                    time.sleep(10)
+
+                except self.cfn.exceptions.ClientError as e:
+                    if "does not exist" in str(e):
+                        # Stack deleted successfully
+                        return {
+                            "stack_name": stack_name,
+                            "operation": "DELETE",
+                            "status": "DELETE_COMPLETE",
+                            "success": True,
+                        }
+                    raise
+
+    def get_bucket_info(self, stack_name: str) -> List[Dict]:
+        """
+        Get information about S3 buckets in stack
+
+        Args:
+            stack_name: Stack name
+
+        Returns:
+            List of bucket information with object counts and sizes
+        """
+        buckets = self._get_stack_buckets(stack_name)
+        s3 = boto3.client("s3", region_name=self.region)
+
+        for bucket_dict in buckets:
+            bucket_name = bucket_dict["bucket_name"]
+
+            try:
+                # Get bucket statistics
+                response = s3.list_objects_v2(Bucket=bucket_name)
+                objects = response.get("Contents", [])
+
+                bucket_dict["object_count"] = len(objects)
+                bucket_dict["total_size"] = sum(obj.get("Size", 0) for obj in objects)
+
+                # Convert size to human-readable format
+                size_mb = bucket_dict["total_size"] / (1024 * 1024)
+                bucket_dict["size_display"] = f"{size_mb:.2f} MB"
+
+            except Exception as e:
+                logger.warning(f"Could not get stats for {bucket_name}: {e}")
+                bucket_dict["object_count"] = 0
+                bucket_dict["total_size"] = 0
+                bucket_dict["size_display"] = "Unknown"
+
+        return buckets
+
 
 def is_local_file_path(path: str) -> bool:
     """
