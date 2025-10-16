@@ -455,6 +455,7 @@ def delete(
     "--batch-id",
     help="Batch ID to get document IDs from (alternative to --document-ids)",
 )
+@click.option("--force", is_flag=True, help="Skip confirmation prompt")
 @click.option("--monitor", is_flag=True, help="Monitor progress until completion")
 @click.option(
     "--refresh-interval",
@@ -468,6 +469,7 @@ def rerun_inference(
     step: str,
     document_ids: Optional[str],
     batch_id: Optional[str],
+    force: bool,
     monitor: bool,
     refresh_interval: int,
     region: Optional[str],
@@ -556,12 +558,14 @@ def rerun_inference(
         console.print("━" * 60)
         console.print()
 
-        # Confirmation
-        if not click.confirm(
-            f"Reprocess {len(doc_id_list)} documents from {step} step?", default=True
-        ):
-            console.print("[yellow]Rerun cancelled[/yellow]")
-            return
+        # Confirmation unless --force
+        if not force:
+            if not click.confirm(
+                f"Reprocess {len(doc_id_list)} documents from {step} step?",
+                default=True,
+            ):
+                console.print("[yellow]Rerun cancelled[/yellow]")
+                return
 
         # Perform rerun
         console.print()

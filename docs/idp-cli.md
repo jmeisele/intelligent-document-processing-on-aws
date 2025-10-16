@@ -289,6 +289,7 @@ idp-cli rerun-inference [OPTIONS]
 - **Document Source** (choose ONE):
   - `--document-ids`: Comma-separated document IDs
   - `--batch-id`: Batch ID to get all documents from
+- `--force`: Skip confirmation prompt (useful for automation)
 - `--monitor`: Monitor progress until completion
 - `--refresh-interval`: Seconds between status checks (default: 5)
 - `--region`: AWS region (optional)
@@ -312,6 +313,14 @@ idp-cli rerun-inference \
     --stack-name my-stack \
     --step extraction \
     --batch-id cli-batch-20251015-143000 \
+    --monitor
+
+# Automated rerun (skip confirmation - perfect for CI/CD)
+idp-cli rerun-inference \
+    --stack-name my-stack \
+    --step classification \
+    --batch-id test-set \
+    --force \
     --monitor
 ```
 

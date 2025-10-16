@@ -17,7 +17,7 @@ SPDX-License-Identifier: MIT-0
 
 - **IDP CLI - Command Line Interface for Batch Document Processing**
   - Added CLI tool (`idp_cli/`) for programmatic batch document processing and stack management
-  - **Key Features**: Deploy/update/delete CloudFormation stacks, process documents from local directories or S3 URIs, live progress monitoring with rich terminal UI, download processing results locally, validate manifests before processing, generate manifests from directories with automatic baseline matching
+  - **Key Features**: Deploy/update/delete CloudFormation stacks, process and reprocess documents from local directories or S3 URIs, live progress monitoring with rich terminal UI, download processing results locally, validate manifests before processing, generate manifests from directories with automatic baseline matching
   - **Stack Lifecycle Management**: Complete stack management including deletion with safety confirmations, bucket analysis, and automatic cleanup options
   - **Selective Reprocessing**: New `rerun-inference` command to reprocess documents from specific pipeline steps (classification or extraction) while leveraging existing OCR data for cost/time optimization
   - **Evaluation Framework**: Workflow for accuracy testing including initial processing, manual validation, baseline creation, and automated evaluation with detailed metrics
