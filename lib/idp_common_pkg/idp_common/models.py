@@ -197,6 +197,7 @@ class Document:
     # Processing metadata
     metering: Dict[str, Any] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    trace_id: Optional[str] = None
     evaluation_status: Optional[str] = None
     evaluation_report_uri: Optional[str] = None
     evaluation_results_uri: Optional[str] = None
@@ -228,6 +229,7 @@ class Document:
             "evaluation_results_uri": self.evaluation_results_uri,
             "errors": self.errors,
             "metering": self.metering,
+            "trace_id": self.trace_id,
             # We don't include evaluation_result or summarization_result in the dict since they're objects
         }
 
@@ -288,6 +290,7 @@ class Document:
             evaluation_results_uri=data.get("evaluation_results_uri"),
             summary_report_uri=data.get("summary_report_uri"),
             metering=data.get("metering", {}),
+            trace_id=data.get("trace_id"),
             errors=data.get("errors", []),
         )
 

@@ -2422,7 +2422,6 @@ Resources:
       RedrivePolicy:
         maxReceiveCount: 1000 # should retry up to 8hrs (1000 * 30 sec visibility) before moving to DLQ
         deadLetterTargetArn: !GetAtt DocumentQueueDLQ.Arn
-      TracingConfig: Active
 
   DocumentQueuePolicy:
     Type: AWS::SQS::QueuePolicy
