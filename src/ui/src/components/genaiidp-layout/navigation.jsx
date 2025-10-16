@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { React } from 'react';
-import { Route, Switch, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { SideNavigation } from '@cloudscape-design/components';
 import useSettingsContext from '../../contexts/settings';
 
@@ -128,16 +128,12 @@ const Navigation = ({
   }
 
   return (
-    <Switch>
-      <Route path={DOCUMENTS_PATH}>
-        <SideNavigation
-          items={navigationItems}
-          header={header || documentsNavHeader}
-          activeHref={activeHref}
-          onFollow={onFollowHandler}
-        />
-      </Route>
-    </Switch>
+    <SideNavigation
+      items={navigationItems}
+      header={header || documentsNavHeader}
+      activeHref={activeHref}
+      onFollow={onFollowHandler}
+    />
   );
 };
 

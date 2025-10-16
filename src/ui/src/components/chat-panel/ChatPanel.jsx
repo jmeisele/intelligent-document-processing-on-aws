@@ -3,11 +3,14 @@
 
 /* eslint-disable react/prop-types */
 import React, { useState, useRef } from 'react';
-import { API, Logger } from 'aws-amplify';
+import { generateClient } from 'aws-amplify/api';
+import { ConsoleLogger } from 'aws-amplify/utils';
 import { Button, Container, SpaceBetween, FormField, Alert } from '@cloudscape-design/components';
+
 import chatWithDocument from '../../graphql/queries/chatWithDocument';
 import './ChatPanel.css';
 
+const client = generateClient();
 const logger = new ConsoleLogger('chatWithDocument');
 
 const getChatResponse = async (s3Uri, prompt, history) => {
@@ -17,7 +20,7 @@ const getChatResponse = async (s3Uri, prompt, history) => {
   // logger.debug('modelId:', modelId);
   const modelId = 'us.amazon.nova-pro-v1:0';
   const strHistory = JSON.stringify(history);
-  const response = await API.graphql({
+  const response = await client.graphql({
     query: chatWithDocument,
     variables: { s3Uri, prompt, history: strHistory, modelId },
   });

@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React, { useState } from 'react';
-import { Switch, Route, useRouteMatch } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { AppLayout, Flashbar } from '@cloudscape-design/components';
 
 import { ConsoleLogger } from 'aws-amplify/utils';
@@ -27,7 +27,6 @@ import SplitPanel from './documents-split-panel';
 import ConfigurationLayout from '../configuration-layout';
 
 import { DOCUMENT_LIST_SHARDS_PER_DAY, PERIODS_TO_LOAD_STORAGE_KEY } from '../document-list/documents-table-config';
-import { UPLOAD_DOCUMENT_PATH, DISCOVERY_PATH } from '../../routes/constants';
 
 import useAppContext from '../../contexts/app';
 
@@ -35,9 +34,6 @@ const logger = new ConsoleLogger('GenAIIDPLayout');
 
 const GenAIIDPLayout = () => {
   const { navigationOpen, setNavigationOpen } = useAppContext();
-
-  const { path } = useRouteMatch();
-  logger.debug('path', path);
 
   const notifications = useNotifications();
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -115,29 +111,15 @@ const GenAIIDPLayout = () => {
         onSplitPanelResize={onSplitPanelResize}
         splitPanel={<SplitPanel />}
         content={
-          <Switch>
-            <Route exact path={path}>
-              <DocumentList />
-            </Route>
-            <Route path={`${path}/query`}>
-              <DocumentsQueryLayout />
-            </Route>
-            <Route path={`${path}/agents`}>
-              <DocumentsAgentsLayout />
-            </Route>
-            <Route path={`${path}/config`}>
-              <ConfigurationLayout />
-            </Route>
-            <Route path={UPLOAD_DOCUMENT_PATH}>
-              <UploadDocumentPanel />
-            </Route>
-            <Route path={DISCOVERY_PATH}>
-              <DiscoveryPanel />
-            </Route>
-            <Route path={`${path}/:objectKey`}>
-              <DocumentDetails />
-            </Route>
-          </Switch>
+          <Routes>
+            <Route index element={<DocumentList />} />
+            <Route path="query" element={<DocumentsQueryLayout />} />
+            <Route path="agents" element={<DocumentsAgentsLayout />} />
+            <Route path="config" element={<ConfigurationLayout />} />
+            <Route path="upload" element={<UploadDocumentPanel />} />
+            <Route path="discovery" element={<DiscoveryPanel />} />
+            <Route path=":objectKey" element={<DocumentDetails />} />
+          </Routes>
         }
         ariaLabels={appLayoutLabels}
       />

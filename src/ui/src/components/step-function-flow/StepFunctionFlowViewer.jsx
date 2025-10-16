@@ -4,8 +4,17 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { API, graphqlOperation, Logger } from 'aws-amplify';
-import { Container, Header, SpaceBetween, Box, Alert, Spinner, Button, Modal, Badge } from '@cloudscape-design/components';
+import {
+  Container,
+  Header,
+  SpaceBetween,
+  Box,
+  Alert,
+  Spinner,
+  Button,
+  Modal,
+  Badge,
+} from '@cloudscape-design/components';
 import {
   FaPlay,
   FaCheck,
@@ -19,11 +28,16 @@ import {
   FaList,
   FaExclamationTriangle,
 } from 'react-icons/fa';
+import { generateClient } from 'aws-amplify/api';
+import { ConsoleLogger } from 'aws-amplify/utils';
+
 import getStepFunctionExecution from '../../graphql/queries/getStepFunctionExecution';
 import FlowDiagram from './FlowDiagram';
 import StepDetails from './StepDetails';
+
 import './StepFunctionFlowViewer.css';
 
+const client = generateClient();
 const logger = new ConsoleLogger('StepFunctionFlowViewer');
 
 const StepFunctionFlowViewer = ({ executionArn, visible, onDismiss }) => {
@@ -83,7 +97,7 @@ const StepFunctionFlowViewer = ({ executionArn, visible, onDismiss }) => {
       logger.info('Fetching Step Function execution with ARN:', executionArn);
       console.log('Fetching Step Function execution with ARN:', executionArn);
 
-      const result = await API.graphql(graphqlOperation(getStepFunctionExecution, { executionArn }));
+      const result = await client.graphql({ query: getStepFunctionExecution, variables: { executionArn } });
       logger.info('GraphQL response received:', result);
       console.log('GraphQL response received:', result);
 

@@ -759,7 +759,6 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
                   toggleExpand();
                 }}
                 ariaLabel={isExpanded ? 'Collapse section' : 'Expand section'}
-                style={{ margin: '0', padding: '0', display: 'inline-flex' }}
                 className="awsui-button-icon"
               />
               <Box fontWeight="bold" fontSize="body-m" marginLeft="xxs" display="inline-block">
@@ -870,7 +869,6 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
                 toggleListExpand();
               }}
               ariaLabel={isListExpanded ? 'Collapse list' : 'Expand list'}
-              style={{ margin: '0', padding: '0', display: 'inline-flex' }}
               className="awsui-button-icon"
             />
             <Box fontWeight="bold" fontSize="body-m" marginLeft="xxs" display="inline-block">
@@ -934,7 +932,6 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
                           updateValue(path, newValues);
                         }}
                         ariaLabel="Remove item"
-                        style={{ padding: '0', margin: '0 4px 0 0', display: 'inline-flex' }}
                         className="awsui-button-icon"
                       />
 

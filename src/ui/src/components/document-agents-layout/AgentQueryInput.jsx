@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT-0
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { API, Logger } from 'aws-amplify';
+import { generateClient } from 'aws-amplify/api';
+import { ConsoleLogger } from 'aws-amplify/utils';
 import {
   FormField,
   Textarea,
@@ -16,10 +17,13 @@ import {
   Header,
   Link,
 } from '@cloudscape-design/components';
+
 import listAgentJobs from '../../graphql/queries/listAgentJobs';
 import deleteAgentJob from '../../graphql/queries/deleteAgentJob';
 import listAvailableAgents from '../../graphql/queries/listAvailableAgents';
 import { useAnalyticsContext } from '../../contexts/analytics';
+
+const client = generateClient();
 
 // Custom styles for expandable textarea
 const textareaStyles = `
@@ -99,7 +103,7 @@ const AgentQueryInput = ({ onSubmit, isSubmitting, selectedResult }) => {
   const fetchAvailableAgents = async () => {
     try {
       setIsLoadingAgents(true);
-      const response = await API.graphql({
+      const response = await client.graphql({
         query: listAvailableAgents,
       });
 
@@ -131,7 +135,7 @@ const AgentQueryInput = ({ onSubmit, isSubmitting, selectedResult }) => {
 
       let response;
       try {
-        response = await API.graphql({
+        response = await client.graphql({
           query: listAgentJobs,
           variables: { limit: 20 }, // Limit to most recent 20 queries
         });
@@ -361,7 +365,7 @@ const AgentQueryInput = ({ onSubmit, isSubmitting, selectedResult }) => {
                 setIsDeletingJob(true);
 
                 try {
-                  await API.graphql({
+                  await client.graphql({
                     query: deleteAgentJob,
                     variables: {
                       jobId: job.jobId,

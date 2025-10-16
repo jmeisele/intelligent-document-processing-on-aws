@@ -13,9 +13,13 @@ import {
   Alert,
   Input,
 } from '@cloudscape-design/components';
-import { API, graphqlOperation } from 'aws-amplify';
+import { generateClient } from 'aws-amplify/api';
+
 import uploadDocument from '../../graphql/queries/uploadDocument';
+
 import useSettingsContext from '../../contexts/settings';
+
+const client = generateClient();
 
 const UploadDocumentPanel = () => {
   const { settings } = useSettingsContext();
@@ -66,14 +70,15 @@ const UploadDocumentPanel = () => {
           console.log(`Getting upload credentials for ${file.name}...`);
           console.log(`Using prefix: ${prefix || 'none'}`);
 
-          const response = await API.graphql(
-            graphqlOperation(uploadDocument, {
+          const response = await client.graphql({
+            query: uploadDocument,
+            variables: {
               fileName: file.name,
               contentType: file.type,
               prefix: prefix || '', // Use the user-provided prefix or empty string
               bucket: settings.InputBucket, // Explicitly pass the input bucket
-            }),
-          );
+            },
+          });
 
           const { presignedUrl, objectKey, usePostMethod } = response.data.uploadDocument;
 
