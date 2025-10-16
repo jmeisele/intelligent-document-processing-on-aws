@@ -32,7 +32,7 @@ ChartJS.register(
   Filler,
 );
 
-const PlotDisplay = ({ plotData }) => {
+const PlotDisplay = ({ plotData = null }) => {
   // Chart type options for the dropdown
   const chartTypeOptions = [
     { label: 'Bar Chart', value: 'bar' },
@@ -360,10 +360,6 @@ PlotDisplay.propTypes = {
       }),
     }),
   }),
-};
-
-PlotDisplay.defaultProps = {
-  plotData: null,
 };
 
 export default PlotDisplay;

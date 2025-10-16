@@ -6,7 +6,7 @@ import PropTypes from 'prop-types';
 import { Box, SpaceBetween, ExpandableSection, Button, Alert, Container } from '@cloudscape-design/components';
 import './StepDetails.css';
 
-const JsonDisplay = ({ data }) => {
+const JsonDisplay = ({ data = null }) => {
   if (!data) return null;
 
   const formatJson = (jsonString) => {
@@ -48,10 +48,6 @@ const JsonDisplay = ({ data }) => {
 
 JsonDisplay.propTypes = {
   data: PropTypes.oneOfType([PropTypes.string, PropTypes.object, PropTypes.array]),
-};
-
-JsonDisplay.defaultProps = {
-  data: null,
 };
 
 const StepDetails = ({ step, formatDuration, getStepIcon }) => {

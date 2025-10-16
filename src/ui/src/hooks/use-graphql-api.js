@@ -1,22 +1,22 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { useEffect, useState } from 'react';
-import { API, Logger, graphqlOperation } from 'aws-amplify';
+import { generateClient } from 'aws-amplify/api';
+import { ConsoleLogger } from 'aws-amplify/utils';
 
 import useAppContext from '../contexts/app';
-
 import listDocumentsDateShard from '../graphql/queries/listDocumentsDateShard';
 import listDocumentsDateHour from '../graphql/queries/listDocumentsDateHour';
 import getDocument from '../graphql/queries/getDocument';
 import deleteDocument from '../graphql/queries/deleteDocument';
 import reprocessDocument from '../graphql/queries/reprocessDocument';
-
 import onCreateDocument from '../graphql/queries/onCreateDocument';
 import onUpdateDocument from '../graphql/queries/onUpdateDocument';
-
 import { DOCUMENT_LIST_SHARDS_PER_DAY } from '../components/document-list/documents-table-config';
 
-const logger = new Logger('useGraphQlApi');
+const client = generateClient();
+
+const logger = new ConsoleLogger('useGraphQlApi');
 
 const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2 } = {}) => {
   const [periodsToLoad, setPeriodsToLoad] = useState(initialPeriodsToLoad);
@@ -42,7 +42,7 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
     // prettier-ignore
     logger.debug('getDocumentDetailsFromIds', objectKeys);
     const getDocumentPromises = objectKeys.map((objectKey) =>
-      API.graphql({ query: getDocument, variables: { objectKey } }),
+      client.graphql({ query: getDocument, variables: { objectKey } }),
     );
     const getDocumentResolutions = await Promise.allSettled(getDocumentPromises);
     const getDocumentRejected = getDocumentResolutions.filter((r) => r.status === 'rejected');
@@ -59,7 +59,7 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
 
   useEffect(() => {
     logger.debug('onCreateDocument subscription');
-    const subscription = API.graphql(graphqlOperation(onCreateDocument)).subscribe({
+    const subscription = client.graphql({ query: onCreateDocument }).subscribe({
       next: async ({ provider, value }) => {
         logger.debug('document list subscription update', { provider, value });
         const objectKey = value?.data?.onCreateDocument.ObjectKey || '';
@@ -79,7 +79,7 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
 
   useEffect(() => {
     logger.debug('onUpdateDocument subscription');
-    const subscription = API.graphql(graphqlOperation(onUpdateDocument)).subscribe({
+    const subscription = client.graphql({ query: onUpdateDocument }).subscribe({
       next: async ({ provider, value }) => {
         logger.debug('document update', { provider, value });
         const documentUpdateEvent = value?.data?.onUpdateDocument;
@@ -99,7 +99,7 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
   const listDocumentIdsByDateShards = async ({ date, shards }) => {
     const listDocumentsDateShardPromises = shards.map((i) => {
       logger.debug('sending list document date shard', date, i);
-      return API.graphql({ query: listDocumentsDateShard, variables: { date, shard: i } });
+      return client.graphql({ query: listDocumentsDateShard, variables: { date, shard: i } });
     });
     const listDocumentsDateShardResolutions = await Promise.allSettled(listDocumentsDateShardPromises);
 
@@ -119,7 +119,7 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
   const listDocumentIdsByDateHours = async ({ date, hours }) => {
     const listDocumentsDateHourPromises = hours.map((i) => {
       logger.debug('sending list document date hour', date, i);
-      return API.graphql({ query: listDocumentsDateHour, variables: { date, hour: i } });
+      return client.graphql({ query: listDocumentsDateHour, variables: { date, hour: i } });
     });
     const listDocumentsDateHourResolutions = await Promise.allSettled(listDocumentsDateHourPromises);
 
@@ -246,7 +246,7 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
   const deleteDocuments = async (objectKeys) => {
     try {
       logger.debug('Deleting documents', objectKeys);
-      const result = await API.graphql(graphqlOperation(deleteDocument, { objectKeys }));
+      const result = await client.graphql({ query: deleteDocument, variables: { objectKeys } });
       logger.debug('Delete documents result', result);
 
       // Refresh the document list after deletion
@@ -263,7 +263,7 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
   const reprocessDocuments = async (objectKeys) => {
     try {
       logger.debug('Reprocessing documents', objectKeys);
-      const result = await API.graphql(graphqlOperation(reprocessDocument, { objectKeys }));
+      const result = await client.graphql({ query: reprocessDocument, variables: { objectKeys } });
       logger.debug('Reprocess documents result', result);
       // Refresh the document list after reprocessing
       setIsDocumentsListLoading(true);

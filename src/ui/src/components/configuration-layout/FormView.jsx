@@ -171,7 +171,7 @@ const getConstraintText = (property) => {
 };
 
 // Resizable Columns Component
-const ResizableColumns = ({ columns, children, columnSpacing = '8px' }) => {
+const ResizableColumns = ({ columns, children = null, columnSpacing = '8px' }) => {
   const [columnWidths, setColumnWidths] = useState([]);
   const containerRef = useRef(null);
   const resizingRef = useRef(null);
@@ -326,12 +326,7 @@ ResizableColumns.propTypes = {
   columnSpacing: PropTypes.string,
 };
 
-ResizableColumns.defaultProps = {
-  children: null,
-  columnSpacing: '8px',
-};
-
-const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDefault, onChange }) => {
+const FormView = ({ schema = { properties: {} }, formValues = {}, defaultConfig = null, isCustomized = null, onResetToDefault = null, onChange }) => {
   // Track expanded state for all list items across the form - default to collapsed
   const [expandedItems, setExpandedItems] = useState({});
 
@@ -1558,14 +1553,6 @@ FormView.propTypes = {
   isCustomized: PropTypes.func,
   onResetToDefault: PropTypes.func,
   onChange: PropTypes.func.isRequired,
-};
-
-FormView.defaultProps = {
-  schema: { properties: {} },
-  formValues: {},
-  defaultConfig: null,
-  isCustomized: null,
-  onResetToDefault: null,
 };
 
 export default FormView;

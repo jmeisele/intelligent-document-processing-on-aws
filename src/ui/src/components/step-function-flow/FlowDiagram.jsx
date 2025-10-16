@@ -6,7 +6,7 @@ import PropTypes from 'prop-types';
 import { Box, Badge } from '@cloudscape-design/components';
 import './FlowDiagram.css';
 
-const FlowDiagram = ({ steps, onStepClick, selectedStep, getStepIcon }) => {
+const FlowDiagram = ({ steps = [], onStepClick, selectedStep = null, getStepIcon }) => {
   if (!steps || steps.length === 0) {
     return (
       <Box textAlign="center" padding="xl">
@@ -209,11 +209,6 @@ FlowDiagram.propTypes = {
     name: PropTypes.string,
   }),
   getStepIcon: PropTypes.func.isRequired,
-};
-
-FlowDiagram.defaultProps = {
-  steps: [],
-  selectedStep: null,
 };
 
 export default FlowDiagram;

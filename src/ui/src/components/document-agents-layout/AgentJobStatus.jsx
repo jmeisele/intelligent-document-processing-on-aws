@@ -19,7 +19,7 @@ const getStatusIndicator = (status) => {
   }
 };
 
-const AgentJobStatus = ({ jobId, status, error }) => {
+const AgentJobStatus = ({ jobId = null, status = null, error = null }) => {
   // Show error even if there's no jobId (for validation errors)
   if (error && !jobId) {
     return (
@@ -53,12 +53,6 @@ AgentJobStatus.propTypes = {
   jobId: PropTypes.string,
   status: PropTypes.string,
   error: PropTypes.string,
-};
-
-AgentJobStatus.defaultProps = {
-  jobId: null,
-  status: null,
-  error: null,
 };
 
 export default AgentJobStatus;

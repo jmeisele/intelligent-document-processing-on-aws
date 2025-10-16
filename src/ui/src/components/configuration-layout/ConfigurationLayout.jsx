@@ -913,11 +913,13 @@ const ConfigurationLayout = () => {
     return (
       <Container header={<Header variant="h2">Configuration</Header>}>
         <Alert type="error" header="Error loading configuration">
-          <SpaceBetween direction="vertical" size="s">
-            <Box>{error}</Box>
-            <Button onClick={fetchConfiguration} variant="primary">
-              Retry
-            </Button>
+          <SpaceBetween size="s">
+            <div>{error}</div>
+            <Box>
+              <Button onClick={fetchConfiguration} variant="primary">
+                Retry
+              </Button>
+            </Box>
           </SpaceBetween>
         </Alert>
       </Container>
@@ -928,11 +930,13 @@ const ConfigurationLayout = () => {
     return (
       <Container header={<Header variant="h2">Configuration</Header>}>
         <Alert type="error" header="Configuration not available">
-          <SpaceBetween direction="vertical" size="s">
-            <Box>Unable to load configuration schema or values.</Box>
-            <Button onClick={fetchConfiguration} variant="primary">
-              Retry
-            </Button>
+          <SpaceBetween size="s">
+            <div>Unable to load configuration schema or values.</div>
+            <Box>
+              <Button onClick={fetchConfiguration} variant="primary">
+                Retry
+              </Button>
+            </Box>
           </SpaceBetween>
         </Alert>
       </Container>

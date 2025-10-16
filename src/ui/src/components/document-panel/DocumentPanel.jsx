@@ -14,7 +14,7 @@ import {
   ExpandableSection,
   StatusIndicator,
 } from '@cloudscape-design/components';
-import { Logger } from 'aws-amplify';
+import { ConsoleLogger } from 'aws-amplify/utils';
 import './DocumentPanel.css';
 import DocumentViewers from '../document-viewers/DocumentViewers';
 import SectionsPanel from '../sections-panel';
@@ -28,7 +28,7 @@ import TroubleshootModal from './TroubleshootModal';
 // Uncomment the line below to enable debugging
 // import { debugDocumentStructure } from '../common/debug-utils';
 
-const logger = new Logger('DocumentPanel');
+const logger = new ConsoleLogger('DocumentPanel');
 
 // Component to display confidence alerts count only
 const ConfidenceAlertsSection = ({ sections, mergedConfig }) => {

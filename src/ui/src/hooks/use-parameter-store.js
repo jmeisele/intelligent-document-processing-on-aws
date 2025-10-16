@@ -27,9 +27,9 @@ const useParameterStore = (creds) => {
     setSettings(idpSettings);
   };
 
-  useEffect(async () => {
+  useEffect(() => {
     refreshSettings(creds);
-  }, []);
+  }, [creds]);
 
   return settings;
 };

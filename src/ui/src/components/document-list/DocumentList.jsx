@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Pagination, TextFilter } from '@cloudscape-design/components';
 import { useCollection } from '@cloudscape-design/collection-hooks';
-import { Logger } from 'aws-amplify';
+import { ConsoleLogger } from 'aws-amplify/utils';
 
 import useDocumentsContext from '../../contexts/documents';
 import useSettingsContext from '../../contexts/settings';
@@ -29,7 +29,7 @@ import { getFilterCounterText, TableEmptyState, TableNoMatchState } from '../com
 
 import '@cloudscape-design/global-styles/index.css';
 
-const logger = new Logger('DocumentList');
+const logger = new ConsoleLogger('DocumentList');
 
 const DocumentList = () => {
   const [documentList, setDocumentList] = useState([]);

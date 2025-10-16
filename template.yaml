@@ -92,7 +92,7 @@ Parameters:
     Description: >-
       S3 URI pointing to your custom configuration YAML file. When provided, this configuration overrides the selected pattern preset and applies to all processing patterns. 
       Leave blank to use the selected pattern configuration preset. For example s3://my-bucket/custom-config/config.yaml
-    AllowedPattern: '^(|s3://[a-zA-Z0-9.\\-_]+(/.*)?)$'
+    AllowedPattern: '^(|s3://.*)$'
     ConstraintDescription: Must be empty or a valid S3 URI (e.g., s3://my-bucket/custom-config/config.yaml)
 
   # Pattern 1 Parameters
