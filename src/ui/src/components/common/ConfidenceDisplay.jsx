@@ -13,7 +13,7 @@ import { Box, Badge } from '@cloudscape-design/components';
  * @param {boolean} props.showThreshold - Whether to show the threshold value
  * @returns {JSX.Element} Confidence display component
  */
-const ConfidenceDisplay = ({ confidenceInfo, variant = 'detailed', showThreshold = true }) => {
+const ConfidenceDisplay = ({ confidenceInfo = null, variant = 'detailed', showThreshold = true }) => {
   if (!confidenceInfo || !confidenceInfo.hasConfidenceInfo) {
     return null;
   }
@@ -100,12 +100,6 @@ ConfidenceDisplay.propTypes = {
   }),
   variant: PropTypes.oneOf(['inline', 'badge', 'detailed']),
   showThreshold: PropTypes.bool,
-};
-
-ConfidenceDisplay.defaultProps = {
-  confidenceInfo: null,
-  variant: 'detailed',
-  showThreshold: true,
 };
 
 export default ConfidenceDisplay;

@@ -17,7 +17,7 @@ import AgentMessagesDisplay from '../document-agents-layout/AgentMessagesDisplay
 const client = generateClient();
 const logger = new ConsoleLogger('TroubleshootModal');
 
-const TroubleshootModal = ({ visible, onDismiss, documentItem, existingJob, onJobUpdate }) => {
+const TroubleshootModal = ({ visible, onDismiss, documentItem = null, existingJob = null, onJobUpdate = null }) => {
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   const [jobResult, setJobResult] = useState(null);
@@ -325,12 +325,6 @@ TroubleshootModal.propTypes = {
     documentKey: PropTypes.string,
   }),
   onJobUpdate: PropTypes.func,
-};
-
-TroubleshootModal.defaultProps = {
-  documentItem: null,
-  existingJob: null,
-  onJobUpdate: null,
 };
 
 export default TroubleshootModal;

@@ -11,7 +11,7 @@ import TextDisplay from './TextDisplay';
 
 const logger = new ConsoleLogger('AgentResultDisplay');
 
-const AgentResultDisplay = ({ result, query }) => {
+const AgentResultDisplay = ({ result = null, query = '' }) => {
   if (!result) {
     return null;
   }
@@ -139,11 +139,6 @@ AgentResultDisplay.propTypes = {
     PropTypes.object, // For parsed objects
   ]),
   query: PropTypes.string,
-};
-
-AgentResultDisplay.defaultProps = {
-  result: null,
-  query: '',
 };
 
 export default AgentResultDisplay;

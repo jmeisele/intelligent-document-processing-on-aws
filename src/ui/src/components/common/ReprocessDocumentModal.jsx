@@ -63,8 +63,6 @@ ReprocessDocumentModal.propTypes = {
   ),
 };
 
-ReprocessDocumentModal.defaultProps = {
-  selectedItems: [],
-};
+
 
 export default ReprocessDocumentModal;

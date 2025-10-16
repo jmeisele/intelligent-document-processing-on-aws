@@ -36,7 +36,7 @@ const textareaStyles = `
 
 const logger = new ConsoleLogger('AgentQueryInput');
 
-const AgentQueryInput = ({ onSubmit, isSubmitting, selectedResult }) => {
+const AgentQueryInput = ({ onSubmit, isSubmitting = false, selectedResult = null }) => {
   const { analyticsState, updateAnalyticsState, resetAnalyticsState } = useAnalyticsContext();
   const { currentInputText } = analyticsState;
 
@@ -665,11 +665,6 @@ AgentQueryInput.propTypes = {
     query: PropTypes.string,
     jobId: PropTypes.string,
   }),
-};
-
-AgentQueryInput.defaultProps = {
-  isSubmitting: false,
-  selectedResult: null,
 };
 
 export default AgentQueryInput;

@@ -47,7 +47,7 @@ const SignOutModal = ({ visible, setVisible }) => {
 
 const GenAIIDPTopNavigation = () => {
   const { user } = useAppContext();
-  const userId = user?.attributes?.email || 'user';
+  const userId = user?.username || 'user';
   const [isSignOutModalVisible, setIsSignOutModalVisiblesetVisible] = useState(false);
   return (
     <>
