@@ -12,7 +12,7 @@ import {
   FormField,
   Input,
   Checkbox,
-} from '@awsui/components-react';
+} from '@cloudscape-design/components';
 import { API, Logger } from 'aws-amplify';
 import { Editor } from '@monaco-editor/react';
 import getFileContents from '../../graphql/queries/getFileContents';
@@ -21,7 +21,7 @@ import { getFieldHighlightInfo, getFieldConfidenceInfo } from '../common/confide
 // Lazy load VisualEditorModal for better performance
 const VisualEditorModal = React.lazy(() => import('./VisualEditorModal'));
 
-const logger = new Logger('FileEditor');
+const logger = new ConsoleLogger('FileEditor');
 
 const EDITOR_DEFAULT_HEIGHT = '600px';
 

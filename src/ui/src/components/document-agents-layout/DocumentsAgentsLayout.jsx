@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 import React, { useEffect } from 'react';
 import { API, Logger } from 'aws-amplify';
-import { Container, Header, SpaceBetween, Spinner, Box } from '@awsui/components-react';
+import { Container, Header, SpaceBetween, Spinner, Box } from '@cloudscape-design/components';
 
 import submitAgentQuery from '../../graphql/queries/submitAgentQuery';
 import getAgentJobStatus from '../../graphql/queries/getAgentJobStatus';
@@ -14,7 +14,7 @@ import AgentJobStatus from './AgentJobStatus';
 import AgentResultDisplay from './AgentResultDisplay';
 import AgentMessagesDisplay from './AgentMessagesDisplay';
 
-const logger = new Logger('DocumentsAgentsLayout');
+const logger = new ConsoleLogger('DocumentsAgentsLayout');
 
 const DocumentsAgentsLayout = () => {
   const { analyticsState, updateAnalyticsState } = useAnalyticsContext();

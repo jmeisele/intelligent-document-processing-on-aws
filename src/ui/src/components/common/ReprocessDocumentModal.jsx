@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Box, Modal, SpaceBetween, Button } from '@awsui/components-react';
-import { Logger } from 'aws-amplify';
+import { Box, Modal, SpaceBetween, Button } from '@cloudscape-design/components';
+import { ConsoleLogger } from 'aws-amplify/utils';
 
-const logger = new Logger('ReprocessDocumentModal');
+const logger = new ConsoleLogger('ReprocessDocumentModal');
 
 const ReprocessDocumentModal = ({ visible, onDismiss, onConfirm, selectedItems = [] }) => {
   let title = 'Reprocess document';

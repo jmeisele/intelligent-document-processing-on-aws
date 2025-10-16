@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { React } from 'react';
 import { Route, Switch, useLocation } from 'react-router-dom';
-import { SideNavigation } from '@awsui/components-react';
+import { SideNavigation } from '@cloudscape-design/components';
 import useSettingsContext from '../../contexts/settings';
 
 import {

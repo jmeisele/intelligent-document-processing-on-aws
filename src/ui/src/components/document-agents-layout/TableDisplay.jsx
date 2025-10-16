@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Table, Box, Container, Header, Pagination, CollectionPreferences } from '@awsui/components-react';
+import { Table, Box, Container, Header, Pagination, CollectionPreferences } from '@cloudscape-design/components';
 
 const TableDisplay = ({ tableData }) => {
   const [preferences, setPreferences] = useState({

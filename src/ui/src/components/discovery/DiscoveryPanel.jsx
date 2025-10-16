@@ -19,7 +19,7 @@ import {
   Box,
   TextContent,
   ColumnLayout,
-} from '@awsui/components-react';
+} from '@cloudscape-design/components';
 import { API, graphqlOperation } from 'aws-amplify';
 import uploadDiscoveryDocument from '../../graphql/queries/uploadDiscoveryDocument';
 import listDiscoveryJobs from '../../graphql/queries/listDiscoveryJobs';

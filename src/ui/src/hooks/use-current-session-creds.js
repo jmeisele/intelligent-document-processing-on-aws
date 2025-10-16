@@ -7,7 +7,7 @@ import { useAuthenticator } from '@aws-amplify/ui-react';
 
 const DEFAULT_CREDS_REFRESH_INTERVAL_IN_MS = 60 * 15 * 1000;
 
-const logger = new Logger('useCurrentSessionCreds');
+const logger = new ConsoleLogger('useCurrentSessionCreds');
 
 const useCurrentSessionCreds = ({ credsIntervalInMs = DEFAULT_CREDS_REFRESH_INTERVAL_IN_MS }) => {
   const { authStatus } = useAuthenticator((context) => [context.authStatus]);

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import React, { useState } from 'react';
 import { Switch, Route, useRouteMatch } from 'react-router-dom';
-import { AppLayout, Flashbar } from '@awsui/components-react';
+import { AppLayout, Flashbar } from '@cloudscape-design/components';
 
-import { Logger } from 'aws-amplify';
+import { ConsoleLogger } from 'aws-amplify/utils';
 
 import { DocumentsContext } from '../../contexts/documents';
 
@@ -31,7 +31,7 @@ import { UPLOAD_DOCUMENT_PATH, DISCOVERY_PATH } from '../../routes/constants';
 
 import useAppContext from '../../contexts/app';
 
-const logger = new Logger('GenAIIDPLayout');
+const logger = new ConsoleLogger('GenAIIDPLayout');
 
 const GenAIIDPLayout = () => {
   const { navigationOpen, setNavigationOpen } = useAppContext();

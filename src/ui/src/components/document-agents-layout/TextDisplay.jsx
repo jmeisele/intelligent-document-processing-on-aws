@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Box, Container, Header } from '@awsui/components-react';
+import { Box, Container, Header } from '@cloudscape-design/components';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';

@@ -6,7 +6,7 @@ import { API, graphqlOperation, Logger } from 'aws-amplify';
 import getConfigurationQuery from '../graphql/queries/getConfiguration';
 import updateConfigurationMutation from '../graphql/queries/updateConfiguration';
 
-const logger = new Logger('useConfiguration');
+const logger = new ConsoleLogger('useConfiguration');
 
 // Utility function to normalize boolean values from strings
 const normalizeBooleans = (obj, schema) => {

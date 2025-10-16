@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: MIT-0
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Box, Container, Header, SpaceBetween, Alert } from '@awsui/components-react';
-import { Logger } from 'aws-amplify';
+import { Box, Container, Header, SpaceBetween, Alert } from '@cloudscape-design/components';
+import { ConsoleLogger } from 'aws-amplify/utils';
 
 import PlotDisplay from './PlotDisplay';
 import TableDisplay from './TableDisplay';
 import TextDisplay from './TextDisplay';
 
-const logger = new Logger('AgentResultDisplay');
+const logger = new ConsoleLogger('AgentResultDisplay');
 
 const AgentResultDisplay = ({ result, query }) => {
   if (!result) {

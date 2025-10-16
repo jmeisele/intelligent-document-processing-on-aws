@@ -3,7 +3,7 @@
 
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Box, Badge } from '@awsui/components-react';
+import { Box, Badge } from '@cloudscape-design/components';
 import './FlowDiagram.css';
 
 const FlowDiagram = ({ steps, onStepClick, selectedStep, getStepIcon }) => {

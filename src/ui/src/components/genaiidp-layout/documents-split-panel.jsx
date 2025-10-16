@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
 import { Route, Switch, useRouteMatch } from 'react-router-dom';
-import { Logger } from 'aws-amplify';
+import { ConsoleLogger } from 'aws-amplify/utils';
 
 import { DOCUMENTS_PATH } from '../../routes/constants';
 
 import DocumentListSplitPanel from '../document-list/DocumentListSplitPanel';
 
-const logger = new Logger('CallsSplitPanel');
+const logger = new ConsoleLogger('CallsSplitPanel');
 
 const CallsSplitPanel = () => {
   const { path } = useRouteMatch();

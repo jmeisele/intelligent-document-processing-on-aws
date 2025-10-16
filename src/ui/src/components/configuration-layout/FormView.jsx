@@ -17,7 +17,7 @@ import {
   Header,
   Container,
   Modal,
-} from '@awsui/components-react';
+} from '@cloudscape-design/components';
 
 // Add custom styles for compact form layout
 const customStyles = `

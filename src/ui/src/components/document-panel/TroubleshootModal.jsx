@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { API, Logger } from 'aws-amplify';
-import { Modal, Box, SpaceBetween, Button, Spinner, Alert, Header } from '@awsui/components-react';
+import { Modal, Box, SpaceBetween, Button, Spinner, Alert, Header } from '@cloudscape-design/components';
 
 import submitAgentQuery from '../../graphql/queries/submitAgentQuery';
 import getAgentJobStatus from '../../graphql/queries/getAgentJobStatus';
@@ -13,7 +13,7 @@ import listAvailableAgents from '../../graphql/queries/listAvailableAgents';
 import AgentResultDisplay from '../document-agents-layout/AgentResultDisplay';
 import AgentMessagesDisplay from '../document-agents-layout/AgentMessagesDisplay';
 
-const logger = new Logger('TroubleshootModal');
+const logger = new ConsoleLogger('TroubleshootModal');
 
 const TroubleshootModal = ({ visible, onDismiss, documentItem, existingJob, onJobUpdate }) => {
   const [jobId, setJobId] = useState(null);

@@ -16,7 +16,7 @@ import {
   FormField,
   Input,
   RadioGroup,
-} from '@awsui/components-react';
+} from '@cloudscape-design/components';
 import Editor from '@monaco-editor/react';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import yaml from 'js-yaml';

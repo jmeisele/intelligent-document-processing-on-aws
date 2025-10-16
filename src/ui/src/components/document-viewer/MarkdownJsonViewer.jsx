@@ -3,14 +3,14 @@
 
 /* eslint-disable react/prop-types, react/destructuring-assignment, no-nested-ternary, no-use-before-define */
 import React, { useState, useEffect } from 'react';
-import { Box, SpaceBetween, Button, Toggle, Alert, SegmentedControl } from '@awsui/components-react';
+import { Box, SpaceBetween, Button, Toggle, Alert, SegmentedControl } from '@cloudscape-design/components';
 import { API, Logger } from 'aws-amplify';
 import { Editor } from '@monaco-editor/react';
 import getFileContents from '../../graphql/queries/getFileContents';
 import uploadDocument from '../../graphql/queries/uploadDocument';
 import MarkdownViewer from './MarkdownViewer';
 
-const logger = new Logger('MarkdownJsonViewer');
+const logger = new ConsoleLogger('MarkdownJsonViewer');
 
 const EDITOR_DEFAULT_HEIGHT = '600px';
 

@@ -15,7 +15,7 @@ import {
   Modal,
   Header,
   Link,
-} from '@awsui/components-react';
+} from '@cloudscape-design/components';
 import listAgentJobs from '../../graphql/queries/listAgentJobs';
 import deleteAgentJob from '../../graphql/queries/deleteAgentJob';
 import listAvailableAgents from '../../graphql/queries/listAvailableAgents';
@@ -30,7 +30,7 @@ const textareaStyles = `
   }
 `;
 
-const logger = new Logger('AgentQueryInput');
+const logger = new ConsoleLogger('AgentQueryInput');
 
 const AgentQueryInput = ({ onSubmit, isSubmitting, selectedResult }) => {
   const { analyticsState, updateAnalyticsState, resetAnalyticsState } = useAnalyticsContext();

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Modal, Box, SpaceBetween, Button } from '@awsui/components-react';
+import { Modal, Box, SpaceBetween, Button } from '@cloudscape-design/components';
 
 const DeleteDocumentModal = ({ visible, onDismiss, onConfirm, selectedItems }) => {
   const documentCount = selectedItems.length;

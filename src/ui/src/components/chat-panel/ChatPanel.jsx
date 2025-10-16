@@ -4,11 +4,11 @@
 /* eslint-disable react/prop-types */
 import React, { useState, useRef } from 'react';
 import { API, Logger } from 'aws-amplify';
-import { Button, Container, SpaceBetween, FormField, Alert } from '@awsui/components-react';
+import { Button, Container, SpaceBetween, FormField, Alert } from '@cloudscape-design/components';
 import chatWithDocument from '../../graphql/queries/chatWithDocument';
 import './ChatPanel.css';
 
-const logger = new Logger('chatWithDocument');
+const logger = new ConsoleLogger('chatWithDocument');
 
 const getChatResponse = async (s3Uri, prompt, history) => {
   logger.debug('s3URI:', s3Uri);

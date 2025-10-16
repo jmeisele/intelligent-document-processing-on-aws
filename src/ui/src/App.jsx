@@ -16,7 +16,7 @@ import Routes from './routes/Routes';
 import './App.css';
 
 Amplify.Logger.LOG_LEVEL = process.env.NODE_ENV === 'development' ? 'DEBUG' : 'WARNING';
-const logger = new Logger('App');
+const logger = new ConsoleLogger('App');
 
 const AppContent = () => {
   const awsConfig = useAwsConfig();

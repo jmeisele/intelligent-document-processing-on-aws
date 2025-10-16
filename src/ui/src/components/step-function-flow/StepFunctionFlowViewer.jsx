@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { API, graphqlOperation, Logger } from 'aws-amplify';
-import { Container, Header, SpaceBetween, Box, Alert, Spinner, Button, Modal, Badge } from '@awsui/components-react';
+import { Container, Header, SpaceBetween, Box, Alert, Spinner, Button, Modal, Badge } from '@cloudscape-design/components';
 import {
   FaPlay,
   FaCheck,
@@ -24,7 +24,7 @@ import FlowDiagram from './FlowDiagram';
 import StepDetails from './StepDetails';
 import './StepFunctionFlowViewer.css';
 
-const logger = new Logger('StepFunctionFlowViewer');
+const logger = new ConsoleLogger('StepFunctionFlowViewer');
 
 const StepFunctionFlowViewer = ({ executionArn, visible, onDismiss }) => {
   const [selectedStep, setSelectedStep] = useState(null);

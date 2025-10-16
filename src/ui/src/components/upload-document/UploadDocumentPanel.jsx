@@ -12,7 +12,7 @@ import {
   StatusIndicator,
   Alert,
   Input,
-} from '@awsui/components-react';
+} from '@cloudscape-design/components';
 import { API, graphqlOperation } from 'aws-amplify';
 import uploadDocument from '../../graphql/queries/uploadDocument';
 import useSettingsContext from '../../contexts/settings';

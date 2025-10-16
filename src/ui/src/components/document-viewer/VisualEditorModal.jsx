@@ -16,13 +16,13 @@ import {
   Header,
   Spinner,
   Button,
-} from '@awsui/components-react';
-import { Logger } from 'aws-amplify';
+} from '@cloudscape-design/components';
+import { ConsoleLogger } from 'aws-amplify/utils';
 import generateS3PresignedUrl from '../common/generate-s3-presigned-url';
 import useAppContext from '../../contexts/app';
 import { getFieldConfidenceInfo } from '../common/confidence-alerts-utils';
 
-const logger = new Logger('VisualEditorModal');
+const logger = new ConsoleLogger('VisualEditorModal');
 
 // Memoized component to render a bounding box on an image
 const BoundingBox = memo(({ box, page, currentPage, imageRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) => {

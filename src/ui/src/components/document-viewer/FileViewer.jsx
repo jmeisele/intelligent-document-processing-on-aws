@@ -3,7 +3,7 @@
 
 /* eslint-disable react/prop-types */
 import React, { useState } from 'react';
-import { Box } from '@awsui/components-react';
+import { Box } from '@cloudscape-design/components';
 import { API, Logger } from 'aws-amplify';
 import DOMPurify from 'dompurify';
 // Note: XLSX and mammoth imports removed since we're using download approach for Excel/Docx files
@@ -12,7 +12,7 @@ import generateS3PresignedUrl from '../common/generate-s3-presigned-url';
 import useAppContext from '../../contexts/app';
 import getFileContents from '../../graphql/queries/getFileContents';
 
-const logger = new Logger('FileViewer');
+const logger = new ConsoleLogger('FileViewer');
 
 // Helper function to create a safe data URL for HTML content
 const createSafeDataUrl = (content, contentType) => {

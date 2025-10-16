@@ -16,7 +16,7 @@ import onUpdateDocument from '../graphql/queries/onUpdateDocument';
 
 import { DOCUMENT_LIST_SHARDS_PER_DAY } from '../components/document-list/documents-table-config';
 
-const logger = new Logger('useGraphQlApi');
+const logger = new ConsoleLogger('useGraphQlApi');
 
 const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2 } = {}) => {
   const [periodsToLoad, setPeriodsToLoad] = useState(initialPeriodsToLoad);
