@@ -336,6 +336,11 @@ idp-cli rerun-inference \
 - Rapid iteration on classification/extraction configurations
 - Perfect for prompt engineering experiments
 
+**Demo:**
+
+https://github.com/user-attachments/assets/28deadbb-378b-42b7-a5e2-f929af9b0e41
+
+
 ---
 
 ### `status`
