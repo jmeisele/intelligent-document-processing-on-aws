@@ -1012,6 +1012,7 @@ def generate_manifest(
     """
     try:
         import csv
+        import os
 
         # Validate mutually exclusive options
         if not directory and not s3_uri:
@@ -1030,7 +1031,6 @@ def generate_manifest(
 
             # Import scan method directly
             import glob as glob_module
-            import os
 
             dir_path = os.path.abspath(directory)
             if recursive:
