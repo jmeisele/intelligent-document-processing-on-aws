@@ -43,8 +43,10 @@ SPDX-License-Identifier: MIT-0
   - Fixed incorrect baseline structure showing flat `.json` files instead of proper directory hierarchy
   - Updated to correct structure: `<document-name>/sections/1/result.json`
   - Reorganized document for better logical flow and user experience
-- **GovCloud Template Generation - Removed GraphQLApi References**
+- **GovCloud Template Generation - Removed GraphQLApi References** - #82
   - Fixed invalid GovCloud template generation where ProcessChanges AppSync resources were not being removed, causing "Fn::GetAtt references undefined resource GraphQLApi" errors
+  - Updated `scripts/generate_govcloud_template.py` to remove all ProcessChanges-related resources and extend AppSync parameter cleanup to all pattern stacks
+  - Fixed InvalidClientTokenId validation error by ensuring CloudFormation client uses the correct region when validating templates (commercial vs GovCloud)
 
 ## [0.3.19]
 

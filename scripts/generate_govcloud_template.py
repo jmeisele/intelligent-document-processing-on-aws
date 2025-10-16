@@ -240,11 +240,11 @@ class GovCloudTemplateGenerator:
         self.logger.info("✅ Publish script completed successfully")
         return True
 
-    def validate_template_via_s3(self, template_url: str) -> bool:
+    def validate_template_via_s3(self, template_url: str, region: str) -> bool:
         """Validate template using CloudFormation API with S3 URL (avoids size limitations)"""
         try:
-            self.logger.info("Performing CloudFormation API validation via S3 URL")
-            cf_client = boto3.client('cloudformation')
+            self.logger.info(f"Performing CloudFormation API validation via S3 URL in region {region}")
+            cf_client = boto3.client('cloudformation', region_name=region)
             
             # Validate template using CloudFormation API with S3 URL
             response = cf_client.validate_template(TemplateURL=template_url)
@@ -1056,7 +1056,7 @@ Examples:
         else:
             # Step 3.5: Validate uploaded GovCloud template using CloudFormation API
             print("🔍 Validating uploaded GovCloud template with CloudFormation API")
-            if not generator.validate_template_via_s3(govcloud_url):
+            if not generator.validate_template_via_s3(govcloud_url, args.region):
                 print("❌ GovCloud template validation failed - template may have issues")
                 # Don't exit - let user decide based on the error details shown
             else:
