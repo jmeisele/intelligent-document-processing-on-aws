@@ -100,6 +100,12 @@ Parameters:
     Type: String
     Description: "Hash token from config library to force updates when config library changes"
 
+  EnableXRayTracing:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Enable X-Ray tracing
+
   PermissionsBoundaryArn:
     Type: String
     Default: ""
@@ -1396,6 +1402,7 @@ Resources:
           - "index.handler"
       Timeout: 900
       MemorySize: 4096
+      Tracing: Active
       Environment:
         Variables:
           METRIC_NAMESPACE: !Ref StackName
@@ -1497,6 +1504,7 @@ Resources:
           - "index.handler"
       Timeout: 900
       MemorySize: 4096
+      Tracing: Active
       Environment:
         Variables:
           METRIC_NAMESPACE: !Ref StackName
@@ -1610,6 +1618,7 @@ Resources:
           - "index.handler"
       Timeout: 900
       MemorySize: 512
+      Tracing: Active
       Environment:
         Variables:
           METRIC_NAMESPACE: !Ref StackName
@@ -1729,6 +1738,7 @@ Resources:
           - "index.handler"
       Timeout: 900
       MemorySize: 512
+      Tracing: Active
       Environment:
         Variables:
           METRIC_NAMESPACE: !Ref StackName
@@ -2300,6 +2310,8 @@ Resources:
         IncludeExecutionData: true
         Destinations:
           - CloudWatchLogsLogGroup: !GetAtt StateMachineLogGroup.Arn
+      Tracing:
+        Enabled: !Ref EnableXRayTracing
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref OCRFunction

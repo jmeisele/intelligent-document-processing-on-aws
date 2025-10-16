@@ -14,7 +14,7 @@ import boto3
 from strands import tool
 
 from ..config import create_error_response, safe_int_conversion
-from .lambda_tools import get_document_context
+from .lambda_tool import lambda_document_context
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +57,19 @@ def search_cloudwatch_logs(
             search_end = datetime.utcnow()
             search_start = search_end - timedelta(hours=hours_back)
 
+        # Use higher limit for error patterns to account for INFO log filtering
+        search_limit = (
+            int(max_events) * 5
+            if filter_pattern
+            in ["[ERROR]", "[WARN]", "ERROR:", "WARN:", "Exception", "Failed"]
+            else int(max_events)
+        )
+
         params = {
             "logGroupName": log_group_name,
             "startTime": int(search_start.timestamp() * 1000),
             "endTime": int(search_end.timestamp() * 1000),
-            "limit": int(max_events),
+            "limit": search_limit,
         }
 
         if filter_pattern:
@@ -71,15 +79,40 @@ def search_cloudwatch_logs(
 
         events = []
         for event in response.get("events", []):
+            message = event["message"]
+
+            # Filter out non-error logs when searching for error patterns
+            if filter_pattern in [
+                "[ERROR]",
+                "[WARN]",
+                "ERROR:",
+                "WARN:",
+                "Exception",
+                "Failed",
+            ]:
+                # Skip INFO logs
+                if message.strip().startswith("[INFO]"):
+                    continue
+                # Skip Lambda system logs
+                if any(
+                    message.strip().startswith(prefix)
+                    for prefix in ["INIT_START", "START", "END", "REPORT"]
+                ):
+                    continue
+
             events.append(
                 {
                     "timestamp": datetime.fromtimestamp(
                         event["timestamp"] / 1000
                     ).isoformat(),
-                    "message": event["message"],
+                    "message": message,
                     "log_stream": event.get("logStreamName", ""),
                 }
             )
+
+            # Stop when we have enough actual error events
+            if len(events) >= max_events:
+                break
 
         return {
             "log_group": log_group_name,
@@ -225,7 +258,7 @@ def get_log_group_prefix(stack_name: str) -> Dict[str, Any]:
 
 
 @tool
-def search_document_logs(
+def cloudwatch_document_logs(
     document_id: str,
     stack_name: str,
     filter_pattern: str = "ERROR",
@@ -252,7 +285,7 @@ def search_document_logs(
         max_log_events = safe_int_conversion(max_log_events, 10)
         max_log_groups = safe_int_conversion(max_log_groups, 20)
         # Get document execution context
-        context = get_document_context(document_id, stack_name)
+        context = lambda_document_context(document_id, stack_name)
 
         if not context.get("document_found"):
             return {
@@ -285,26 +318,27 @@ def search_document_logs(
         start_time = context.get("processing_start_time")
         end_time = context.get("processing_end_time")
 
-        # Build filter patterns for document-specific search
-        search_patterns = [filter_pattern]
+        # Build filter patterns for document-specific search with priority order
+        # Priority 1: Actual error level patterns
+        error_patterns = ["[ERROR]", "[WARN]", "ERROR:", "WARN:", "Exception", "Failed"]
 
-        # Add execution ARN as filter if available
+        # Priority 2: Execution context patterns
+        context_patterns = []
         execution_arn = context.get("execution_arn")
         if execution_arn:
-            # Extract execution name from ARN for filtering
             execution_name = execution_arn.split(":")[-1]
-            search_patterns.append(execution_name)
+            context_patterns.append(execution_name)
 
-        # Add Lambda request IDs as filters
         request_ids = context.get("lambda_request_ids", [])
-        search_patterns.extend(request_ids)
+        context_patterns.extend(request_ids)
 
-        # Add document ID as filter
-        search_patterns.append(document_id)
+        # Combine patterns with error patterns first (higher priority)
+        search_patterns = error_patterns + context_patterns
 
-        # Search logs with multiple patterns
+        # Search logs with multiple patterns, prioritizing error patterns
         all_results = []
         total_events = 0
+        found_actual_errors = False
 
         groups_to_search = log_groups["log_groups"][:max_log_groups]
 
@@ -326,7 +360,7 @@ def search_document_logs(
 
                 if search_result.get("events_found", 0) > 0:
                     logger.info(
-                        f"  Found {search_result['events_found']} events in {log_group_name}"
+                        f"  Found {search_result['events_found']} events in {log_group_name} with pattern '{pattern}'"
                     )
 
                     all_results.append(
@@ -338,10 +372,18 @@ def search_document_logs(
                         }
                     )
                     total_events += search_result["events_found"]
+
+                    # Mark if we found actual error patterns
+                    if pattern in error_patterns:
+                        found_actual_errors = True
                 else:
                     logger.info(
                         f"  No events found in {log_group_name} with pattern '{pattern}'"
                     )
+
+            # If we found actual errors, prioritize them and stop searching context patterns
+            if found_actual_errors and total_events >= max_log_events:
+                break
 
         return {
             "analysis_type": "document_specific",
@@ -365,7 +407,7 @@ def search_document_logs(
 
 
 @tool
-def search_stack_logs(
+def cloudwatch_stack_logs(
     filter_pattern: str = "ERROR",
     hours_back: int = None,
     max_log_events: int = None,

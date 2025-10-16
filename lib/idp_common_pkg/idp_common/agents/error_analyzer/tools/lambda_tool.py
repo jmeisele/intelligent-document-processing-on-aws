@@ -14,7 +14,7 @@ from typing import Any, Dict, List
 import boto3
 from strands import tool
 
-from ..config import create_error_response, create_success_response
+from ..config import create_error_response, create_response
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ def extract_lambda_request_ids(execution_events: List[Dict[str, Any]]) -> List[s
 
 
 @tool
-def get_document_context(document_id: str, stack_name: str = "") -> Dict[str, Any]:
+def lambda_document_context(document_id: str, stack_name: str = "") -> Dict[str, Any]:
     """
     Retrieve comprehensive document processing context via Lambda lookup function.
     Invokes the lookup Lambda function to gather execution context, timing information,
@@ -154,7 +154,7 @@ def get_document_context(document_id: str, stack_name: str = "") -> Dict[str, An
                 timestamps["CompletionTime"].replace("Z", "+00:00")
             )
 
-        return create_success_response(
+        return create_response(
             {
                 "document_found": True,
                 "document_id": document_id,

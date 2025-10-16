@@ -54,6 +54,7 @@ mutation UpdateDocument($input: UpdateDocumentInput!) {
         ExpiresAfter
         HITLStatus
         HITLReviewURL
+        TraceId
     }
 }
 """

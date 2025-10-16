@@ -215,6 +215,13 @@ Parameters:
       Set to true during test cycles to evaluate and compare accuracy for different patterns and prompts for each document.
       If false, evaluation is not automatically attempted for each processed document. Set to false when deployed in production.
 
+  # X-Ray Tracing
+  EnableXRayTracing:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Enable X-Ray tracing
+
   # Optional Knowledge Base Configuration
   DocumentKnowledgeBase:
     Default: "BEDROCK_KNOWLEDGE_BASE (Create)"
@@ -894,6 +901,7 @@ Resources:
                   ConfigPath,
                 ]
         ConfigLibraryHash: "<CONFIG_LIBRARY_HASH_TOKEN>"
+        EnableXRayTracing: !Ref EnableXRayTracing
         PermissionsBoundaryArn: !Ref PermissionsBoundaryArn
         SageMakerA2IReviewPortalURL: !If
           - IsHITLEnabled
@@ -945,6 +953,7 @@ Resources:
           - IsHITLEnabled
           - !GetAtt WorkforceURLResource.PortalURL
           - ""
+        EnableXRayTracing: !Ref EnableXRayTracing
         PermissionsBoundaryArn: !Ref PermissionsBoundaryArn
         ImageVersion: "<LAMBDA_IMAGE_VERSION>"
         ArtifactBucket: "<ARTIFACT_BUCKET_TOKEN>"
@@ -995,6 +1004,7 @@ Resources:
           - IsHITLEnabled
           - !GetAtt WorkforceURLResource.PortalURL
           - ""
+        EnableXRayTracing: !Ref EnableXRayTracing
         PermissionsBoundaryArn: !Ref PermissionsBoundaryArn
 
   ##########################################################################
@@ -2412,6 +2422,7 @@ Resources:
       RedrivePolicy:
         maxReceiveCount: 1000 # should retry up to 8hrs (1000 * 30 sec visibility) before moving to DLQ
         deadLetterTargetArn: !GetAtt DocumentQueueDLQ.Arn
+      TracingConfig: Active
 
   DocumentQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -2481,6 +2492,7 @@ Resources:
       Handler: index.handler
       Runtime: python3.12
       Timeout: 30
+      Tracing: Active
       DeadLetterQueue:
         Type: SQS
         TargetArn: !GetAtt QueueSenderDLQ.Arn
@@ -2554,6 +2566,7 @@ Resources:
       Handler: index.handler
       Runtime: python3.12
       Timeout: 30
+      Tracing: Active
       LoggingConfig:
         LogGroup: !Ref QueueProcessorLogGroup
       Environment:
@@ -3856,6 +3869,12 @@ Resources:
                 - states:GetExecutionHistory
               Resource:
                 - !Sub "arn:${AWS::Partition}:states:${AWS::Region}:${AWS::AccountId}:execution:${AWS::StackName}*"
+            - Effect: Allow
+              Action:
+                - xray:GetTraceSummaries
+                - xray:BatchGetTraces
+                - xray:GetServiceGraph
+              Resource: "*"
 
   AgentProcessorLogGroup:
     Type: AWS::Logs::LogGroup

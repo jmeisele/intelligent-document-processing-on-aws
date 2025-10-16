@@ -13,7 +13,7 @@ from strands import tool
 
 from ..config import (
     create_error_response,
-    create_success_response,
+    create_response,
     get_config_with_fallback,
 )
 
@@ -151,7 +151,7 @@ def _analyze_execution_timeline(events: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 @tool
-def analyze_stepfunction_execution(execution_arn: str) -> Dict[str, Any]:
+def stepfunction_execution_details(execution_arn: str) -> Dict[str, Any]:
     """
     Analyze Step Function execution to identify workflow failures and state transitions.
     Retrieves execution history and performs comprehensive analysis to identify failure points,
@@ -204,7 +204,7 @@ def analyze_stepfunction_execution(execution_arn: str) -> Dict[str, Any]:
             if failure_point.get("details", {}).get("error"):
                 analysis_summary += f": {failure_point['details']['error']}"
 
-        return create_success_response(
+        return create_response(
             {
                 "execution_status": execution_status,
                 "duration_seconds": duration_seconds,

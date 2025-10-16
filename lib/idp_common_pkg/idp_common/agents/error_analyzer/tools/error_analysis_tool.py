@@ -17,8 +17,8 @@ from ..config import (
     get_config_with_fallback,
     safe_int_conversion,
 )
-from .document_analysis_tool import analyze_document_failure
-from .general_analysis_tool import analyze_recent_system_errors
+from .document_analysis_tool import analyze_document_error
+from .general_analysis_tool import analyze_general_errors
 
 logger = logging.getLogger(__name__)
 
@@ -96,12 +96,29 @@ def analyze_errors(query: str, time_range_hours: int = 1) -> Dict[str, Any]:
 
         if intent == "document_specific" and document_id:
             logger.info(f"Document-specific analysis for: {document_id}")
-            return analyze_document_failure(document_id, stack_name, max_log_events)
+            response = analyze_document_error(document_id, stack_name, max_log_events)
         else:
             logger.info(f"General system analysis for query: {query[:50]}...")
-            return analyze_recent_system_errors(
+            response = analyze_general_errors(
                 time_range_hours, stack_name, max_log_events
             )
+
+        # Log context for debugging as single CloudWatch event
+        import json
+
+        context_log = {
+            "event_type": "error_analyzer_context",
+            "query": query,
+            "intent": intent,
+            "document_id": document_id if document_id else None,
+            "context_size_chars": len(json.dumps(response, default=str)),
+            "analysis_context": response,
+        }
+        logger.info(
+            f"CONTEXT: {json.dumps(context_log, separators=(',', ':'), default=str)}"
+        )
+
+        return response
 
     except Exception as e:
         logger.error(f"Error in unified analysis: {e}")

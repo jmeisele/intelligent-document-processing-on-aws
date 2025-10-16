@@ -109,6 +109,12 @@ Parameters:
     Description: "Bedrock model id to use for label extraction"
     Default: "us.amazon.nova-pro-v1:0"
 
+  EnableXRayTracing:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Enable X-Ray tracing
+
   PermissionsBoundaryArn:
     Type: String
     Default: ""
@@ -651,6 +657,8 @@ Resources:
         IncludeExecutionData: true
         Destinations:
           - CloudWatchLogsLogGroup: !GetAtt StateMachineLogGroup.Arn
+      Tracing:
+        Enabled: !Ref EnableXRayTracing
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref InvokeBDAFunction

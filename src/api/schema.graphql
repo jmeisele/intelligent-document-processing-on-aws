@@ -25,6 +25,7 @@ type Document implements DynamoDbBase @aws_cognito_user_pools @aws_iam {
   ExpiresAfter: AWSTimestamp
   HITLStatus: String
   HITLReviewURL: String
+  TraceId: String
 }
 
 type Section @aws_cognito_user_pools @aws_iam {
@@ -92,6 +93,7 @@ input CreateDocumentInput {
   InitialEventTime: AWSDateTime
   QueuedTime: AWSDateTime
   ExpiresAfter: AWSTimestamp
+  TraceId: String
 }
 
 type CreateDocumentOutput @aws_iam {

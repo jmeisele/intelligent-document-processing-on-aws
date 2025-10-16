@@ -143,11 +143,9 @@ def create_error_response(error: str, **kwargs) -> Dict[str, Any]:
     return response
 
 
-def create_success_response(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Creates standardized success response with consistent format."""
-    response = {"success": True}
-    response.update(data)
-    return response
+def create_response(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Creates standardized response with consistent format."""
+    return data
 
 
 def safe_int_conversion(value: Any, default: int = 0) -> int:
