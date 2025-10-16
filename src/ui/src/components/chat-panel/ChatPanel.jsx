@@ -176,7 +176,7 @@ const ChatPanel = (item) => {
             <textarea name="postContent" ref={textareaRef} rows={6} className="chat-textarea" id="chatTextarea" />
           </FormField> */}
 
-          <div style={{ gap: '8px', width: '100%' }}>
+          <SpaceBetween size="m">
             <FormField label="Your message" style={{ flex: 8 }}>
               <input
                 type="text"
@@ -195,7 +195,7 @@ const ChatPanel = (item) => {
             <Button variant="primary" onClick={handlePromptSubmit}>
               Send
             </Button>
-          </div>
+          </SpaceBetween>
 
           {/* <FormField label="Model">
             <select name="model" id="modelSelect" onChange={handleModelIdChange}>
