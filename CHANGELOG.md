@@ -34,7 +34,11 @@ SPDX-License-Identifier: MIT-0
 
 ### Fixed
 - **Discovery function times out when processing large documents.**
-  - increase lambda discovery processor timeout to 900s 
+  - increase lambda discovery processor timeout to 900s
+- **Corrected baseline directory structure documentation in evaluation.md**
+  - Fixed incorrect baseline structure showing flat `.json` files instead of proper directory hierarchy
+  - Updated to correct structure: `<document-name>/sections/1/result.json`
+  - Reorganized document for better logical flow and user experience
 
 ## [0.3.19]
 
