@@ -31,6 +31,12 @@ logger = logging.getLogger(__name__)
 
 console = Console()
 
+# Region-specific template URLs
+TEMPLATE_URLS = {
+    "us-west-2": "https://s3.us-west-2.amazonaws.com/aws-ml-blog-us-west-2/artifacts/genai-idp/idp-main.yaml",
+    "us-east-1": "https://s3.us-east-1.amazonaws.com/aws-ml-blog-us-east-1/artifacts/genai-idp/idp-main.yaml",
+}
+
 
 @click.group()
 @click.version_option(version="1.0.0")
@@ -59,8 +65,7 @@ def cli():
 )
 @click.option(
     "--template-url",
-    default="https://s3.us-west-2.amazonaws.com/aws-ml-blog-us-west-2/artifacts/genai-idp/idp-main.yaml",
-    help="URL to CloudFormation template in S3 (default: public template)",
+    help="URL to CloudFormation template in S3 (default: auto-selected based on region)",
 )
 @click.option(
     "--max-concurrent",
@@ -125,6 +130,30 @@ def deploy(
           --parameters "DataRetentionInDays=90,ErrorThreshold=5"
     """
     try:
+        # Auto-detect region if not provided
+        if not region:
+            import boto3
+
+            session = boto3.session.Session()
+            region = session.region_name
+            if not region:
+                raise ValueError(
+                    "Region could not be determined. Please specify --region or configure AWS_DEFAULT_REGION"
+                )
+
+        # Determine template URL (user-provided takes precedence)
+        if not template_url:
+            if region in TEMPLATE_URLS:
+                template_url = TEMPLATE_URLS[region]
+                console.print(f"[bold]Using template for region: {region}[/bold]")
+            else:
+                supported_regions = ", ".join(TEMPLATE_URLS.keys())
+                raise ValueError(
+                    f"Region '{region}' is not supported. "
+                    f"Supported regions: {supported_regions}. "
+                    f"Please provide --template-url explicitly for other regions."
+                )
+
         # Initialize deployer
         deployer = StackDeployer(region=region)
 
