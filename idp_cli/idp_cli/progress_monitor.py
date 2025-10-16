@@ -19,17 +19,19 @@ logger = logging.getLogger(__name__)
 class ProgressMonitor:
     """Monitors document processing progress"""
 
-    def __init__(self, stack_name: str, resources: Dict[str, str]):
+    def __init__(self, stack_name: str, resources: Dict[str, str], region: str = None):
         """
         Initialize progress monitor
 
         Args:
             stack_name: Name of the CloudFormation stack
             resources: Dictionary of stack resources
+            region: AWS region (optional)
         """
         self.stack_name = stack_name
         self.resources = resources
-        self.lambda_client = boto3.client("lambda")
+        self.region = region
+        self.lambda_client = boto3.client("lambda", region_name=region)
         self.lookup_function = resources.get("LookupFunctionName", "")
 
         # Track finished documents to avoid redundant queries

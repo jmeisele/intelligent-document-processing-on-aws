@@ -854,7 +854,7 @@ def status(
         else:
             # Show current status once
             monitor = ProgressMonitor(
-                stack_name=stack_name, resources=processor.resources
+                stack_name=stack_name, resources=processor.resources, region=region
             )
             status_data = monitor.get_batch_status(document_ids)
             stats = monitor.calculate_statistics(status_data)
@@ -1255,7 +1255,7 @@ def _monitor_progress(
         region: AWS region
         resources: Stack resources dictionary
     """
-    monitor = ProgressMonitor(stack_name=stack_name, resources=resources)
+    monitor = ProgressMonitor(stack_name=stack_name, resources=resources, region=region)
 
     display.show_monitoring_header(batch_id)
 
