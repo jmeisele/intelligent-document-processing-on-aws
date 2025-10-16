@@ -7,6 +7,10 @@ SPDX-License-Identifier: MIT-0
 
 ### Added
 
+### Fixed
+
+
+
 ## [0.3.20]
 
 ### Added
@@ -39,6 +43,8 @@ SPDX-License-Identifier: MIT-0
   - Fixed incorrect baseline structure showing flat `.json` files instead of proper directory hierarchy
   - Updated to correct structure: `<document-name>/sections/1/result.json`
   - Reorganized document for better logical flow and user experience
+- **GovCloud Template Generation - Removed GraphQLApi References**
+  - Fixed invalid GovCloud template generation where ProcessChanges AppSync resources were not being removed, causing "Fn::GetAtt references undefined resource GraphQLApi" errors
 
 ## [0.3.19]
 

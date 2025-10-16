@@ -116,7 +116,11 @@ class GovCloudTemplateGenerator:
             'DiscoveryTableDataSource',
             'DiscoveryUploadDocumentResolver',
             'DiscoveryUploadResolverDataSource',
-            'UpdateDiscoveryJobStatusResolver'
+            'UpdateDiscoveryJobStatusResolver',
+            'ProcessChangesResolverFunction',
+            'ProcessChangesResolverFunctionLogGroup',
+            'ProcessChangesDataSource',
+            'ProcessChangesResolver'
         }
         
         self.auth_resources = {
@@ -386,7 +390,7 @@ class GovCloudTemplateGenerator:
         return template
 
     def remove_parameters(self, template: Dict[str, Any]) -> Dict[str, Any]:
-        """Remove parameters related to unsupported services"""
+        """Remove parameters related to unsupported services and restrict IDPPattern to Pattern-2"""
         parameters = template.get('Parameters', {})
         original_count = len(parameters)
         
@@ -395,6 +399,18 @@ class GovCloudTemplateGenerator:
             if param_name in self.ui_parameters:
                 del parameters[param_name]
                 removed_parameters.append(param_name)
+        
+        # Modify IDPPattern parameter to only allow Pattern-2 as the default
+        if 'IDPPattern' in parameters:
+            parameters['IDPPattern'] = {
+                'Type': 'String',
+                'Default': 'Pattern2 - Packet processing with Textract and Bedrock',
+                'Description': 'Document processing pattern (GovCloud version supports Pattern-2 only)',
+                'AllowedValues': [
+                    'Pattern2 - Packet processing with Textract and Bedrock'
+                ]
+            }
+            self.logger.info("Modified IDPPattern parameter to only support Pattern-2")
         
         self.logger.info(f"Removed {len(removed_parameters)} UI-related parameters")
         self.logger.debug(f"Removed parameters: {', '.join(removed_parameters)}")
@@ -681,7 +697,7 @@ class GovCloudTemplateGenerator:
                             if len(policy['Statement']) != len(statements):
                                 self.logger.debug(f"Removed AppSync permissions from {func_name}")
         
-        # Clean nested stack parameters comprehensively
+        # Clean nested stack parameters comprehensively (all patterns need AppSync params removed)
         pattern_stacks = ['PATTERN1STACK', 'PATTERN2STACK', 'PATTERN3STACK']
         for stack_name in pattern_stacks:
             if stack_name in resources:
@@ -846,7 +862,7 @@ class GovCloudTemplateGenerator:
         if missing_core:
             issues.append(f"Missing core resources: {', '.join(missing_core)}")
         
-        # Check that nested stacks are still present
+        # Check that pattern nested stacks are still present
         pattern_stacks = {'PATTERN1STACK', 'PATTERN2STACK', 'PATTERN3STACK'}
         present_patterns = pattern_stacks & set(resources.keys())
         if not present_patterns:
