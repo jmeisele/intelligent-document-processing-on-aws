@@ -7,6 +7,7 @@ import { ConsoleLogger } from 'aws-amplify/utils';
 // Import the component directly from the file instead of the directory
 import DocumentsAgentsLayout from '../components/document-agents-layout/DocumentsAgentsLayout';
 import GenAIIDPLayout from '../components/genaiidp-layout';
+import GenAIIDPTopNavigation from '../components/genai-idp-top-navigation';
 
 const logger = new ConsoleLogger('DocumentsAnalyticsRoutes');
 
@@ -18,9 +19,12 @@ const DocumentsAnalyticsRoutes = () => {
       <Route
         path="*"
         element={
-          <GenAIIDPLayout>
-            <DocumentsAgentsLayout />
-          </GenAIIDPLayout>
+          <div>
+            <GenAIIDPTopNavigation />
+            <GenAIIDPLayout>
+              <DocumentsAgentsLayout />
+            </GenAIIDPLayout>
+          </div>
         }
       />
     </Routes>

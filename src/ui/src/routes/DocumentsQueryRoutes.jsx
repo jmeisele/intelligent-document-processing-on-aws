@@ -6,6 +6,7 @@ import { ConsoleLogger } from 'aws-amplify/utils';
 
 import DocumentsQueryLayout from '../components/document-kb-query-layout';
 import GenAIIDPLayout from '../components/genaiidp-layout';
+import GenAIIDPTopNavigation from '../components/genai-idp-top-navigation';
 
 const logger = new ConsoleLogger('DocumentsQueryRoutes');
 
@@ -17,9 +18,12 @@ const DocumentsQueryRoutes = () => {
       <Route
         path="*"
         element={
-          <GenAIIDPLayout>
-            <DocumentsQueryLayout />
-          </GenAIIDPLayout>
+          <div>
+            <GenAIIDPTopNavigation />
+            <GenAIIDPLayout>
+              <DocumentsQueryLayout />
+            </GenAIIDPLayout>
+          </div>
         }
       />
     </Routes>
