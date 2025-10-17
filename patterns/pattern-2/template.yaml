@@ -348,7 +348,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       KmsKeyId: !Ref CustomerManagedEncryptionKeyArn
-      LogGroupName: !Sub "/${StackName}/lambda/Pattern2CodeBuildTrigger"
+      LogGroupName: !Sub "/${AWS::StackName}/lambda/Pattern2CodeBuildTrigger"
       RetentionInDays: !Ref LogRetentionDays
 
   Pattern2DockerBuildRun:
