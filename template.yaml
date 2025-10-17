@@ -92,7 +92,7 @@ Parameters:
     Description: >-
       S3 URI pointing to your custom configuration YAML file. When provided, this configuration overrides the selected pattern preset and applies to all processing patterns. 
       Leave blank to use the selected pattern configuration preset. For example s3://my-bucket/custom-config/config.yaml
-    AllowedPattern: '^(|s3://[a-zA-Z0-9.\\-_]+(/.*)?)$'
+    AllowedPattern: '^(|s3://.*)$'
     ConstraintDescription: Must be empty or a valid S3 URI (e.g., s3://my-bucket/custom-config/config.yaml)
 
   # Pattern 1 Parameters
@@ -3721,6 +3721,8 @@ Resources:
         Variables:
           LOG_LEVEL: !Ref LogLevel
           CONFIGURATION_TABLE_NAME: !Ref ConfigurationTable
+          TRACKING_TABLE_NAME: !Ref TrackingTable
+          LOOKUP_FUNCTION_NAME: !Ref LookupFunction
           STRANDS_LOG_LEVEL: !Ref LogLevel
           AGENT_TABLE: !Ref AgentTable
           APPSYNC_API_URL: !GetAtt GraphQLApi.GraphQLUrl
@@ -3834,16 +3836,9 @@ Resources:
                 - dynamodb:Scan
                 - dynamodb:Query
                 - dynamodb:GetItem
-                - dynamodb:ListTables
+                - dynamodb:Query
               Resource:
-                - !GetAtt ConfigurationTable.Arn
-                - !Sub "${ConfigurationTable.Arn}/*"
-                - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AWS::StackName}*"
-            - Effect: Allow
-              Action:
-                - dynamodb:ListTables
-              Resource:
-                - "*"
+                - !GetAtt TrackingTable.Arn
             - Effect: Allow
               Action:
                 - cloudformation:DescribeStackResources
@@ -3855,6 +3850,12 @@ Resources:
                 - lambda:InvokeFunction
               Resource:
                 - !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}*"
+            - Effect: Allow
+              Action:
+                - states:DescribeExecution
+                - states:GetExecutionHistory
+              Resource:
+                - !Sub "arn:${AWS::Partition}:states:${AWS::Region}:${AWS::AccountId}:execution:${AWS::StackName}*"
 
   AgentProcessorLogGroup:
     Type: AWS::Logs::LogGroup
@@ -6231,7 +6232,7 @@ Resources:
       CodeUri: ./src/lambda/discovery_processor
       Description: Lambda function to process discovery jobs from SQS queue
       MemorySize: 1024
-      Timeout: 120
+      Timeout: 900
       Environment:
         Variables:
           LOG_LEVEL: !Ref LogLevel
@@ -6790,6 +6791,7 @@ Resources:
                 - echo Installing Web UI dependencies
                 - rm -rf node_modules
                 - npm cache clean --force
+                - npm install --package-lock-only
                 - npm ci
                 - echo Checking for and fixing security vulnerabilities
                 - npm audit fix || echo "Some vulnerabilities could not be automatically fixed"

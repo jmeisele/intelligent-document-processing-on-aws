@@ -9,16 +9,53 @@ SPDX-License-Identifier: MIT-0
 
 ### Added
 
-- **Agentic extraction preview with Strands agents** delivering structured field validation, configurable review flows, and sample notebooks/assets for Pattern-2 lending documents.
-  - Agentic extraction utilises Strands Agent framework to produce structured outputs in an iterative and self reviewing agent loop. It utilises tools for interacting with the output which will be extended in the future.
-  - Through the library this already allows users to utilise the `structured_output` function from the `lib/idp_common_pkg/idp_common/extraction/agentic_idp.py` to request extractions using Pydantic Models with custom validators defined. We intend to enable deeper validation customizations through the UI as well in the future.
-- **Containerized Pattern-2 deployment pipeline** that builds and pushes all Lambda images via CodeBuild using the new Dockerfile, plus automated ECR cleanup and tests.
+- **Agentic extraction preview with Strands agents (experimental)** introducing intelligent, self-correcting document extraction with improved schema compliance and accuracy improvements over traditional methods.
+  - Leverages the Strands Agent framework with iterative validation loops and automatic error correction to deliver schema compliance
+  - Provides structured output through Pydantic models with built-in validators, automatic retry handling, and superior handling of complex nested structures and date standardization
+  - Includes sample notebooks and configuration assets demonstrating agentic extraction for Pattern-2 lending documents
+  - Programmatic access available via `structured_output` function in `lib/idp_common_pkg/idp_common/extraction/agentic_idp.py`
+  - Currently this is an experimental feature. Future extensibility includes UI-based validation customization, code generation, and Model Context Protocol (MCP) integration for external data enrichment during extraction
+
+- **IDP CLI - Command Line Interface for Batch Document Processing**
+  - Added CLI tool (`idp_cli/`) for programmatic batch document processing and stack management
+  - **Key Features**: Deploy/update/delete CloudFormation stacks, process and reprocess documents from local directories or S3 URIs, live progress monitoring with rich terminal UI, download processing results locally, validate manifests before processing, generate manifests from directories with automatic baseline matching
+  - **Selective Reprocessing**: New `rerun-inference` command to reprocess documents from specific pipeline steps (classification or extraction) while leveraging existing OCR data for cost/time optimization
+  - **Evaluation Framework**: Workflow for accuracy testing including initial processing, manual validation, baseline creation, and automated evaluation with detailed metrics
+  - **Analytics Integration**: Query aggregated results via Athena SQL or use Agent Analytics in Web UI for visual analysis
+  - **Use Cases**: Rapid configuration iteration, large-scale batch processing, CI/CD integration, automated accuracy testing, automated environment cleanup, prompt engineering experiments
+  - **Documentation**: README with Quick Start, Commands Reference, Evaluation Workflow, and troubleshooting guides
+
+- **Extraction Results Integration in Summarization Service**
+  - Integrates extraction results from the extraction service into summarization module for context-aware summaries
+  - **Features**: Fully backward compatible (works with or without extraction results), automatic section handling, error resilient with graceful continuation, comprehensive logging
+  - **Configuration**: Enable by adding `{EXTRACTION_RESULTS}` placeholder to `task_prompt` in config.yaml
+  - **Benefits**: Context-aware summaries referencing extracted values, improved accuracy and quality, better extraction-summary alignment
 
 ### Changed
 
-- Updated Pattern-2 templates, `publish.py`, and documentation to detect container builds, surface new prerequisites (Docker/ECR), and detail enabling agentic extraction.
+- **Containerized Pattern-2 deployment pipeline** that builds and pushes all Lambda images via CodeBuild using the new Dockerfile, plus automated ECR cleanup and tests.
   - Lambda docker image deployments have a 10 GB image size limit compared to the 250 MB zip limit of regular deployment. This however doesn't allow for viewing the code in the AWS console.
     The change was introduced to accommodate the increased package size of introducing Strands into the package dependencies.
+
+### Fixed
+- **Discovery function times out when processing large documents.**
+  - increase lambda discovery processor timeout to 900s
+- **Corrected baseline directory structure documentation in evaluation.md**
+  - Fixed incorrect baseline structure showing flat `.json` files instead of proper directory hierarchy
+  - Updated to correct structure: `<document-name>/sections/1/result.json`
+  - Reorganized document for better logical flow and user experience
+- **GovCloud Template Generation - Removed GraphQLApi References** - #82
+  - Fixed invalid GovCloud template generation where ProcessChanges AppSync resources were not being removed, causing "Fn::GetAtt references undefined resource GraphQLApi" errors
+  - Updated `scripts/generate_govcloud_template.py` to remove all ProcessChanges-related resources and extend AppSync parameter cleanup to all pattern stacks
+  - Fixed InvalidClientTokenId validation error by ensuring CloudFormation client uses the correct region when validating templates (commercial vs GovCloud)
+- **Enhanced Processing Flow Visualization for Disabled Steps**
+  - Fixed UX issue where disabled processing steps (when `summarization.enabled: false` or `assessment.enabled: false` in configuration) appeared visually identical to active steps in the "View Processing Flow" display
+  - **Key Benefit**: Users can now immediately see which steps are actually processing data vs. steps that execute but skip processing based on configuration settings, preventing confusion about whether summarization or assessment ran
+  - Limitation: the new visual indicators are driven from the current config, which may have been altered since the document was processed. We will address this in a later release. See Issue #86.
+
+### Known Issues
+- **GovCloud Deployments fail, due to lack of ARM support for CodeBuild. Fix targeted for next release.**
+
 
 ## [0.3.19]
 

@@ -983,6 +983,15 @@ class ExtractionService:
         sorted_page_ids = sorted(section.page_ids, key=int)
         start_page = int(sorted_page_ids[0])
         end_page = int(sorted_page_ids[-1])
+
+        # Find minimum page ID across all sections in the document to determine offset
+        min_page_id = min(
+            int(page_id) for sec in document.sections for page_id in sec.page_ids
+        )
+
+        # Adjust page indices to be zero-based if document pages start at 1
+        page_indices = [int(page_id) - min_page_id for page_id in sorted_page_ids]
+
         logger.info(
             f"Processing {len(sorted_page_ids)} pages, class {class_label}: {start_page}-{end_page}"
         )
@@ -1069,6 +1078,7 @@ class ExtractionService:
                 # Write to S3 with empty extraction result
                 output = {
                     "document_class": {"type": class_label},
+                    "split_document": {"page_indices": page_indices},
                     "inference_result": extracted_fields,
                     "metadata": {
                         "parsing_succeeded": parsing_succeeded,
@@ -1403,6 +1413,7 @@ class ExtractionService:
             # Write to S3
             output = {
                 "document_class": {"type": class_label},
+                "split_document": {"page_indices": page_indices},
                 "inference_result": extracted_fields,
                 "metadata": {
                     "parsing_succeeded": parsing_succeeded,
