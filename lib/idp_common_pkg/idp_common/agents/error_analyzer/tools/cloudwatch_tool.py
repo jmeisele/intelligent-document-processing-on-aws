@@ -73,7 +73,11 @@ def search_cloudwatch_logs(
         }
 
         if filter_pattern:
-            params["filterPattern"] = filter_pattern
+            # Sanitize filter pattern to avoid CloudWatch API errors
+            # Remove or replace problematic characters that cause InvalidParameterException
+            sanitized_pattern = filter_pattern.replace(":", "")
+            if sanitized_pattern.strip():
+                params["filterPattern"] = sanitized_pattern
 
         response = client.filter_log_events(**params)
 
@@ -377,7 +381,7 @@ def cloudwatch_document_logs(
                     if pattern in error_patterns:
                         found_actual_errors = True
                 else:
-                    logger.info(
+                    logger.debug(
                         f"  No events found in {log_group_name} with pattern '{pattern}'"
                     )
 
@@ -508,7 +512,7 @@ def cloudwatch_stack_logs(
                 )
                 total_events += search_result["events_found"]
             else:
-                logger.info(f"No events found in {log_group_name}")
+                logger.debug(f"No events found in {log_group_name}")
 
         return {
             "stack_name": stack_name,
