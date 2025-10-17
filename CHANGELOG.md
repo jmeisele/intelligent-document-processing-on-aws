@@ -58,6 +58,10 @@ SPDX-License-Identifier: MIT-0
   - Updated components: `StepFunctionFlowViewer.jsx`, `FlowDiagram.jsx`, `StepDetails.jsx`, and associated CSS files
   - Limitation: the new visual indicators are driven from the current config, which may have been altered since the document was processed. We will address this in a later release. See Issue #86.
 
+### Known Issues
+- **GovCloud Deployments fail, due to lack of ARM support for CodeBuild. Fix targeted for next release.**
+
+
 ## [0.3.19]
 
 ### Added
