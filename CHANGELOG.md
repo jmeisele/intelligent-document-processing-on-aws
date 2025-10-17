@@ -19,11 +19,9 @@ SPDX-License-Identifier: MIT-0
 - **IDP CLI - Command Line Interface for Batch Document Processing**
   - Added CLI tool (`idp_cli/`) for programmatic batch document processing and stack management
   - **Key Features**: Deploy/update/delete CloudFormation stacks, process and reprocess documents from local directories or S3 URIs, live progress monitoring with rich terminal UI, download processing results locally, validate manifests before processing, generate manifests from directories with automatic baseline matching
-  - **Stack Lifecycle Management**: Complete stack management including deletion with safety confirmations, bucket analysis, and automatic cleanup options
   - **Selective Reprocessing**: New `rerun-inference` command to reprocess documents from specific pipeline steps (classification or extraction) while leveraging existing OCR data for cost/time optimization
   - **Evaluation Framework**: Workflow for accuracy testing including initial processing, manual validation, baseline creation, and automated evaluation with detailed metrics
   - **Analytics Integration**: Query aggregated results via Athena SQL or use Agent Analytics in Web UI for visual analysis
-  - **Manifest Formats**: Support for CSV and JSON manifests with auto-generated document IDs from filenames and optional baseline references for evaluation
   - **Use Cases**: Rapid configuration iteration, large-scale batch processing, CI/CD integration, automated accuracy testing, automated environment cleanup, prompt engineering experiments
   - **Documentation**: README with Quick Start, Commands Reference, Evaluation Workflow, and troubleshooting guides
 
@@ -52,10 +50,7 @@ SPDX-License-Identifier: MIT-0
   - Fixed InvalidClientTokenId validation error by ensuring CloudFormation client uses the correct region when validating templates (commercial vs GovCloud)
 - **Enhanced Processing Flow Visualization for Disabled Steps**
   - Fixed UX issue where disabled processing steps (when `summarization.enabled: false` or `assessment.enabled: false` in configuration) appeared visually identical to active steps in the "View Processing Flow" display
-  - Added visual indicators to clearly distinguish disabled steps from active steps
-  - Added informational alert in Step Details panel explaining that disabled steps execute but perform no processing
   - **Key Benefit**: Users can now immediately see which steps are actually processing data vs. steps that execute but skip processing based on configuration settings, preventing confusion about whether summarization or assessment ran
-  - Updated components: `StepFunctionFlowViewer.jsx`, `FlowDiagram.jsx`, `StepDetails.jsx`, and associated CSS files
   - Limitation: the new visual indicators are driven from the current config, which may have been altered since the document was processed. We will address this in a later release. See Issue #86.
 
 ### Known Issues
