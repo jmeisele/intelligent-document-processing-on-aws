@@ -115,7 +115,7 @@ def analyze_errors(query: str, time_range_hours: int = 1) -> Dict[str, Any]:
             "analysis_context": response,
         }
         logger.info(
-            f"CONTEXT: {json.dumps(context_log, separators=(',', ':'), default=str)}"
+            f"LLM Context: {json.dumps(context_log, separators=(',', ':'), default=str)}"
         )
 
         return response
