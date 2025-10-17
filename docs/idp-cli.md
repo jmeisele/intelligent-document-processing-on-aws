@@ -26,6 +26,7 @@ https://github.com/user-attachments/assets/3d448a74-ba5b-4a4a-96ad-ec03ac0b4d7d
   - [deploy](#deploy)
   - [delete](#delete)
   - [run-inference](#run-inference)
+  - [rerun-inference](#rerun-inference)
   - [status](#status)
   - [download-results](#download-results)
   - [generate-manifest](#generate-manifest)
@@ -265,6 +266,80 @@ idp-cli run-inference \
     --s3-uri archive/2024/ \
     --monitor
 ```
+
+---
+
+### `rerun-inference`
+
+Reprocess existing documents from a specific pipeline step.
+
+**Usage:**
+```bash
+idp-cli rerun-inference [OPTIONS]
+```
+
+**Use Cases:**
+- Test different classification or extraction configurations without re-running OCR
+- Fix classification errors and reprocess extraction
+- Iterate on prompt engineering rapidly
+
+**Options:**
+- `--stack-name` (required): CloudFormation stack name
+- `--step` (required): Pipeline step to rerun from (`classification` or `extraction`)
+- **Document Source** (choose ONE):
+  - `--document-ids`: Comma-separated document IDs
+  - `--batch-id`: Batch ID to get all documents from
+- `--force`: Skip confirmation prompt (useful for automation)
+- `--monitor`: Monitor progress until completion
+- `--refresh-interval`: Seconds between status checks (default: 5)
+- `--region`: AWS region (optional)
+
+**Step Behavior:**
+- `classification`: Clears page classifications and sections, reruns classification → extraction → assessment
+- `extraction`: Keeps classifications, clears extraction data, reruns extraction → assessment
+
+**Examples:**
+
+```bash
+# Rerun classification for specific documents
+idp-cli rerun-inference \
+    --stack-name my-stack \
+    --step classification \
+    --document-ids "batch-123/doc1.pdf,batch-123/doc2.pdf" \
+    --monitor
+
+# Rerun extraction for entire batch
+idp-cli rerun-inference \
+    --stack-name my-stack \
+    --step extraction \
+    --batch-id cli-batch-20251015-143000 \
+    --monitor
+
+# Automated rerun (skip confirmation - perfect for CI/CD)
+idp-cli rerun-inference \
+    --stack-name my-stack \
+    --step classification \
+    --batch-id test-set \
+    --force \
+    --monitor
+```
+
+**What Gets Cleared:**
+
+| Step | Clears | Keeps |
+|------|--------|-------|
+| `classification` | Page classifications, sections, extraction results | OCR data (pages, images, text) |
+| `extraction` | Section extraction results, attributes | OCR data, page classifications, section structure |
+
+**Benefits:**
+- Leverages existing OCR data (saves time and cost)
+- Rapid iteration on classification/extraction configurations
+- Perfect for prompt engineering experiments
+
+**Demo:**
+
+https://github.com/user-attachments/assets/28deadbb-378b-42b7-a5e2-f929af9b0e41
+
 
 ---
 

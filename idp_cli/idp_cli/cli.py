@@ -31,6 +31,12 @@ logger = logging.getLogger(__name__)
 
 console = Console()
 
+# Region-specific template URLs
+TEMPLATE_URLS = {
+    "us-west-2": "https://s3.us-west-2.amazonaws.com/aws-ml-blog-us-west-2/artifacts/genai-idp/idp-main.yaml",
+    "us-east-1": "https://s3.us-east-1.amazonaws.com/aws-ml-blog-us-east-1/artifacts/genai-idp/idp-main.yaml",
+}
+
 
 @click.group()
 @click.version_option(version="1.0.0")
@@ -59,8 +65,7 @@ def cli():
 )
 @click.option(
     "--template-url",
-    default="https://s3.us-west-2.amazonaws.com/aws-ml-blog-us-west-2/artifacts/genai-idp/idp-main.yaml",
-    help="URL to CloudFormation template in S3 (default: public template)",
+    help="URL to CloudFormation template in S3 (default: auto-selected based on region)",
 )
 @click.option(
     "--max-concurrent",
@@ -125,6 +130,30 @@ def deploy(
           --parameters "DataRetentionInDays=90,ErrorThreshold=5"
     """
     try:
+        # Auto-detect region if not provided
+        if not region:
+            import boto3
+
+            session = boto3.session.Session()
+            region = session.region_name
+            if not region:
+                raise ValueError(
+                    "Region could not be determined. Please specify --region or configure AWS_DEFAULT_REGION"
+                )
+
+        # Determine template URL (user-provided takes precedence)
+        if not template_url:
+            if region in TEMPLATE_URLS:
+                template_url = TEMPLATE_URLS[region]
+                console.print(f"[bold]Using template for region: {region}[/bold]")
+            else:
+                supported_regions = ", ".join(TEMPLATE_URLS.keys())
+                raise ValueError(
+                    f"Region '{region}' is not supported. "
+                    f"Supported regions: {supported_regions}. "
+                    f"Please provide --template-url explicitly for other regions."
+                )
+
         # Initialize deployer
         deployer = StackDeployer(region=region)
 
@@ -442,6 +471,176 @@ def delete(
 @cli.command()
 @click.option("--stack-name", required=True, help="CloudFormation stack name")
 @click.option(
+    "--step",
+    required=True,
+    type=click.Choice(["classification", "extraction"]),
+    help="Pipeline step to rerun from",
+)
+@click.option(
+    "--document-ids",
+    help="Comma-separated list of document IDs to reprocess",
+)
+@click.option(
+    "--batch-id",
+    help="Batch ID to get document IDs from (alternative to --document-ids)",
+)
+@click.option("--force", is_flag=True, help="Skip confirmation prompt")
+@click.option("--monitor", is_flag=True, help="Monitor progress until completion")
+@click.option(
+    "--refresh-interval",
+    default=5,
+    type=int,
+    help="Seconds between status checks (default: 5)",
+)
+@click.option("--region", help="AWS region (optional)")
+def rerun_inference(
+    stack_name: str,
+    step: str,
+    document_ids: Optional[str],
+    batch_id: Optional[str],
+    force: bool,
+    monitor: bool,
+    refresh_interval: int,
+    region: Optional[str],
+):
+    """
+    Rerun processing for existing documents from a specific step
+    
+    Reprocesses documents already in InputBucket, leveraging existing OCR data.
+    
+    Steps:
+      - classification: Reruns classification and all subsequent steps
+      - extraction: Reruns extraction and assessment (keeps classification)
+    
+    Document ID Format: Use the S3 key format (e.g., "batch-id/document.pdf")
+    
+    Examples:
+    
+      # Rerun classification for specific documents
+      idp-cli rerun-inference \\
+          --stack-name my-stack \\
+          --step classification \\
+          --document-ids "batch-123/doc1.pdf,batch-123/doc2.pdf" \\
+          --monitor
+      
+      # Rerun extraction for all documents in a batch
+      idp-cli rerun-inference \\
+          --stack-name my-stack \\
+          --step extraction \\
+          --batch-id cli-batch-20251015-143000 \\
+          --monitor
+    """
+    try:
+        # Validate mutually exclusive options
+        if not document_ids and not batch_id:
+            console.print(
+                "[red]✗ Error: Must specify either --document-ids or --batch-id[/red]"
+            )
+            sys.exit(1)
+
+        if document_ids and batch_id:
+            console.print(
+                "[red]✗ Error: Cannot specify both --document-ids and --batch-id[/red]"
+            )
+            sys.exit(1)
+
+        from .rerun_processor import RerunProcessor
+
+        # Initialize processor
+        console.print(
+            f"[bold blue]Initializing rerun processor for stack: {stack_name}[/bold blue]"
+        )
+        processor = RerunProcessor(stack_name=stack_name, region=region)
+
+        # Get document IDs
+        if document_ids:
+            doc_id_list = [doc_id.strip() for doc_id in document_ids.split(",")]
+            console.print(f"Processing {len(doc_id_list)} specified documents")
+        else:
+            console.print(f"Getting document IDs from batch: {batch_id}")
+            doc_id_list = processor.get_batch_document_ids(batch_id)
+            console.print(f"Found {len(doc_id_list)} documents in batch")
+
+        # Show what will be cleared based on step
+        console.print()
+        console.print(f"[bold yellow]⚠️  Rerun Step: {step}[/bold yellow]")
+        console.print("━" * 60)
+
+        if step == "classification":
+            console.print("[bold]What will be cleared:[/bold]")
+            console.print("  • All page classifications")
+            console.print("  • All document sections")
+            console.print("  • All extraction results")
+            console.print()
+            console.print("[bold]What will be kept:[/bold]")
+            console.print("  • OCR data (pages, images, text)")
+        else:  # extraction
+            console.print("[bold]What will be cleared:[/bold]")
+            console.print("  • Section extraction results")
+            console.print("  • Section attributes")
+            console.print()
+            console.print("[bold]What will be kept:[/bold]")
+            console.print("  • OCR data (pages, images, text)")
+            console.print("  • Page classifications")
+            console.print("  • Document sections structure")
+
+        console.print("━" * 60)
+        console.print()
+
+        # Confirmation unless --force
+        if not force:
+            if not click.confirm(
+                f"Reprocess {len(doc_id_list)} documents from {step} step?",
+                default=True,
+            ):
+                console.print("[yellow]Rerun cancelled[/yellow]")
+                return
+
+        # Perform rerun
+        console.print()
+        with console.status(
+            f"[bold green]Reprocessing {len(doc_id_list)} documents..."
+        ):
+            results = processor.rerun_documents(
+                document_ids=doc_id_list, step=step, monitor=monitor
+            )
+
+        # Show results
+        console.print()
+        if results["documents_queued"] > 0:
+            console.print(
+                f"[green]✓ Queued {results['documents_queued']} documents for {step} reprocessing[/green]"
+            )
+
+        if results["documents_failed"] > 0:
+            console.print(
+                f"[red]✗ Failed to queue {results['documents_failed']} documents[/red]"
+            )
+            for failed in results["failed_documents"]:
+                console.print(f"  • {failed['object_key']}: {failed['error']}")
+
+        console.print()
+
+        if monitor and results["documents_queued"] > 0:
+            # Monitor progress using existing monitoring function
+            _monitor_progress(
+                stack_name=stack_name,
+                batch_id=batch_id or "rerun",
+                document_ids=doc_id_list,
+                refresh_interval=refresh_interval,
+                region=region,
+                resources=processor.resources,
+            )
+
+    except Exception as e:
+        logger.error(f"Error rerunning documents: {e}", exc_info=True)
+        console.print(f"[red]✗ Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.command()
+@click.option("--stack-name", required=True, help="CloudFormation stack name")
+@click.option(
     "--manifest",
     type=click.Path(exists=True),
     help="Path to manifest file (CSV or JSON)",
@@ -655,7 +854,7 @@ def status(
         else:
             # Show current status once
             monitor = ProgressMonitor(
-                stack_name=stack_name, resources=processor.resources
+                stack_name=stack_name, resources=processor.resources, region=region
             )
             status_data = monitor.get_batch_status(document_ids)
             stats = monitor.calculate_statistics(status_data)
@@ -842,6 +1041,7 @@ def generate_manifest(
     """
     try:
         import csv
+        import os
 
         # Validate mutually exclusive options
         if not directory and not s3_uri:
@@ -860,7 +1060,6 @@ def generate_manifest(
 
             # Import scan method directly
             import glob as glob_module
-            import os
 
             dir_path = os.path.abspath(directory)
             if recursive:
@@ -1056,7 +1255,7 @@ def _monitor_progress(
         region: AWS region
         resources: Stack resources dictionary
     """
-    monitor = ProgressMonitor(stack_name=stack_name, resources=resources)
+    monitor = ProgressMonitor(stack_name=stack_name, resources=resources, region=region)
 
     display.show_monitoring_header(batch_id)
 

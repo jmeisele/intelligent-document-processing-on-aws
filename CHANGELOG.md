@@ -5,25 +5,33 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
-### Added
-
 ## [0.3.20]
 
 ### Added
 
-- **Agentic extraction preview with Strands agents** delivering structured field validation, configurable review flows, and sample notebooks/assets for Pattern-2 lending documents.
-  - Agentic extraction utilises Strands Agent framework to produce structured outputs in an iterative and self reviewing agent loop. It utilises tools for interacting with the output which will be extended in the future.
-  - Through the library this already allows users to utilise the `structured_output` function from the `lib/idp_common_pkg/idp_common/extraction/agentic_idp.py` to request extractions using Pydantic Models with custom validators defined. We intend to enable deeper validation customizations through the UI as well in the future.
+- **Agentic extraction preview with Strands agents** introducing intelligent, self-correcting document extraction with improved schema compliance and accuracy improvements over traditional methods.
+  - Leverages the Strands Agent framework with iterative validation loops and automatic error correction to deliver schema compliance
+  - Provides structured output through Pydantic models with built-in validators, automatic retry handling, and superior handling of complex nested structures and date standardization
+  - Includes sample notebooks and configuration assets demonstrating agentic extraction for Pattern-2 lending documents
+  - Programmatic access available via `structured_output` function in `lib/idp_common_pkg/idp_common/extraction/agentic_idp.py`
+  - Future extensibility includes UI-based validation customization, code generation, and Model Context Protocol (MCP) integration for external data enrichment during extraction
 
 - **IDP CLI - Command Line Interface for Batch Document Processing**
   - Added CLI tool (`idp_cli/`) for programmatic batch document processing and stack management
-  - **Key Features**: Deploy/update/delete CloudFormation stacks, process documents from local directories or S3 URIs, live progress monitoring with rich terminal UI, download processing results locally, validate manifests before processing, generate manifests from directories with automatic baseline matching
+  - **Key Features**: Deploy/update/delete CloudFormation stacks, process and reprocess documents from local directories or S3 URIs, live progress monitoring with rich terminal UI, download processing results locally, validate manifests before processing, generate manifests from directories with automatic baseline matching
   - **Stack Lifecycle Management**: Complete stack management including deletion with safety confirmations, bucket analysis, and automatic cleanup options
+  - **Selective Reprocessing**: New `rerun-inference` command to reprocess documents from specific pipeline steps (classification or extraction) while leveraging existing OCR data for cost/time optimization
   - **Evaluation Framework**: Workflow for accuracy testing including initial processing, manual validation, baseline creation, and automated evaluation with detailed metrics
   - **Analytics Integration**: Query aggregated results via Athena SQL or use Agent Analytics in Web UI for visual analysis
   - **Manifest Formats**: Support for CSV and JSON manifests with auto-generated document IDs from filenames and optional baseline references for evaluation
-  - **Use Cases**: Rapid configuration iteration, large-scale batch processing, CI/CD integration, automated accuracy testing, automated environment cleanup
+  - **Use Cases**: Rapid configuration iteration, large-scale batch processing, CI/CD integration, automated accuracy testing, automated environment cleanup, prompt engineering experiments
   - **Documentation**: README with Quick Start, Commands Reference, Evaluation Workflow, and troubleshooting guides
+
+- **Extraction Results Integration in Summarization Service**
+  - Integrates extraction results from the extraction service into summarization module for context-aware summaries
+  - **Features**: Fully backward compatible (works with or without extraction results), automatic section handling, error resilient with graceful continuation, comprehensive logging
+  - **Configuration**: Enable by adding `{EXTRACTION_RESULTS}` placeholder to `task_prompt` in config.yaml
+  - **Benefits**: Context-aware summaries referencing extracted values, improved accuracy and quality, better extraction-summary alignment
 
 ### Changed
 
@@ -33,7 +41,15 @@ SPDX-License-Identifier: MIT-0
 
 ### Fixed
 - **Discovery function times out when processing large documents.**
-  - increase lambda discovery processor timeout to 900s 
+  - increase lambda discovery processor timeout to 900s
+- **Corrected baseline directory structure documentation in evaluation.md**
+  - Fixed incorrect baseline structure showing flat `.json` files instead of proper directory hierarchy
+  - Updated to correct structure: `<document-name>/sections/1/result.json`
+  - Reorganized document for better logical flow and user experience
+- **GovCloud Template Generation - Removed GraphQLApi References** - #82
+  - Fixed invalid GovCloud template generation where ProcessChanges AppSync resources were not being removed, causing "Fn::GetAtt references undefined resource GraphQLApi" errors
+  - Updated `scripts/generate_govcloud_template.py` to remove all ProcessChanges-related resources and extend AppSync parameter cleanup to all pattern stacks
+  - Fixed InvalidClientTokenId validation error by ensuring CloudFormation client uses the correct region when validating templates (commercial vs GovCloud)
 
 ## [0.3.19]
 
