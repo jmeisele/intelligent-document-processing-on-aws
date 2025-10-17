@@ -6,6 +6,25 @@ import PropTypes from 'prop-types';
 import { Box, Badge } from '@cloudscape-design/components';
 import './FlowDiagram.css';
 
+// Helper function to check if a step is disabled based on configuration
+const isStepDisabled = (stepName, config) => {
+  if (!config) return false;
+
+  const stepNameLower = stepName.toLowerCase();
+
+  // Check if this is a summarization step
+  if (stepNameLower.includes('summarization') || stepNameLower.includes('summary')) {
+    return config.summarization?.enabled === false;
+  }
+
+  // Check if this is an assessment step
+  if (stepNameLower.includes('assessment') || stepNameLower.includes('assess')) {
+    return config.assessment?.enabled === false;
+  }
+
+  return false;
+};
+
 const FlowDiagram = ({ steps = [], onStepClick, selectedStep = null, getStepIcon }) => {
   if (!steps || steps.length === 0) {
     return (
@@ -63,6 +82,7 @@ const FlowDiagram = ({ steps = [], onStepClick, selectedStep = null, getStepIcon
           // Check if this is a Map state
           const isMapState = step.type === 'Map';
           const mapIterationsForThisStep = mapIterationsByParent[step.name] || [];
+          const stepDisabled = isStepDisabled(step.name, mergedConfig);
 
           return (
             <React.Fragment key={`main-step-${step.name}-${step.type}-${step.startDate || index}`}>
@@ -70,7 +90,7 @@ const FlowDiagram = ({ steps = [], onStepClick, selectedStep = null, getStepIcon
               <div
                 className={`flow-step ${getStepStatus(step)} ${selectedStep?.name === step.name ? 'selected' : ''} ${
                   isMapState ? 'map-step' : ''
-                }`}
+                } ${stepDisabled ? 'step-disabled' : ''}`}
                 onClick={() => onStepClick(step)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -79,6 +99,7 @@ const FlowDiagram = ({ steps = [], onStepClick, selectedStep = null, getStepIcon
                 }}
                 role="button"
                 tabIndex={0}
+                title={stepDisabled ? 'This step was disabled in configuration and performed no processing' : ''}
               >
                 <div className="step-icon-container">
                   {getStepIcon(step.name, step.type, step.status)}
@@ -87,6 +108,7 @@ const FlowDiagram = ({ steps = [], onStepClick, selectedStep = null, getStepIcon
                 <div className="step-label">
                   <div className="step-name">
                     {step.name}
+                    {stepDisabled && <Badge color="grey">NOT ENABLED</Badge>}
                     {isMapState && step.mapIterations && <Badge color="blue">{step.mapIterations} iterations</Badge>}
                   </div>
                   <div className={`step-status-text status-text-${step.status.toLowerCase()}`}>{step.status}</div>
@@ -209,6 +231,14 @@ FlowDiagram.propTypes = {
     name: PropTypes.string,
   }),
   getStepIcon: PropTypes.func.isRequired,
+  mergedConfig: PropTypes.shape({
+    summarization: PropTypes.shape({
+      enabled: PropTypes.bool,
+    }),
+    assessment: PropTypes.shape({
+      enabled: PropTypes.bool,
+    }),
+  }),
 };
 
 export default FlowDiagram;
