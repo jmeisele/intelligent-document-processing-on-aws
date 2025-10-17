@@ -192,7 +192,7 @@ export const DocumentsQueryLayout = () => {
               </ValueWithLabel>
             ))
           ) : (
-            <ValueWithLabel key="nosummary">{`${initialMsg}`}</ValueWithLabel>
+            <ValueWithLabel key="nosummary" label="" index={0}>{`${initialMsg}`}</ValueWithLabel>
           )}
         </SpaceBetween>
       </div>

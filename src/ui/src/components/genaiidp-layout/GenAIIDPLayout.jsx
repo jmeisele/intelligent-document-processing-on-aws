@@ -32,7 +32,7 @@ import useAppContext from '../../contexts/app';
 
 const logger = new ConsoleLogger('GenAIIDPLayout');
 
-const GenAIIDPLayout = () => {
+const GenAIIDPLayout = ({ children }) => {
   const { navigationOpen, setNavigationOpen } = useAppContext();
 
   const notifications = useNotifications();
@@ -111,15 +111,17 @@ const GenAIIDPLayout = () => {
         onSplitPanelResize={onSplitPanelResize}
         splitPanel={<SplitPanel />}
         content={
-          <Routes>
-            <Route index element={<DocumentList />} />
-            <Route path="query" element={<DocumentsQueryLayout />} />
-            <Route path="agents" element={<DocumentsAgentsLayout />} />
-            <Route path="config" element={<ConfigurationLayout />} />
-            <Route path="upload" element={<UploadDocumentPanel />} />
-            <Route path="discovery" element={<DiscoveryPanel />} />
-            <Route path=":objectKey" element={<DocumentDetails />} />
-          </Routes>
+          children || (
+            <Routes>
+              <Route index element={<DocumentList />} />
+              <Route path="query" element={<DocumentsQueryLayout />} />
+              <Route path="agents" element={<DocumentsAgentsLayout />} />
+              <Route path="config" element={<ConfigurationLayout />} />
+              <Route path="upload" element={<UploadDocumentPanel />} />
+              <Route path="discovery" element={<DiscoveryPanel />} />
+              <Route path=":objectKey" element={<DocumentDetails />} />
+            </Routes>
+          )
         }
         ariaLabels={appLayoutLabels}
       />

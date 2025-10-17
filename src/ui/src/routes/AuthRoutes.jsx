@@ -40,6 +40,8 @@ const AuthRoutes = ({ redirectParam }) => {
   return (
     <SettingsContext.Provider value={settingsContextValue}>
       <Routes>
+        <Route path={`${DOCUMENTS_KB_QUERY_PATH}/*`} element={<DocumentsQueryRoutes />} />
+        <Route path={`${DOCUMENTS_ANALYTICS_PATH}/*`} element={<DocumentsAnalyticsRoutes />} />
         <Route path={`${DOCUMENTS_PATH}/*`} element={<DocumentsRoutes />} />
         <Route
           path={LOGIN_PATH}
@@ -48,8 +50,6 @@ const AuthRoutes = ({ redirectParam }) => {
           }
         />
         <Route path={LOGOUT_PATH} element={<Button onClick={signOut}>Sign Out</Button>} />
-        <Route path={`${DOCUMENTS_KB_QUERY_PATH}/*`} element={<DocumentsQueryRoutes />} />
-        <Route path={`${DOCUMENTS_ANALYTICS_PATH}/*`} element={<DocumentsAnalyticsRoutes />} />
         <Route path="*" element={<Navigate to={DEFAULT_PATH} replace />} />
       </Routes>
     </SettingsContext.Provider>
