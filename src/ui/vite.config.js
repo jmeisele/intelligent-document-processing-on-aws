@@ -41,62 +41,6 @@ export default defineConfig({
   build: {
     outDir: 'build',
     sourcemap: false,
-    // Increase chunk size warning limit
-    chunkSizeWarningLimit: 1000,
-    rollupOptions: {
-      output: {
-        // Manual chunking for better code splitting
-        manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            if (id.includes('aws-amplify') || id.includes('@aws-amplify')) {
-              return 'aws-amplify';
-            }
-            if (id.includes('@aws-sdk')) {
-              return 'aws-sdk';
-            }
-            if (id.includes('@cloudscape-design')) {
-              return 'cloudscape';
-            }
-            if (id.includes('chart.js') || id.includes('react-chartjs-2')) {
-              return 'chart';
-            }
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'react-vendor';
-            }
-            if (id.includes('lodash')) {
-              return 'lodash';
-            }
-            return 'vendor';
-          }
-          
-          if (id.includes('src/components/document-list') || 
-              id.includes('src/components/document-details') ||
-              id.includes('src/components/document-panel')) {
-            return 'documents';
-          }
-          
-          if (id.includes('src/components/configuration-layout') ||
-              id.includes('src/components/upload-document') ||
-              id.includes('src/components/discovery')) {
-            return 'admin';
-          }
-          
-          if (id.includes('src/components/document-kb-query-layout') ||
-              id.includes('src/components/document-agents-layout') ||
-              id.includes('src/components/agent-chat')) {
-            return 'agents';
-          }
-          
-          // Keep navigation/header components in main bundle for instant loading
-          if (id.includes('src/components/genai-idp-top-navigation') ||
-              id.includes('src/components/genaiidp-layout/navigation') ||
-              id.includes('src/components/genaiidp-layout/breadcrumbs')) {
-            return undefined; // Don't chunk these - keep in main bundle
-          }
-        },
-      },
-    },
-    // Configure target to ensure JSX is handled
     target: 'esnext',
   },
 
