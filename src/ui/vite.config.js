@@ -42,7 +42,7 @@ export default defineConfig({
     outDir: 'build',
     sourcemap: false,
     // Increase chunk size warning limit
-    chunkSizeWarningLimit: 500,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         // Manual chunking for better code splitting
