@@ -51,6 +51,14 @@ SPDX-License-Identifier: MIT-0
   - Updated `scripts/generate_govcloud_template.py` to remove all ProcessChanges-related resources and extend AppSync parameter cleanup to all pattern stacks
   - Fixed InvalidClientTokenId validation error by ensuring CloudFormation client uses the correct region when validating templates (commercial vs GovCloud)
 
+- **Enhanced Processing Flow Visualization for Disabled Steps**
+  - Fixed UX issue where disabled processing steps (when `summarization.enabled: false` or `assessment.enabled: false` in configuration) appeared visually identical to active steps in the "View Processing Flow" display
+  - Added visual indicators to clearly distinguish disabled steps from active steps
+  - Added informational alert in Step Details panel explaining that disabled steps execute but perform no processing
+  - **Key Benefit**: Users can now immediately see which steps are actually processing data vs. steps that execute but skip processing based on configuration settings, preventing confusion about whether summarization or assessment ran
+  - Updated components: `StepFunctionFlowViewer.jsx`, `FlowDiagram.jsx`, `StepDetails.jsx`, and associated CSS files
+  - Limitation: the new visual indicators are driven from the current config, which may have been altered since the document was processed. We will address this in a later release. See Issue #86.
+
 ## [0.3.19]
 
 ### Added
