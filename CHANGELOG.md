@@ -9,12 +9,12 @@ SPDX-License-Identifier: MIT-0
 
 ### Added
 
-- **Agentic extraction preview with Strands agents** introducing intelligent, self-correcting document extraction with improved schema compliance and accuracy improvements over traditional methods.
+- **Agentic extraction preview with Strands agents (experimental)** introducing intelligent, self-correcting document extraction with improved schema compliance and accuracy improvements over traditional methods.
   - Leverages the Strands Agent framework with iterative validation loops and automatic error correction to deliver schema compliance
   - Provides structured output through Pydantic models with built-in validators, automatic retry handling, and superior handling of complex nested structures and date standardization
   - Includes sample notebooks and configuration assets demonstrating agentic extraction for Pattern-2 lending documents
   - Programmatic access available via `structured_output` function in `lib/idp_common_pkg/idp_common/extraction/agentic_idp.py`
-  - Future extensibility includes UI-based validation customization, code generation, and Model Context Protocol (MCP) integration for external data enrichment during extraction
+  - Currently this is an experimental feature. Future extensibility includes UI-based validation customization, code generation, and Model Context Protocol (MCP) integration for external data enrichment during extraction
 
 - **IDP CLI - Command Line Interface for Batch Document Processing**
   - Added CLI tool (`idp_cli/`) for programmatic batch document processing and stack management
