@@ -50,7 +50,6 @@ SPDX-License-Identifier: MIT-0
   - Fixed invalid GovCloud template generation where ProcessChanges AppSync resources were not being removed, causing "Fn::GetAtt references undefined resource GraphQLApi" errors
   - Updated `scripts/generate_govcloud_template.py` to remove all ProcessChanges-related resources and extend AppSync parameter cleanup to all pattern stacks
   - Fixed InvalidClientTokenId validation error by ensuring CloudFormation client uses the correct region when validating templates (commercial vs GovCloud)
-
 - **Enhanced Processing Flow Visualization for Disabled Steps**
   - Fixed UX issue where disabled processing steps (when `summarization.enabled: false` or `assessment.enabled: false` in configuration) appeared visually identical to active steps in the "View Processing Flow" display
   - Added visual indicators to clearly distinguish disabled steps from active steps
