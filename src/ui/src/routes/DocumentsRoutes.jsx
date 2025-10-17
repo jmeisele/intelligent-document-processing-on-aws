@@ -1,11 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { ConsoleLogger } from 'aws-amplify/utils';
-
-import GenAIIDPLayout from '../components/genaiidp-layout';
+import CenteredSpinner from '../components/common/CenteredSpinner';
 import GenAIIDPTopNavigation from '../components/genai-idp-top-navigation';
+
+const GenAIIDPLayout = React.lazy(() => import('../components/genaiidp-layout'));
 
 const logger = new ConsoleLogger('DocumentsRoutes');
 
@@ -19,7 +20,9 @@ const DocumentsRoutes = () => {
         element={
           <div>
             <GenAIIDPTopNavigation />
-            <GenAIIDPLayout />
+            <Suspense fallback={<CenteredSpinner />}>
+              <GenAIIDPLayout />
+            </Suspense>
           </div>
         }
       />

@@ -1,6 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { AppLayout, Flashbar } from '@cloudscape-design/components';
 
@@ -11,20 +11,22 @@ import { DocumentsContext } from '../../contexts/documents';
 import useNotifications from '../../hooks/use-notifications';
 import useSplitPanel from '../../hooks/use-split-panel';
 import useGraphQlApi from '../../hooks/use-graphql-api';
+import CenteredSpinner from '../common/CenteredSpinner';
 
-import DocumentList from '../document-list';
-import DocumentDetails from '../document-details';
-import DocumentsQueryLayout from '../document-kb-query-layout';
-import DocumentsAgentsLayout from '../document-agents-layout/DocumentsAgentsLayout';
-import UploadDocumentPanel from '../upload-document';
-import DiscoveryPanel from '../discovery/DiscoveryPanel';
+const DocumentList = React.lazy(() => import('../document-list'));
+const DocumentDetails = React.lazy(() => import('../document-details'));
+const DocumentsQueryLayout = React.lazy(() => import('../document-kb-query-layout'));
+const DocumentsAgentsLayout = React.lazy(() => import('../document-agents-layout/DocumentsAgentsLayout'));
+const UploadDocumentPanel = React.lazy(() => import('../upload-document'));
+const DiscoveryPanel = React.lazy(() => import('../discovery/DiscoveryPanel'));
+const ConfigurationLayout = React.lazy(() => import('../configuration-layout'));
+
 import { appLayoutLabels } from '../common/labels';
 
 import Navigation from './navigation';
 import Breadcrumbs from './breadcrumbs';
 import ToolsPanel from './tools-panel';
 import SplitPanel from './documents-split-panel';
-import ConfigurationLayout from '../configuration-layout';
 
 import { DOCUMENT_LIST_SHARDS_PER_DAY, PERIODS_TO_LOAD_STORAGE_KEY } from '../document-list/documents-table-config';
 
@@ -112,13 +114,62 @@ const GenAIIDPLayout = () => {
         splitPanel={<SplitPanel />}
         content={
           <Routes>
-            <Route index element={<DocumentList />} />
-            <Route path="query" element={<DocumentsQueryLayout />} />
-            <Route path="agents" element={<DocumentsAgentsLayout />} />
-            <Route path="config" element={<ConfigurationLayout />} />
-            <Route path="upload" element={<UploadDocumentPanel />} />
-            <Route path="discovery" element={<DiscoveryPanel />} />
-            <Route path=":objectKey" element={<DocumentDetails />} />
+            <Route
+              index
+              element={
+                <Suspense fallback={<CenteredSpinner />}>
+                  <DocumentList />
+                </Suspense>
+              }
+            />
+            <Route
+              path="query"
+              element={
+                <Suspense fallback={<CenteredSpinner />}>
+                  <DocumentsQueryLayout />
+                </Suspense>
+              }
+            />
+            <Route
+              path="agents"
+              element={
+                <Suspense fallback={<CenteredSpinner />}>
+                  <DocumentsAgentsLayout />
+                </Suspense>
+              }
+            />
+            <Route
+              path="config"
+              element={
+                <Suspense fallback={<CenteredSpinner />}>
+                  <ConfigurationLayout />
+                </Suspense>
+              }
+            />
+            <Route
+              path="upload"
+              element={
+                <Suspense fallback={<CenteredSpinner />}>
+                  <UploadDocumentPanel />
+                </Suspense>
+              }
+            />
+            <Route
+              path="discovery"
+              element={
+                <Suspense fallback={<CenteredSpinner />}>
+                  <DiscoveryPanel />
+                </Suspense>
+              }
+            />
+            <Route
+              path=":objectKey"
+              element={
+                <Suspense fallback={<CenteredSpinner />}>
+                  <DocumentDetails />
+                </Suspense>
+              }
+            />
           </Routes>
         }
         ariaLabels={appLayoutLabels}
