@@ -445,7 +445,7 @@ const StepFunctionFlowViewer = ({ executionArn, visible, onDismiss, mergedConfig
                   <div className="timeline-step-content">
                     <div className="timeline-step-name">
                       {step.name}
-                      {stepDisabled && <Badge color="grey">Config Disabled</Badge>}
+                      {stepDisabled && <Badge color="grey">NOT ENABLED</Badge>}
                       {step.isMapIteration && <Badge color="green">Map Iteration</Badge>}
                       {step.type === 'Map' && step.mapIterations && (
                         <Badge color="blue">{step.mapIterations} iterations</Badge>

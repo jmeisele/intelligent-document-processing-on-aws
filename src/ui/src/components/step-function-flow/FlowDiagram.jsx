@@ -108,7 +108,7 @@ const FlowDiagram = ({ steps, onStepClick, selectedStep, getStepIcon, mergedConf
                 <div className="step-label">
                   <div className="step-name">
                     {step.name}
-                    {stepDisabled && <Badge color="grey">Config Disabled</Badge>}
+                    {stepDisabled && <Badge color="grey">NOT ENABLED</Badge>}
                     {isMapState && step.mapIterations && <Badge color="blue">{step.mapIterations} iterations</Badge>}
                   </div>
                   <div className={`step-status-text status-text-${step.status.toLowerCase()}`}>{step.status}</div>
