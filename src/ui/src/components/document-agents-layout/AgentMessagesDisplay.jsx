@@ -3,9 +3,9 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { Container, Header, Box, Spinner, SpaceBetween, Button, Modal } from '@awsui/components-react';
+import { Container, Header, Box, Spinner, SpaceBetween, Button, Modal } from '@cloudscape-design/components';
 
-const AgentMessagesDisplay = ({ agentMessages, isProcessing }) => {
+const AgentMessagesDisplay = ({ agentMessages = null, isProcessing = false }) => {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const [sqlModalVisible, setSqlModalVisible] = useState(false);
@@ -1167,11 +1167,6 @@ JOIN metering m ON ds."document_id" = m."document_id"
 AgentMessagesDisplay.propTypes = {
   agentMessages: PropTypes.string,
   isProcessing: PropTypes.bool,
-};
-
-AgentMessagesDisplay.defaultProps = {
-  agentMessages: null,
-  isProcessing: false,
 };
 
 export default AgentMessagesDisplay;

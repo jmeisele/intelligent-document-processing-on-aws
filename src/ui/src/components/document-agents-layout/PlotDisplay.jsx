@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Box, Container, Header, Select, SpaceBetween } from '@awsui/components-react';
+import { Box, Container, Header, Select, SpaceBetween } from '@cloudscape-design/components';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -32,7 +32,7 @@ ChartJS.register(
   Filler,
 );
 
-const PlotDisplay = ({ plotData }) => {
+const PlotDisplay = ({ plotData = null }) => {
   // Chart type options for the dropdown
   const chartTypeOptions = [
     { label: 'Bar Chart', value: 'bar' },
@@ -360,10 +360,6 @@ PlotDisplay.propTypes = {
       }),
     }),
   }),
-};
-
-PlotDisplay.defaultProps = {
-  plotData: null,
 };
 
 export default PlotDisplay;

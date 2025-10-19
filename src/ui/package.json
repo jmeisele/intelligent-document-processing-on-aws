@@ -3,7 +3,7 @@
   "version": "0.3.15",
   "private": true,
   "dependencies": {
-    "@aws-amplify/ui-react": "^4.6.4",
+    "@aws-amplify/ui-react": "^6.12.0",
     "@aws-crypto/sha256-browser": "^2.0.2",
     "@aws-crypto/sha256-js": "^2.0.2",
     "@aws-sdk/client-cognito-identity": "^3.777.0",
@@ -15,14 +15,14 @@
     "@aws-sdk/s3-request-presigner": "^3.779.0",
     "@aws-sdk/url-parser": "^3.374.0",
     "@aws-sdk/util-format-url": "^3.775.0",
-    "@awsui/collection-hooks": "^1.0.98",
-    "@awsui/components-react": "^3.0.1487",
-    "@awsui/global-styles": "^1.0.25",
+    "@cloudscape-design/collection-hooks": "^1.0.76",
+    "@cloudscape-design/components": "^3.0.1112",
+    "@cloudscape-design/global-styles": "^1.0.44",
     "@monaco-editor/react": "^4.7.0",
     "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^12.1.5",
-    "@testing-library/user-event": "^13.5.0",
-    "aws-amplify": "^5.3.11",
+    "@testing-library/react": "^14.3.1",
+    "@testing-library/user-event": "^14.5.2",
+    "aws-amplify": "^6.15.0",
     "axios": "^1.12.1",
     "brace-expansion": "^2.0.2",
     "chart.js": "^4.5.0",
@@ -34,32 +34,31 @@
     "mammoth": "^1.9.1",
     "postcss": "^8.5.6",
     "prop-types": "^15.8.1",
-    "react": "^17.0.2",
+    "react": "^18.3.1",
     "react-chartjs-2": "^5.3.0",
-    "react-dom": "^17.0.2",
+    "react-dom": "^18.3.1",
     "react-icons": "^4.12.0",
     "react-markdown": "^8.0.7",
-    "react-router-dom": "^5.3.4",
-    "react-scripts": "^5.0.1",
+    "react-router-dom": "^6.28.0",
     "rehype-raw": "^6.1.1",
     "remark-gfm": "^3.0.1",
     "serialize-javascript": "^6.0.2",
     "tmp": "^0.2.5",
     "vuera": "^0.2.7",
-    "webpack-dev-server": "^5.2.2",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
+    "dev": "vite",
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest",
     "lint": "npx eslint \"src/**/*.{js,jsx}\""
   },
   "eslintConfig": {
     "extends": [
-      "react-app",
-      "react-app/jest"
+      "airbnb",
+      "prettier"
     ]
   },
   "browserslist": {
@@ -77,6 +76,7 @@
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@babel/plugin-transform-react-jsx": "^7.22.15",
+    "@vitejs/plugin-react": "^5.0.4",
     "eslint": "^8.57.1",
     "eslint-config-airbnb": "^19.0.4",
     "eslint-config-prettier": "^8.10.0",
@@ -86,11 +86,13 @@
     "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^4.6.2",
-    "prettier": "^2.8.8"
+    "prettier": "^2.8.8",
+    "vite": "^7.1.10",
+    "vite-plugin-svgr": "^4.5.0"
   },
   "jest": {
     "transformIgnorePatterns": [
-      "<roodDir>/node_modules/(?!@awsui)"
+      "<roodDir>/node_modules/(?!@cloudscape-design)"
     ]
   },
   "overrides": {

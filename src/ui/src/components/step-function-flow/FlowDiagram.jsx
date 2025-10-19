@@ -3,7 +3,7 @@
 
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Box, Badge } from '@awsui/components-react';
+import { Box, Badge } from '@cloudscape-design/components';
 import './FlowDiagram.css';
 
 // Helper function to check if a step is disabled based on configuration
@@ -25,7 +25,7 @@ const isStepDisabled = (stepName, config) => {
   return false;
 };
 
-const FlowDiagram = ({ steps, onStepClick, selectedStep, getStepIcon, mergedConfig }) => {
+const FlowDiagram = ({ steps = [], onStepClick, selectedStep = null, getStepIcon }) => {
   if (!steps || steps.length === 0) {
     return (
       <Box textAlign="center" padding="xl">
@@ -239,12 +239,6 @@ FlowDiagram.propTypes = {
       enabled: PropTypes.bool,
     }),
   }),
-};
-
-FlowDiagram.defaultProps = {
-  steps: [],
-  selectedStep: null,
-  mergedConfig: null,
 };
 
 export default FlowDiagram;

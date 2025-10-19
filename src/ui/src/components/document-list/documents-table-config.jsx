@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
-import { Button, ButtonDropdown, CollectionPreferences, Link, SpaceBetween } from '@awsui/components-react';
+import { Button, ButtonDropdown, CollectionPreferences, Link, SpaceBetween } from '@cloudscape-design/components';
 
 import { TableHeader } from '../common/table';
 import { DOCUMENTS_PATH } from '../../routes/constants';

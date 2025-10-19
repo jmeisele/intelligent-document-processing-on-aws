@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 
 import React from 'react';
-import { HelpPanel } from '@awsui/components-react';
+import { HelpPanel } from '@cloudscape-design/components';
 
 const header = <h2>Configuration</h2>;
 const content = (

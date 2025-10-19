@@ -3,13 +3,16 @@
 
 /* eslint-disable react/prop-types */
 import React, { useState, useEffect } from 'react';
-import { SpaceBetween, Box, Button, StatusIndicator } from '@awsui/components-react';
-import { API, graphqlOperation, Logger } from 'aws-amplify';
+import { SpaceBetween, Box, Button, StatusIndicator } from '@cloudscape-design/components';
+import { generateClient } from 'aws-amplify/api';
+import { ConsoleLogger } from 'aws-amplify/utils';
+
 import copyToBaselineMutation from '../../graphql/queries/copyToBaseline';
 import FileViewer from '../document-viewer/FileViewer';
 import { MarkdownReport } from '../document-viewer/MarkdownViewer';
 
-const logger = new Logger('DocumentViewers');
+const client = generateClient();
+const logger = new ConsoleLogger('DocumentViewers');
 
 const ViewerControls = ({
   onViewSource,
@@ -142,11 +145,12 @@ const DocumentViewers = ({ objectKey, evaluationReportUri, summaryReportUri, eva
     setCopyStatus('in-progress');
 
     try {
-      const result = await API.graphql(
-        graphqlOperation(copyToBaselineMutation, {
+      const result = await client.graphql({
+        query: copyToBaselineMutation,
+        variables: {
           objectKey,
-        }),
-      );
+        },
+      });
 
       // The Lambda returns immediately, so check the result
       if (result.data.copyToBaseline.success) {

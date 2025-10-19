@@ -1,9 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React, { useEffect, useState } from 'react';
-import { Table, Pagination, TextFilter } from '@awsui/components-react';
-import { useCollection } from '@awsui/collection-hooks';
-import { Logger } from 'aws-amplify';
+import { Table, Pagination, TextFilter } from '@cloudscape-design/components';
+import { useCollection } from '@cloudscape-design/collection-hooks';
+import { ConsoleLogger } from 'aws-amplify/utils';
 
 import useDocumentsContext from '../../contexts/documents';
 import useSettingsContext from '../../contexts/settings';
@@ -27,9 +27,9 @@ import {
 
 import { getFilterCounterText, TableEmptyState, TableNoMatchState } from '../common/table';
 
-import '@awsui/global-styles/index.css';
+import '@cloudscape-design/global-styles/index.css';
 
-const logger = new Logger('DocumentList');
+const logger = new ConsoleLogger('DocumentList');
 
 const DocumentList = () => {
   const [documentList, setDocumentList] = useState([]);
