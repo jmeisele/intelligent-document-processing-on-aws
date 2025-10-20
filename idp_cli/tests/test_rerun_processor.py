@@ -37,9 +37,8 @@ class TestRerunProcessor:
         self, mock_boto_client, mock_stack_info_class
     ):
         """Test document preparation for classification rerun"""
-        from idp_common.models import Document, Page, Section, Status
-
         from idp_cli.rerun_processor import RerunProcessor
+        from idp_common.models import Document, Page, Section, Status
 
         mock_stack_info = MagicMock()
         mock_stack_info.validate_stack.return_value = True
@@ -92,9 +91,8 @@ class TestRerunProcessor:
         self, mock_boto_client, mock_stack_info_class
     ):
         """Test document preparation for extraction rerun"""
-        from idp_common.models import Document, Page, Section, Status
-
         from idp_cli.rerun_processor import RerunProcessor
+        from idp_common.models import Document, Page, Section, Status
 
         mock_stack_info = MagicMock()
         mock_stack_info.validate_stack.return_value = True
@@ -147,9 +145,8 @@ class TestRerunProcessor:
     @patch("boto3.client")
     def test_send_to_queue(self, mock_boto_client, mock_stack_info_class):
         """Test sending document to SQS queue"""
-        from idp_common.models import Document, Status
-
         from idp_cli.rerun_processor import RerunProcessor
+        from idp_common.models import Document, Status
 
         mock_stack_info = MagicMock()
         mock_stack_info.validate_stack.return_value = True

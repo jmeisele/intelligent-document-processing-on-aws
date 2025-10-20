@@ -9,7 +9,6 @@ import csv
 import json
 
 import pytest
-
 from idp_cli.manifest_parser import ManifestParser, parse_manifest, validate_manifest
 
 
