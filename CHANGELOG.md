@@ -5,6 +5,15 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+### Changed
+
+- **Migrated UI Build System from Create React App to Vite**
+  - Upgraded to Vite 7 for faster build times
+  - Updated to React 18, AWS Amplify v6, react-router-dom v6, and Cloudscape Design System
+  - Reduced dependencies and node_modules size
+  - Implemented strategic code splitting for improved performance
+  - Environment variables now use `VITE_` prefix instead of `REACT_APP_` for local development
+
 ## [0.3.20]
 
 ### Added
