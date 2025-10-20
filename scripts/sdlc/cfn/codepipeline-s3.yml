@@ -160,7 +160,7 @@ Resources:
                 - make install -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX
                 - make smoketest -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX
                 - echo "All tests passed successfully, running cleanup..."
-                - make uninstall -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX || echo "Cleanup failed but continuing"
+                - make uninstall -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX && aws cloudformation delete-stack --stack-name ${IDP_CFN_PREFIX}-cloudformation-service-role --region us-east-1 || echo "Cleanup failed but continuing"
 
   DeploymentPipeline:
     Type: 'AWS::CodePipeline::Pipeline'
