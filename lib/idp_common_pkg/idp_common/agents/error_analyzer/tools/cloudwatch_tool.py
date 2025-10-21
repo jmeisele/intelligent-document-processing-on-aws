@@ -26,11 +26,11 @@ def search_cloudwatch_logs(
     max_events: int = 10,
     start_time: datetime = None,
     end_time: datetime = None,
+    request_id: str = None,
 ) -> Dict[str, Any]:
     """
     Search CloudWatch logs within a specific log group for matching patterns.
-    Internal utility function that performs the actual log filtering and event retrieval.
-    Handles time window calculations and event formatting.
+    Enhanced with request ID-first search strategy for precise log correlation.
 
     Args:
         log_group_name: CloudWatch log group name to search
@@ -39,6 +39,7 @@ def search_cloudwatch_logs(
         max_events: Maximum number of events to return
         start_time: Optional start time for search window
         end_time: Optional end time for search window
+        request_id: Optional Lambda request ID for precise filtering
 
     Returns:
         Dict containing found events and search metadata
@@ -72,12 +73,10 @@ def search_cloudwatch_logs(
             "limit": search_limit,
         }
 
-        if filter_pattern:
-            # Sanitize filter pattern to avoid CloudWatch API errors
-            # Remove or replace problematic characters that cause InvalidParameterException
-            sanitized_pattern = filter_pattern.replace(":", "")
-            if sanitized_pattern.strip():
-                params["filterPattern"] = sanitized_pattern
+        # Build filter pattern with request ID priority
+        final_filter_pattern = _build_filter_pattern(filter_pattern, request_id)
+        if final_filter_pattern:
+            params["filterPattern"] = final_filter_pattern
 
         response = client.filter_log_events(**params)
 
@@ -122,12 +121,40 @@ def search_cloudwatch_logs(
             "log_group": log_group_name,
             "events_found": len(events),
             "events": events,
-            "filter_pattern": filter_pattern,
+            "filter_pattern": final_filter_pattern,
+            "request_id_used": request_id,
+            "search_strategy": "request_id" if request_id else "pattern",
         }
 
     except Exception as e:
         logger.error(f"CloudWatch search failed for log group '{log_group_name}': {e}")
         return create_error_response(str(e), events_found=0, events=[])
+
+
+def _build_filter_pattern(base_pattern: str, request_id: str = None) -> str:
+    """
+    Build CloudWatch filter pattern with request ID priority.
+
+    Args:
+        base_pattern: Base filter pattern (e.g., "ERROR")
+        request_id: Lambda request ID for precise filtering
+
+    Returns:
+        Optimized filter pattern string
+    """
+    if request_id:
+        # Request ID-first strategy: combine request ID with error patterns
+        if base_pattern and base_pattern.strip():
+            # Sanitize base pattern
+            sanitized_base = base_pattern.replace(":", "")
+            return f"{request_id} {sanitized_base}"
+        else:
+            return request_id
+    elif base_pattern:
+        # Fallback to base pattern only
+        return base_pattern.replace(":", "")
+    else:
+        return ""
 
 
 def get_cloudwatch_log_groups(prefix: str = "") -> Dict[str, Any]:
@@ -288,7 +315,7 @@ def cloudwatch_document_logs(
         # Use safe integer conversion with defaults
         max_log_events = safe_int_conversion(max_log_events, 10)
         max_log_groups = safe_int_conversion(max_log_groups, 20)
-        # Get document execution context
+        # Get document execution context with enhanced request ID mapping
         context = lambda_document_context(document_id, stack_name)
 
         if not context.get("document_found"):
@@ -322,22 +349,40 @@ def cloudwatch_document_logs(
         start_time = context.get("processing_start_time")
         end_time = context.get("processing_end_time")
 
-        # Build filter patterns for document-specific search with priority order
-        # Priority 1: Actual error level patterns
-        error_patterns = ["[ERROR]", "[WARN]", "ERROR:", "WARN:", "Exception", "Failed"]
+        # Enhanced search strategy with request ID priority
+        request_ids = context.get("lambda_request_ids", [])
+        function_request_map = context.get("function_request_map", {})
+        failed_functions = context.get("failed_functions", [])
+        primary_failed_function = context.get("primary_failed_function")
 
-        # Priority 2: Execution context patterns
-        context_patterns = []
+        # Priority 1: Request IDs from failed functions
+        priority_request_ids = []
+        if primary_failed_function and primary_failed_function in function_request_map:
+            priority_request_ids.append(function_request_map[primary_failed_function])
+
+        # Priority 2: All request IDs from failed functions
+        for func in failed_functions:
+            if func in function_request_map:
+                req_id = function_request_map[func]
+                if req_id not in priority_request_ids:
+                    priority_request_ids.append(req_id)
+
+        # Priority 3: All other request IDs
+        fallback_request_ids = [
+            rid for rid in request_ids if rid not in priority_request_ids
+        ]
+
+        # Priority 4: Fallback patterns
         execution_arn = context.get("execution_arn")
+        fallback_patterns = []
         if execution_arn:
             execution_name = execution_arn.split(":")[-1]
-            context_patterns.append(execution_name)
+            fallback_patterns.append(execution_name)
 
-        request_ids = context.get("lambda_request_ids", [])
-        context_patterns.extend(request_ids)
-
-        # Combine patterns with error patterns first (higher priority)
-        search_patterns = error_patterns + context_patterns
+        # Combine all search patterns in priority order
+        search_patterns = (
+            priority_request_ids + fallback_request_ids + fallback_patterns
+        )
 
         # Search logs with multiple patterns, prioritizing error patterns
         all_results = []
@@ -349,17 +394,21 @@ def cloudwatch_document_logs(
         for group in groups_to_search:
             log_group_name = group["name"]
 
-            # Try each search pattern
+            # Try each search pattern with request ID priority
             for pattern in search_patterns:
                 if not pattern:
                     continue
 
+                # Determine if this is a request ID or fallback pattern
+                is_request_id = pattern in (priority_request_ids + fallback_request_ids)
+
                 search_result = search_cloudwatch_logs(
                     log_group_name=log_group_name,
-                    filter_pattern=pattern,
+                    filter_pattern="ERROR" if is_request_id else pattern,
                     max_events=max_log_events,
                     start_time=start_time,
                     end_time=end_time,
+                    request_id=pattern if is_request_id else None,
                 )
 
                 if search_result.get("events_found", 0) > 0:
@@ -377,8 +426,8 @@ def cloudwatch_document_logs(
                     )
                     total_events += search_result["events_found"]
 
-                    # Mark if we found actual error patterns
-                    if pattern in error_patterns:
+                    # Mark if we found actual errors from request ID search
+                    if is_request_id:
                         found_actual_errors = True
                 else:
                     logger.debug(
@@ -395,6 +444,9 @@ def cloudwatch_document_logs(
             "document_status": context.get("document_status"),
             "execution_arn": execution_arn,
             "search_patterns_used": search_patterns,
+            "priority_request_ids": priority_request_ids,
+            "failed_functions": failed_functions,
+            "primary_failed_function": primary_failed_function,
             "processing_time_window": {
                 "start": start_time.isoformat() if start_time else None,
                 "end": end_time.isoformat() if end_time else None,

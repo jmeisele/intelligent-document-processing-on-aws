@@ -9,7 +9,7 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import boto3
 from strands import tool
@@ -38,48 +38,117 @@ def get_lookup_function_name() -> str:
     raise ValueError("LOOKUP_FUNCTION_NAME environment variable not set")
 
 
-def extract_lambda_request_ids(execution_events: List[Dict[str, Any]]) -> List[str]:
+def extract_lambda_request_ids(
+    execution_events: List[Dict[str, Any]],
+) -> Dict[str, Any]:
     """
-    Extract Lambda request IDs from Step Functions execution event history.
-    Parses Step Function execution events to find Lambda function invocation request IDs
-    for targeted CloudWatch log filtering.
+    Extract Lambda request IDs from Step Functions execution event history with function mapping.
+    Enhanced to extract request IDs from multiple event fields and map them to specific Lambda functions.
 
     Args:
         execution_events: List of Step Function execution events
 
     Returns:
-        List of unique Lambda request ID strings
+        Dict containing request IDs mapped to functions and failure information
     """
-    request_ids = []
+    function_request_map = {}
+    failed_functions = []
+    all_request_ids = []
 
     for event in execution_events:
         event_type = event.get("type", "")
 
-        # Look for Lambda task events
+        # Extract function name from various event types
+        function_name = None
+        request_id = None
+
         if event_type in [
             "LambdaFunctionSucceeded",
             "LambdaFunctionFailed",
             "LambdaFunctionTimedOut",
+            "TaskStateEntered",
+            "TaskStateExited",
         ]:
-            # Extract request ID from event details if available
-            event_detail = (
-                event.get("lambdaFunctionSucceededEventDetails")
-                or event.get("lambdaFunctionFailedEventDetails")
-                or event.get("lambdaFunctionTimedOutEventDetails")
-            )
+            # Get function name from resource ARN or state name
+            if "LambdaFunction" in event_type:
+                event_detail = (
+                    event.get("lambdaFunctionSucceededEventDetails")
+                    or event.get("lambdaFunctionFailedEventDetails")
+                    or event.get("lambdaFunctionTimedOutEventDetails")
+                )
+            elif "TaskState" in event_type:
+                event_detail = event.get("stateEnteredEventDetails") or event.get(
+                    "stateExitedEventDetails"
+                )
+            else:
+                event_detail = None
 
-            if event_detail and isinstance(event_detail, dict):
-                # Request ID might be in output or error details
-                output = event_detail.get("output", "")
-                if output:
-                    try:
-                        output_data = json.loads(output)
-                        if "requestId" in output_data:
-                            request_ids.append(output_data["requestId"])
-                    except (json.JSONDecodeError, TypeError):
-                        pass
+            if event_detail:
+                # Extract function name
+                resource = event_detail.get("resource", "")
+                name = event_detail.get("name", "")
 
-    return list(set(request_ids))  # Remove duplicates
+                if resource and ":function:" in resource:
+                    function_name = resource.split(":function:")[-1]
+                elif name:
+                    function_name = name
+
+                # Also check for function name in resource ARN without :function: prefix
+                if not function_name and resource:
+                    # Handle cases like arn:aws:lambda:region:account:function:FunctionName
+                    arn_parts = resource.split(":")
+                    if len(arn_parts) >= 6 and arn_parts[2] == "lambda":
+                        function_name = arn_parts[6]
+
+                # Extract request ID from multiple fields
+                for field in ["output", "cause", "error", "input"]:
+                    field_data = event_detail.get(field, "")
+                    if field_data:
+                        request_id = _extract_request_id_from_json(field_data)
+                        if request_id:
+                            break
+
+                # Track failed functions
+                if event_type in ["LambdaFunctionFailed", "LambdaFunctionTimedOut"]:
+                    if function_name:
+                        failed_functions.append(function_name)
+
+                # Map function to request ID
+                if function_name and request_id:
+                    function_request_map[function_name] = request_id
+                    all_request_ids.append(request_id)
+
+    return {
+        "function_request_map": function_request_map,
+        "failed_functions": list(set(failed_functions)),
+        "all_request_ids": list(set(all_request_ids)),
+        "primary_failed_function": failed_functions[0] if failed_functions else None,
+    }
+
+
+def _extract_request_id_from_json(json_string: str) -> Optional[str]:
+    """
+    Extract request ID from JSON string in various formats.
+
+    Args:
+        json_string: JSON string that may contain request ID
+
+    Returns:
+        Request ID string if found, None otherwise
+    """
+    if not json_string:
+        return None
+
+    try:
+        data = json.loads(json_string)
+        # Check common request ID field names
+        for field in ["requestId", "request_id", "RequestId", "awsRequestId"]:
+            if field in data and data[field]:
+                return str(data[field])
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    return None
 
 
 @tool
@@ -134,8 +203,12 @@ def lambda_document_context(document_id: str, stack_name: str = "") -> Dict[str,
         execution_arn = processing_detail.get("executionArn")
         execution_events = processing_detail.get("events", [])
 
-        # Extract Lambda request IDs from execution events
-        request_ids = extract_lambda_request_ids(execution_events)
+        # Extract Lambda request IDs and function mapping from execution events
+        request_context = extract_lambda_request_ids(execution_events)
+        request_ids = request_context.get("all_request_ids", [])
+        function_request_map = request_context.get("function_request_map", {})
+        failed_functions = request_context.get("failed_functions", [])
+        primary_failed_function = request_context.get("primary_failed_function")
 
         # Get timestamps for precise time windows
         timestamps = payload.get("timing", {}).get("timestamps", {})
@@ -161,6 +234,9 @@ def lambda_document_context(document_id: str, stack_name: str = "") -> Dict[str,
                 "document_status": payload.get("status"),
                 "execution_arn": execution_arn,
                 "lambda_request_ids": request_ids,
+                "function_request_map": function_request_map,
+                "failed_functions": failed_functions,
+                "primary_failed_function": primary_failed_function,
                 "timestamps": timestamps,
                 "processing_start_time": start_time,
                 "processing_end_time": end_time,
