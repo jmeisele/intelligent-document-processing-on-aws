@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: MIT-0
 
 import { useState, useEffect } from 'react';
-import { API, graphqlOperation, Logger } from 'aws-amplify';
+import { generateClient } from 'aws-amplify/api';
+import { ConsoleLogger } from 'aws-amplify/utils';
 import getConfigurationQuery from '../graphql/queries/getConfiguration';
 import updateConfigurationMutation from '../graphql/queries/updateConfiguration';
 
-const logger = new Logger('useConfiguration');
+const client = generateClient();
+const logger = new ConsoleLogger('useConfiguration');
 
 // Utility function to normalize boolean values from strings
 const normalizeBooleans = (obj, schema) => {
@@ -91,7 +93,7 @@ const useConfiguration = () => {
     setError(null);
     try {
       logger.debug('Fetching configuration...');
-      const result = await API.graphql(graphqlOperation(getConfigurationQuery));
+      const result = await client.graphql({ query: getConfigurationQuery });
       logger.debug('API response:', result);
 
       const { Schema, Default, Custom } = result.data.getConfiguration;
@@ -206,7 +208,10 @@ const useConfiguration = () => {
 
       logger.debug('Sending customConfig string:', configString);
 
-      const result = await API.graphql(graphqlOperation(updateConfigurationMutation, { customConfig: configString }));
+      const result = await client.graphql({
+        query: updateConfigurationMutation,
+        variables: { customConfig: configString },
+      });
 
       if (result.data.updateConfiguration) {
         setCustomConfig(configToUpdate);

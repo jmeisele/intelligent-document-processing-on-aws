@@ -16,7 +16,7 @@ import {
   FormField,
   Input,
   RadioGroup,
-} from '@awsui/components-react';
+} from '@cloudscape-design/components';
 import Editor from '@monaco-editor/react';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import yaml from 'js-yaml';
@@ -913,10 +913,14 @@ const ConfigurationLayout = () => {
     return (
       <Container header={<Header variant="h2">Configuration</Header>}>
         <Alert type="error" header="Error loading configuration">
-          {error}
-          <Button onClick={fetchConfiguration} variant="primary" style={{ marginTop: '1rem' }}>
-            Retry
-          </Button>
+          <SpaceBetween size="s">
+            <div>{error}</div>
+            <Box>
+              <Button onClick={fetchConfiguration} variant="primary">
+                Retry
+              </Button>
+            </Box>
+          </SpaceBetween>
         </Alert>
       </Container>
     );
@@ -926,10 +930,14 @@ const ConfigurationLayout = () => {
     return (
       <Container header={<Header variant="h2">Configuration</Header>}>
         <Alert type="error" header="Configuration not available">
-          Unable to load configuration schema or values.
-          <Button onClick={fetchConfiguration} variant="primary" style={{ marginTop: '1rem' }}>
-            Retry
-          </Button>
+          <SpaceBetween size="s">
+            <div>Unable to load configuration schema or values.</div>
+            <Box>
+              <Button onClick={fetchConfiguration} variant="primary">
+                Retry
+              </Button>
+            </Box>
+          </SpaceBetween>
         </Alert>
       </Container>
     );
@@ -1043,12 +1051,12 @@ const ConfigurationLayout = () => {
                   ]}
                 />
                 {viewMode === 'json' && (
-                  <Button onClick={formatJson} iconName="file-text">
+                  <Button onClick={formatJson} iconName="file">
                     Format JSON
                   </Button>
                 )}
                 {viewMode === 'yaml' && (
-                  <Button onClick={formatYaml} iconName="file-text">
+                  <Button onClick={formatYaml} iconName="file">
                     Format YAML
                   </Button>
                 )}

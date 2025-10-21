@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
-import { Link } from '@awsui/components-react';
+import { Link } from '@cloudscape-design/components';
 
 /**
  * Shared function to render HITL (A2I) status consistently across all components

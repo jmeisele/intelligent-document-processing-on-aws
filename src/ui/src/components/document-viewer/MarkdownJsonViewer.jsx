@@ -3,14 +3,16 @@
 
 /* eslint-disable react/prop-types, react/destructuring-assignment, no-nested-ternary, no-use-before-define */
 import React, { useState, useEffect } from 'react';
-import { Box, SpaceBetween, Button, Toggle, Alert, SegmentedControl } from '@awsui/components-react';
-import { API, Logger } from 'aws-amplify';
+import { Box, SpaceBetween, Button, Toggle, Alert, SegmentedControl } from '@cloudscape-design/components';
+import { generateClient } from 'aws-amplify/api';
+import { ConsoleLogger } from 'aws-amplify/utils';
 import { Editor } from '@monaco-editor/react';
 import getFileContents from '../../graphql/queries/getFileContents';
 import uploadDocument from '../../graphql/queries/uploadDocument';
 import MarkdownViewer from './MarkdownViewer';
 
-const logger = new Logger('MarkdownJsonViewer');
+const client = generateClient();
+const logger = new ConsoleLogger('MarkdownJsonViewer');
 
 const EDITOR_DEFAULT_HEIGHT = '600px';
 
@@ -225,7 +227,7 @@ const MarkdownJsonViewer = ({ fileUri, textConfidenceUri, fileType = 'text', but
     try {
       logger.info('Fetching content:', uriToFetch);
 
-      const response = await API.graphql({
+      const response = await client.graphql({
         query: getFileContents,
         variables: { s3Uri: uriToFetch },
       });
@@ -276,7 +278,7 @@ const MarkdownJsonViewer = ({ fileUri, textConfidenceUri, fileType = 'text', but
       const prefix = fullPath.substring(0, fullPath.lastIndexOf('/'));
 
       // Get presigned URL
-      const response = await API.graphql({
+      const response = await client.graphql({
         query: uploadDocument,
         variables: {
           fileName,

@@ -459,50 +459,6 @@ class BatchProcessor:
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         return f"{prefix}-{timestamp}"
 
-    def _process_document(self, doc: Dict, batch_id: str) -> str:
-        """
-        Process a single document (upload, copy, or reference)
-
-        Args:
-            doc: Document specification from manifest
-            batch_id: Batch identifier
-
-        Returns:
-            S3 key for the document in InputBucket
-        """
-        if doc["type"] == "local":
-            # Upload local file to InputBucket
-            s3_key = self._upload_local_file(doc, batch_id)
-            logger.info(f"Uploaded {doc['filename']} to {s3_key}")
-            return s3_key
-        elif doc["type"] == "s3":
-            # Copy from external S3 location to InputBucket
-            s3_key = self._copy_s3_file(doc, batch_id)
-            logger.info(f"Copied {doc['filename']} from {doc['path']} to {s3_key}")
-            return s3_key
-        elif doc["type"] == "s3-key":
-            # Document already in InputBucket, validate it exists
-            s3_key = doc["path"]
-            self._validate_s3_key(s3_key)
-            logger.info(f"Referenced existing {doc['filename']} at {s3_key}")
-            return s3_key
-        else:
-            raise ValueError(f"Unknown document type: {doc['type']}")
-
-    def _upload_local_file(self, doc: Dict, batch_id: str) -> str:
-        """Upload local file to S3 InputBucket"""
-        local_path = doc["path"]
-        filename = doc["filename"]
-
-        # Construct S3 key: batch_id/filename
-        s3_key = f"{batch_id}/{filename}"
-
-        # Upload file
-        input_bucket = self.resources["InputBucket"]
-        self.s3.upload_file(Filename=local_path, Bucket=input_bucket, Key=s3_key)
-
-        return s3_key
-
     def _copy_s3_file(self, doc: Dict, batch_id: str) -> str:
         """
         Copy file from any S3 location to InputBucket

@@ -12,8 +12,9 @@ import {
   FormField,
   Input,
   Checkbox,
-} from '@awsui/components-react';
-import { API, Logger } from 'aws-amplify';
+} from '@cloudscape-design/components';
+import { generateClient } from 'aws-amplify/api';
+import { ConsoleLogger } from 'aws-amplify/utils';
 import { Editor } from '@monaco-editor/react';
 import getFileContents from '../../graphql/queries/getFileContents';
 import uploadDocument from '../../graphql/queries/uploadDocument';
@@ -21,7 +22,8 @@ import { getFieldHighlightInfo, getFieldConfidenceInfo } from '../common/confide
 // Lazy load VisualEditorModal for better performance
 const VisualEditorModal = React.lazy(() => import('./VisualEditorModal'));
 
-const logger = new Logger('FileEditor');
+const client = generateClient();
+const logger = new ConsoleLogger('FileEditor');
 
 const EDITOR_DEFAULT_HEIGHT = '600px';
 
@@ -575,7 +577,7 @@ const JSONViewer = ({ fileUri, fileType = 'text', buttonText = 'View File', sect
     try {
       logger.info('Fetching content:', fileUri);
 
-      const response = await API.graphql({
+      const response = await client.graphql({
         query: getFileContents,
         variables: { s3Uri: fileUri },
       });
@@ -619,7 +621,7 @@ const JSONViewer = ({ fileUri, fileType = 'text', buttonText = 'View File', sect
       const prefix = fullPath.substring(0, fullPath.lastIndexOf('/'));
 
       // Get presigned URL
-      const response = await API.graphql({
+      const response = await client.graphql({
         query: uploadDocument,
         variables: {
           fileName,

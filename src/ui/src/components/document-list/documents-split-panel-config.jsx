@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
-import { Table, ColumnLayout, Box, Link } from '@awsui/components-react';
+import { Table, ColumnLayout, Box, Link } from '@cloudscape-design/components';
 import { SELECTION_LABELS } from './documents-table-config';
 import { DOCUMENTS_PATH } from '../../routes/constants';
 

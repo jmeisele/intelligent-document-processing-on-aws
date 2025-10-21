@@ -5,14 +5,27 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import { Box, Button, Spinner, Header, Grid, Container, SpaceBetween, Input, Link } from '@awsui/components-react';
+import {
+  Box,
+  Button,
+  Spinner,
+  Header,
+  Grid,
+  Container,
+  SpaceBetween,
+  Input,
+  Link,
+} from '@cloudscape-design/components';
 import PropTypes from 'prop-types';
-import { API, Logger } from 'aws-amplify';
+import { generateClient } from 'aws-amplify/api';
+import { ConsoleLogger } from 'aws-amplify/utils';
+
 import queryKnowledgeBase from '../../graphql/queries/queryKnowledgeBase';
 import { DOCUMENTS_PATH } from '../../routes/constants';
 import useSettingsContext from '../../contexts/settings';
 
-const logger = new Logger('queryKnowledgeBase');
+const client = generateClient();
+const logger = new ConsoleLogger('queryKnowledgeBase');
 
 const ValueWithLabel = ({ label, index, children }) => (
   <>
@@ -77,7 +90,7 @@ export const DocumentsQueryLayout = () => {
   };
 
   const getDocumentsQueryResponseFromKB = async (input, sessionId) => {
-    const response = await API.graphql({
+    const response = await client.graphql({
       query: queryKnowledgeBase,
       variables: { input, sessionId },
     });
@@ -179,7 +192,7 @@ export const DocumentsQueryLayout = () => {
               </ValueWithLabel>
             ))
           ) : (
-            <ValueWithLabel key="nosummary">{`${initialMsg}`}</ValueWithLabel>
+            <ValueWithLabel key="nosummary" label="" index={0}>{`${initialMsg}`}</ValueWithLabel>
           )}
         </SpaceBetween>
       </div>

@@ -5,6 +5,21 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+### Changed
+
+- **Migrated UI Build System from Create React App to Vite**
+  - Upgraded to Vite 7 for faster build times
+  - Updated to React 18, AWS Amplify v6, react-router-dom v6, and Cloudscape Design System
+  - Reduced dependencies and node_modules size
+  - Implemented strategic code splitting for improved performance
+  - Environment variables now use `VITE_` prefix instead of `REACT_APP_` for local development
+
+### Fixed
+
+- **IDP CLI Code Cleanup and Portability Improvements** - [#91](https://github.com/aws-solutions-library-samples/accelerated-intelligent-document-processing-on-aws/issues/91), [#92](https://github.com/aws-solutions-library-samples/accelerated-intelligent-document-processing-on-aws/issues/92)
+  - Removed dead code from previous refactors in batch_processor.py (51 lines)
+  - Replaced hardcoded absolute paths with dynamic path resolution in rerun_processor.py for cross-platform compatibility
+
 ## [0.3.20]
 
 ### Added

@@ -3,8 +3,9 @@
 
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { API, Logger } from 'aws-amplify';
-import { Modal, Box, SpaceBetween, Button, Spinner, Alert, Header } from '@awsui/components-react';
+import { generateClient } from 'aws-amplify/api';
+import { ConsoleLogger } from 'aws-amplify/utils';
+import { Modal, Box, SpaceBetween, Button, Spinner, Alert, Header } from '@cloudscape-design/components';
 
 import submitAgentQuery from '../../graphql/queries/submitAgentQuery';
 import getAgentJobStatus from '../../graphql/queries/getAgentJobStatus';
@@ -13,9 +14,10 @@ import listAvailableAgents from '../../graphql/queries/listAvailableAgents';
 import AgentResultDisplay from '../document-agents-layout/AgentResultDisplay';
 import AgentMessagesDisplay from '../document-agents-layout/AgentMessagesDisplay';
 
-const logger = new Logger('TroubleshootModal');
+const client = generateClient();
+const logger = new ConsoleLogger('TroubleshootModal');
 
-const TroubleshootModal = ({ visible, onDismiss, documentItem, existingJob, onJobUpdate }) => {
+const TroubleshootModal = ({ visible, onDismiss, documentItem = null, existingJob = null, onJobUpdate = null }) => {
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   const [jobResult, setJobResult] = useState(null);
@@ -30,43 +32,45 @@ const TroubleshootModal = ({ visible, onDismiss, documentItem, existingJob, onJo
   const subscribeToJobCompletion = (id) => {
     try {
       logger.debug('Subscribing to job completion for job ID:', id);
-      const sub = API.graphql({
-        query: onAgentJobComplete,
-        variables: { jobId: id },
-      }).subscribe({
-        next: async ({ value }) => {
-          const jobCompleted = value?.data?.onAgentJobComplete;
-          logger.debug('Job completion notification:', jobCompleted);
+      const sub = client
+        .graphql({
+          query: onAgentJobComplete,
+          variables: { jobId: id },
+        })
+        .subscribe({
+          next: async ({ value }) => {
+            const jobCompleted = value?.data?.onAgentJobComplete;
+            logger.debug('Job completion notification:', jobCompleted);
 
-          if (jobCompleted) {
-            try {
-              const jobResponse = await API.graphql({
-                query: getAgentJobStatus,
-                variables: { jobId: id },
-              });
+            if (jobCompleted) {
+              try {
+                const jobResponse = await client.graphql({
+                  query: getAgentJobStatus,
+                  variables: { jobId: id },
+                });
 
-              const job = jobResponse?.data?.getAgentJobStatus;
-              if (job) {
-                setJobStatus(job.status);
-                setAgentMessages(job.agent_messages);
+                const job = jobResponse?.data?.getAgentJobStatus;
+                if (job) {
+                  setJobStatus(job.status);
+                  setAgentMessages(job.agent_messages);
 
-                if (job.status === 'COMPLETED') {
-                  setJobResult(job.result);
-                } else if (job.status === 'FAILED') {
-                  setError(job.error || 'Job processing failed');
+                  if (job.status === 'COMPLETED') {
+                    setJobResult(job.result);
+                  } else if (job.status === 'FAILED') {
+                    setError(job.error || 'Job processing failed');
+                  }
                 }
+              } catch (fetchError) {
+                logger.error('Error fetching job details:', fetchError);
+                setError(`Failed to fetch job details: ${fetchError.message}`);
               }
-            } catch (fetchError) {
-              logger.error('Error fetching job details:', fetchError);
-              setError(`Failed to fetch job details: ${fetchError.message}`);
             }
-          }
-        },
-        error: (err) => {
-          logger.error('Subscription error:', err);
-          setError(`Subscription error: ${err.message}`);
-        },
-      });
+          },
+          error: (err) => {
+            logger.error('Subscription error:', err);
+            setError(`Subscription error: ${err.message}`);
+          },
+        });
 
       setSubscription(sub);
       return sub;
@@ -79,7 +83,7 @@ const TroubleshootModal = ({ visible, onDismiss, documentItem, existingJob, onJo
 
   const checkAvailableAgents = async () => {
     try {
-      const response = await API.graphql({ query: listAvailableAgents });
+      const response = await client.graphql({ query: listAvailableAgents });
       const agents = response?.data?.listAvailableAgents || [];
       setAvailableAgents(agents);
       logger.debug('Available agents:', agents);
@@ -117,7 +121,7 @@ const TroubleshootModal = ({ visible, onDismiss, documentItem, existingJob, onJo
       logger.debug('Query:', query);
       logger.debug('Agent IDs:', ['Error-Analyzer-Agent-v1']);
 
-      const response = await API.graphql({
+      const response = await client.graphql({
         query: submitAgentQuery,
         variables: {
           query,
@@ -175,7 +179,7 @@ const TroubleshootModal = ({ visible, onDismiss, documentItem, existingJob, onJo
       intervalId = setInterval(async () => {
         try {
           logger.debug('Polling job status for job ID:', jobId);
-          const response = await API.graphql({
+          const response = await client.graphql({
             query: getAgentJobStatus,
             variables: { jobId },
           });
@@ -282,7 +286,7 @@ const TroubleshootModal = ({ visible, onDismiss, documentItem, existingJob, onJo
         )}
 
         {/* Debug section - remove in production */}
-        {process.env.NODE_ENV === 'development' && jobId && (
+        {import.meta.env.DEV && jobId && (
           <Alert type="info">
             <strong>Debug Info:</strong>
             <br />
@@ -321,12 +325,6 @@ TroubleshootModal.propTypes = {
     documentKey: PropTypes.string,
   }),
   onJobUpdate: PropTypes.func,
-};
-
-TroubleshootModal.defaultProps = {
-  documentItem: null,
-  existingJob: null,
-  onJobUpdate: null,
 };
 
 export default TroubleshootModal;
