@@ -1149,8 +1149,7 @@ def generate_manifest(
                 matched = 0
                 for doc in documents:
                     filename = os.path.basename(doc["document_path"])
-                    doc_id = os.path.splitext(filename)[0]
-                    if doc_id in baseline_map:
+                    if filename in baseline_map:
                         matched += 1
 
                 console.print(
@@ -1163,10 +1162,9 @@ def generate_manifest(
             writer = csv.DictWriter(f, fieldnames=["document_path", "baseline_source"])
             writer.writeheader()
             for doc in documents:
-                # Get filename and derive ID for baseline matching
+                # Match baseline using full filename (including extension)
                 filename = os.path.basename(doc["document_path"])
-                doc_id = os.path.splitext(filename)[0]
-                baseline_source = baseline_map.get(doc_id, "")
+                baseline_source = baseline_map.get(filename, "")
 
                 writer.writerow(
                     {
