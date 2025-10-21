@@ -9,11 +9,37 @@ Handles document reprocessing for specific pipeline steps.
 
 import json
 import logging
+import os
 from typing import Dict, List
 
 import boto3
 
 logger = logging.getLogger(__name__)
+
+
+def _get_idp_common_path() -> str:
+    """
+    Get path to idp_common package dynamically
+
+    Returns:
+        Absolute path to idp_common_pkg directory
+
+    Raises:
+        RuntimeError: If idp_common_pkg cannot be found
+    """
+    # Get the directory containing this file (idp_cli/idp_cli/)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # Navigate up to project root (../../)
+    project_root = os.path.dirname(os.path.dirname(current_dir))
+    # Construct path to idp_common_pkg
+    idp_common_path = os.path.join(project_root, "lib", "idp_common_pkg")
+
+    if not os.path.exists(idp_common_path):
+        raise RuntimeError(
+            f"idp_common_pkg not found at expected location: {idp_common_path}"
+        )
+
+    return idp_common_path
 
 
 class RerunProcessor:
@@ -176,12 +202,9 @@ class RerunProcessor:
         # Import idp_common here to get document
         try:
             # Use DynamoDB service directly to get document
-            import os
             import sys
 
-            sys.path.insert(
-                0, "/home/ec2-user/projects/genaiic-idp-accelerator/lib/idp_common_pkg"
-            )
+            sys.path.insert(0, _get_idp_common_path())
             from idp_common.docs_service import create_document_service
 
             # Set environment variables for DynamoDB service
@@ -351,12 +374,9 @@ class RerunProcessor:
             document: Document object with status=QUEUED and cleared sections
         """
         try:
-            import os
             import sys
 
-            sys.path.insert(
-                0, "/home/ec2-user/projects/genaiic-idp-accelerator/lib/idp_common_pkg"
-            )
+            sys.path.insert(0, _get_idp_common_path())
             from idp_common.docs_service import create_document_service
 
             # Set environment variables temporarily
