@@ -1141,8 +1141,6 @@ def generate_manifest(
                 for item in os.listdir(baseline_path):
                     item_path = os.path.join(baseline_path, item)
                     if os.path.isdir(item_path):
-                        # Map both with and without extension
-                        # e.g., "doc.pdf/" → matches doc_id "doc"
                         baseline_map[item] = item_path
 
                 console.print(f"Found {len(baseline_map)} baseline directories")
