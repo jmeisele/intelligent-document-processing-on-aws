@@ -194,6 +194,7 @@ Resources:
 
   Pattern2ECRRepository:
     Type: AWS::ECR::Repository
+    # checkov:skip=CKV_AWS_51: "Mutable tags allowed for workflow flexibility and version updates."
     Properties:
       ImageScanningConfiguration:
         ScanOnPush: true
@@ -1925,6 +1926,7 @@ Resources:
             reason: "Function does not require VPC access as it only interacts with AWS services via APIs"
     # checkov:skip=CKV_AWS_173: "Environment variables do not contain sensitive data - only configuration values like feature flags and non-sensitive settings"
     # checkov:skip=CKV_AWS_117: "Function does not require VPC access as it only interacts with AWS services via APIs"
+    # checkov:skip=CKV_AWS_116: "DLQ not required for this function as StepFunctions will handle retries"
     # checkov:skip=CKV_AWS_115: "Function does not require reserved concurrency as it scales based on demand"
     Properties:
       PermissionsBoundary:
@@ -1999,6 +2001,7 @@ Resources:
             reason: "Function does not require reserved concurrency as it scales based on demand"
     # checkov:skip=CKV_AWS_117: "Function does not require VPC access as it only interacts with AWS services via APIs"
     # checkov:skip=CKV_AWS_115: "Function does not require reserved concurrency as it scales based on demand"
+    # checkov:skip=CKV_AWS_116: "DLQ not required for Cfn Custom Resource function"
     Properties:
       PermissionsBoundary:
         !If [

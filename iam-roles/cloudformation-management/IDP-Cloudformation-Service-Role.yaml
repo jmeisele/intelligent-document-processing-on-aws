@@ -25,6 +25,11 @@ Resources:
             reason: "Suppressing W76: SPCM for IAM policy document is higher than 25"
           - id: F3
             reason: "Suppressing F3: wildcard action on named services required for cloudformation service role, to allow CRUD on stack respources"
+    # checkov:skip=CKV_AWS_110: "CloudFormation service role requires IAM permissions to create Lambda execution roles and service-linked roles during stack deployment. Trust policy restricts to cloudformation.amazonaws.com service principal."
+    # checkov:skip=CKV_AWS_109: "CloudFormation service role requires IAM policy management permissions to attach policies to created roles during infrastructure deployment. Constrained by trust policy."
+    # checkov:skip=CKV_AWS_108: "CloudFormation service role requires S3/KMS permissions to create and configure encrypted data buckets for the IDP solution. All buckets use customer-managed KMS encryption."
+    # checkov:skip=CKV_AWS_111: "CloudFormation service role requires write permissions across AWS services to deploy complete IDP infrastructure. Trust policy limits to CloudFormation service. Use in conjunction with CloudTrail auditing."
+    # checkov:skip=CKV_AWS_107: "CloudFormation service role may need to create/configure secrets for service integrations. Actual secret values are provided via parameters, not embedded in templates."
     Properties:
       RoleName: !Sub '${AWS::StackName}-CFServiceRole'
       AssumeRolePolicyDocument:
