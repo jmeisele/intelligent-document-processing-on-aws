@@ -185,6 +185,12 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
+              - Resource:
+                  - !GetAtt Pattern2ECRRepository.Arn
+                Effect: Allow
+                Action:
+                  - ecr:DescribeImageScanFindings
+                  - ecr:StartImageScan
 
   Pattern2ECRRepository:
     Type: AWS::ECR::Repository
