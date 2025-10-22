@@ -12,6 +12,13 @@ Description: >
 Resources:
   CloudFormationServiceRole:
     Type: AWS::IAM::Role
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: "Broad permissions required for non-admin users to deploy IDP stacks via delegated CloudFormation service role"
+          - id: W28
+            reason: "Explicit role name required for consistent cross-stack references in delegated deployment model"
     Properties:
       RoleName: !Sub '${AWS::StackName}-CFServiceRole'
       AssumeRolePolicyDocument:
