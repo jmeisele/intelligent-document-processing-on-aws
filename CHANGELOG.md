@@ -5,6 +5,12 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+### Added
+
+- **Claude Sonnet 4.5 Haiku Model Support**
+  - Added support for Claude Haiku 4.5
+  - Available for configuration across all document processing steps
+
 ### Changed
 
 - **Migrated UI Build System from Create React App to Vite**
