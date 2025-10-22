@@ -10,6 +10,12 @@ IDP_CFN_PREFIX?=idp-dev
 IDP_STACK_NAME?=$(IDP_CFN_PREFIX)
 IDP_PIPELINE_NAME?=idp-sdlc-deploy-pipeline
 
+# Pattern-specific configurations
+IDP_PATTERN1_STACK_NAME?=$(IDP_CFN_PREFIX)-pattern1
+IDP_PATTERN2_STACK_NAME?=$(IDP_CFN_PREFIX)-pattern2
+IDP_PATTERN1_NAME?=Pattern1 - Packet or Media processing with Bedrock Data Automation (BDA)
+IDP_PATTERN2_NAME?=Pattern2 - OCR → Bedrock Classification (page-level or holistic) → Bedrock Extraction
+
 test:
 	poetry run pytest -s --log-cli-level=DEBUG
 
@@ -27,15 +33,15 @@ install:
 uninstall:
 	export S3UTIL_ALLOW_BUCKET_DESTRUCT=true && \
 	poetry run idpcli uninstall \
-	--stack-name=$(IDP_STACK_NAME) \
+	--stack-name-prefix=$(IDP_CFN_PREFIX) \
 	--account-id=$(IDP_ACCOUNT_ID) \
 	--cfn-prefix=$(IDP_CFN_PREFIX)
-	# Clean up CloudWatch Logs resource policy after uninstall
-	cd $(IDP_CWD) && python3 scripts/cleanup-logs.py || echo "Log cleanup failed but continuing" \
+	cd $(IDP_CWD) && python3 scripts/cleanup-logs.py || echo "Log cleanup failed but continuing"
 
 smoketest:
 	poetry run idpcli smoketest \
-	--stack-name=$(IDP_STACK_NAME)
+	--stack-name-prefix=$(IDP_CFN_PREFIX) \
+	--file-path="../../../samples/lending_package.pdf"
 
 wait:
 	$(eval VERSION_ID := $(shell cat $(IDP_CWD)/.upload_version_id 2>/dev/null || echo ""))

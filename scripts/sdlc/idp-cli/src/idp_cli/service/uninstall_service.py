@@ -3,6 +3,7 @@
 
 import os
 import boto3
+import concurrent.futures
 from typing import Any, Dict, Optional
 from botocore.exceptions import ClientError
 from idp_cli.util.cfn_util import CfnUtil
@@ -10,51 +11,89 @@ from idp_cli.util.s3_util import S3Util
 from loguru import logger
 
 class UninstallService():
-    def __init__(self, stack_name: str,
+    def __init__(self, stack_name_prefix: str,
                  account_id: str,
                  cfn_prefix: Optional[str] = "idp-dev"):
-        self.stack_name = stack_name
+        self.stack_name_prefix = stack_name_prefix
         self.account_id = account_id
         self.cfn_prefix = cfn_prefix 
         self.region = os.environ.get('AWS_REGION', 'us-east-1')
         self.install_bucket_name = f"{self.cfn_prefix}-{self.account_id}-{self.region}"
-        self.outputs: Optional[Dict[str, str]] = None
-        self.bucket_names = []
-        logger.debug(f"stack_name: {self.stack_name}\naccount_id: {account_id}\ncfn_prefix: {cfn_prefix}\nregion:{self.region}\ninstall_bucket_name: {self.install_bucket_name}")
+        self.stack_names = [f"{stack_name_prefix}-pattern1", f"{stack_name_prefix}-pattern2"]
+        logger.debug(f"stack_names: {self.stack_names}\naccount_id: {account_id}\ncfn_prefix: {cfn_prefix}\nregion:{self.region}")
 
-    def get_outputs(self):
-        self.outputs = CfnUtil.get_stack_outputs(stack_name=self.stack_name)
-
-    def get_buckets(self):
-
-        bucket_keys = [
-            "S3LoggingBucket",
-            "S3WebUIBucket",
-            "S3EvaluationBaselineBucketName",
-            "S3InputBucketName",
-            "S3OutputBucketName",
-        ]
-
-        self.bucket_names = []
-
-        self.bucket_names.append(self.install_bucket_name)
-
-        for key in bucket_keys:
-            bucket_name = self.outputs[key]
-            self.bucket_names.append(bucket_name)
-
-        logger.debug(f"bucket_names: {self.bucket_names}")
-
-    def delete_buckets(self):
-        for bucket_name in self.bucket_names:
+    def uninstall(self):
+        """Uninstall both pattern stacks in parallel"""
+        def uninstall_single_stack(stack_name):
+            """Uninstall a single stack completely"""
             try:
-                S3Util.delete_bucket(bucket_name=bucket_name)
+                logger.info(f"Starting uninstall of stack: {stack_name}")
+                
+                # Get outputs and buckets for this stack
+                outputs = CfnUtil.get_stack_outputs(stack_name=stack_name)
+                
+                # Delete the stack first
+                CfnUtil.delete_stack(stack_name=stack_name, wait=True)
+                logger.info(f"Successfully deleted stack: {stack_name}")
+                
+                # Collect and delete buckets for this stack
+                bucket_keys = [
+                    "S3LoggingBucket",
+                    "S3WebUIBucket", 
+                    "S3EvaluationBaselineBucketName",
+                    "S3InputBucketName",
+                    "S3OutputBucketName",
+                ]
+                
+                stack_buckets = []
+                for key in bucket_keys:
+                    if key in outputs:
+                        stack_buckets.append(outputs[key])
+                
+                # Delete buckets for this stack
+                for bucket_name in stack_buckets:
+                    try:
+                        S3Util.delete_bucket(bucket_name=bucket_name)
+                        logger.info(f"Deleted bucket: {bucket_name}")
+                    except Exception as e:
+                        logger.error(f"Error deleting bucket {bucket_name}: {e}")
+                
+                return True
+                
             except Exception as e:
-                logger.exception(e)
-
-    def delete_stack(self, wait=True):
-        response = CfnUtil.delete_stack(stack_name=self.stack_name, wait=wait)
-        logger.debug(response)
+                if "does not exist" in str(e):
+                    logger.info(f"Stack {stack_name} does not exist, skipping")
+                    return True
+                else:
+                    logger.error(f"Error uninstalling stack {stack_name}: {e}")
+                    return False
+        
+        # Uninstall both stacks in parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {executor.submit(uninstall_single_stack, stack_name): stack_name for stack_name in self.stack_names}
+            
+            results = {}
+            for future in concurrent.futures.as_completed(futures):
+                stack_name = futures[future]
+                results[stack_name] = future.result()
+        
+        # Delete shared install bucket
+        try:
+            S3Util.delete_bucket(bucket_name=self.install_bucket_name)
+        except Exception as e:
+            logger.error(f"Error deleting install bucket {self.install_bucket_name}: {e}")
+        
+        # Clean up shared resources
+        self.delete_service_role_stack()
+        self.delete_permission_boundary_policy()
+        
+        success = all(results.values())
+        if success:
+            logger.info("Both patterns uninstalled successfully!")
+        else:
+            logger.error(f"Some patterns failed to uninstall: {results}")
+        
+        return success
 
     def delete_service_role_stack(self):
         """Delete the CloudFormation service role stack if it exists"""
@@ -92,11 +131,3 @@ class UninstallService():
                 logger.error(f"Failed to delete permission boundary policy {policy_name}: {e}")
         except Exception as e:
             logger.error(f"Unexpected error deleting permission boundary policy {policy_name}: {e}")
-
-    def uninstall(self):
-        self.get_outputs()
-        self.delete_stack(wait=True)
-        self.get_buckets()
-        self.delete_buckets()
-        self.delete_service_role_stack()
-        self.delete_permission_boundary_policy()
