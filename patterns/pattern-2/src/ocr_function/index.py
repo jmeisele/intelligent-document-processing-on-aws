@@ -15,6 +15,9 @@ from idp_common import get_config, ocr
 from idp_common.models import Document, Status
 from idp_common.docs_service import create_document_service
 from idp_common.utils import calculate_lambda_metering, merge_metering_data
+from aws_xray_sdk.core import xray_recorder, patch_all
+
+patch_all()
 
 # Configuration will be loaded in handler function
 
@@ -27,6 +30,7 @@ region = os.environ['AWS_REGION']
 METRIC_NAMESPACE = os.environ.get('METRIC_NAMESPACE')
 MAX_WORKERS = int(os.environ.get('MAX_WORKERS', 20))
 
+@xray_recorder.capture('ocr_function')
 def handler(event, context): 
     """
     Lambda handler for OCR processing.
@@ -45,6 +49,10 @@ def handler(event, context):
     logger.info(f"Document pages count: {len(document.pages)}, sections count: {len(document.sections)}")
     logger.info(f"Full document content: {json.dumps(document.to_dict(), default=str)}")
     
+    # X-Ray annotations
+    xray_recorder.put_annotation('document_id', {document.id})
+    xray_recorder.put_annotation('processing_stage', 'ocr')
+
     # Intelligent OCR detection: Skip if pages already have OCR data
     pages_with_ocr = 0
     for page in document.pages.values():

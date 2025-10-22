@@ -39,7 +39,7 @@ def _truncate_log_results(log_results: Dict[str, Any], config: Dict[str, Any]) -
 
     # Cache config values once
     max_events_per_group = config.get("max_events_per_log_group", 3)
-    max_message_length = config.get("max_log_message_length", 200)
+    max_message_length = config.get("max_log_message_length", 400)
 
     for result in log_results["results"]:
         events = result.get("events", [])
@@ -67,7 +67,7 @@ def _truncate_stepfunction_analysis(
 
     # Cache config values once
     max_timeline_events = config.get("max_stepfunction_timeline_events", 3)
-    max_error_length = config.get("max_stepfunction_error_length", 150)
+    max_error_length = config.get("max_stepfunction_error_length", 400)
 
     timeline_analysis = sf_analysis.get("timeline_analysis", {})
     if "timeline" in timeline_analysis:
