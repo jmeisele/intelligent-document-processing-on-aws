@@ -137,14 +137,17 @@ class InstallService():
             return False
         
 
-    def deploy_service_role(self):
+    def deploy_service_role(self, stack_prefix):
         """
         Deploy the CloudFormation service role stack.
+        
+        Args:
+            stack_prefix: Stack-specific prefix for unique naming
         
         Returns:
             str: The ARN of the service role, or None if deployment failed
         """
-        service_role_stack_name = f"{self.cfn_prefix}-cloudformation-service-role"
+        service_role_stack_name = f"{stack_prefix}-cloudformation-service-role"
         service_role_template = 'iam-roles/cloudformation-management/IDP-Cloudformation-Service-Role.yaml'
         
         try:
@@ -238,10 +241,14 @@ class InstallService():
             logger.error(f"Error getting service role ARN from stack {stack_name}: {e}")
             return None
 
-    def create_permission_boundary_policy(self):
-        """Create an 'allow everything' permission boundary policy"""
+    def create_permission_boundary_policy(self, stack_prefix):
+        """Create an 'allow everything' permission boundary policy
         
-        policy_name = f"{self.cfn_prefix}-IDPPermissionBoundary"
+        Args:
+            stack_prefix: Stack-specific prefix for unique policy naming
+        """
+        
+        policy_name = f"{stack_prefix}-IDPPermissionBoundary"
         iam = boto3.client('iam')
         
         try:
@@ -405,14 +412,14 @@ class InstallService():
         try:
             # Step 1: Create permission boundary policy
             logger.info(f"Step 1: Creating permission boundary policy for {stack_name}...")
-            permission_boundary_arn = self.create_permission_boundary_policy()
+            permission_boundary_arn = self.create_permission_boundary_policy(stack_name)
             if not permission_boundary_arn:
                 logger.error("Failed to create permission boundary policy. Aborting deployment.")
                 return False
 
             # Step 2: Deploy CloudFormation service role
             logger.info(f"Step 2: Deploying CloudFormation service role for {stack_name}...")
-            service_role_arn = self.deploy_service_role()
+            service_role_arn = self.deploy_service_role(stack_name)
             if not service_role_arn:
                 logger.error("Failed to deploy service role. Aborting IDP deployment.")
                 return False

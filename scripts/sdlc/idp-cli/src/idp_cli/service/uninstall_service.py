@@ -83,9 +83,10 @@ class UninstallService():
         except Exception as e:
             logger.error(f"Error deleting install bucket {self.install_bucket_name}: {e}")
         
-        # Clean up shared resources
-        self.delete_service_role_stack()
-        self.delete_permission_boundary_policy()
+        # Clean up pattern-specific resources
+        for stack_name in self.stack_names:
+            self.delete_service_role_stack(stack_name)
+            self.delete_permission_boundary_policy(stack_name)
         
         success = all(results.values())
         if success:
@@ -95,9 +96,9 @@ class UninstallService():
         
         return success
 
-    def delete_service_role_stack(self):
+    def delete_service_role_stack(self, stack_name):
         """Delete the CloudFormation service role stack if it exists"""
-        service_role_stack_name = f"{self.cfn_prefix}-cloudformation-service-role"
+        service_role_stack_name = f"{stack_name}-cloudformation-service-role"
         
         try:
             logger.info(f"Attempting to delete service role stack: {service_role_stack_name}")
@@ -110,9 +111,9 @@ class UninstallService():
             else:
                 logger.error(f"Failed to delete service role stack {service_role_stack_name}: {e}")
 
-    def delete_permission_boundary_policy(self):
+    def delete_permission_boundary_policy(self, stack_name):
         """Delete the permission boundary policy if it exists"""
-        policy_name = f"{self.cfn_prefix}-IDPPermissionBoundary"
+        policy_name = f"{stack_name}-IDPPermissionBoundary"
         
         try:
             iam = boto3.client('iam')
