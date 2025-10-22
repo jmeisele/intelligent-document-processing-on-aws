@@ -1320,7 +1320,7 @@ Resources:
           - id: W92
             reason: "Function does not require concurrent execution limits as it is designed to scale based on demand"
           - id: W58
-            reason: "DLQ not required for EventBridge triggered function as it handles A2I status updates"
+            reason: "Lambda function has CloudWatch Logs permissions via AWSLambdaBasicExecutionRole managed policy"
     # checkov:skip=CKV_AWS_116: "DLQ not required for EventBridge triggered function as it handles A2I status updates"
     # checkov:skip=CKV_AWS_117: "Function does not require VPC access as it only interacts with AWS services via APIs"
     # checkov:skip=CKV_AWS_115: "Function does not require reserved concurrency as it scales based on demand"
