@@ -98,7 +98,7 @@ class UninstallService():
 
     def delete_service_role_stack(self, stack_name):
         """Delete the CloudFormation service role stack if it exists"""
-        service_role_stack_name = f"{stack_name}-cloudformation-service-role"
+        service_role_stack_name = f"{stack_name}-cfrole"
         
         try:
             logger.info(f"Attempting to delete service role stack: {service_role_stack_name}")

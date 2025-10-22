@@ -147,7 +147,7 @@ class InstallService():
         Returns:
             str: The ARN of the service role, or None if deployment failed
         """
-        service_role_stack_name = f"{stack_prefix}-cloudformation-service-role"
+        service_role_stack_name = f"{stack_prefix}-cfrole"
         service_role_template = 'iam-roles/cloudformation-management/IDP-Cloudformation-Service-Role.yaml'
         
         try:

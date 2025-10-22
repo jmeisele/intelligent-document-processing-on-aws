@@ -166,10 +166,10 @@ Resources:
             build:
               commands:
                 - export IDP_CFN_PREFIX=$(make cfn-prefix) || { echo "CFN prefix generation failed"; exit 1; }
-                - make install -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX
-                - make smoketest -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX
+                - make install -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX || { echo "Install failed"; exit 1; }
+                - make smoketest -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX || { echo "Smoketest failed - leaving deployment for debugging"; exit 1; }
                 - echo "All tests passed successfully, running cleanup..."
-                - make uninstall -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX && aws cloudformation delete-stack --stack-name ${IDP_CFN_PREFIX}-cloudformation-service-role --region us-east-1 || echo "Cleanup failed but continuing"
+                - make uninstall -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX
 
   DeploymentPipeline:
     Type: 'AWS::CodePipeline::Pipeline'
