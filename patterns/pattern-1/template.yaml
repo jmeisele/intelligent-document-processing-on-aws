@@ -758,6 +758,10 @@ Resources:
             reason: "This Lambda function does not require VPC access as it only interacts with AWS services via AWS APIs"
           - id: W92
             reason: "Function does not require concurrent execution limits as it is designed to scale based on demand"
+    # checkov:skip=CKV_AWS_116: "DLQ not required for this function as StepFunctions will handle retries"
+    # checkov:skip=CKV_AWS_173: "Environment variables do not contain sensitive data - only configuration values like feature flags and non-sensitive settings"
+    # checkov:skip=CKV_AWS_117: "Function does not require VPC access as it only interacts with AWS services via APIs"
+    # checkov:skip=CKV_AWS_115: "Function does not require reserved concurrency as it scales based on demand"
     Properties:
       PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref AWS::NoValue]
       CodeUri: src/bda_discovery_function/
@@ -1328,7 +1332,7 @@ Resources:
           - id: W92
             reason: "Function does not require concurrent execution limits as it is designed to scale based on demand"
           - id: W58
-            reason: "DLQ not required for EventBridge triggered function as it handles A2I status updates"
+            reason: "Lambda function has CloudWatch Logs permissions via AWSLambdaBasicExecutionRole managed policy"
     # checkov:skip=CKV_AWS_116: "DLQ not required for EventBridge triggered function as it handles A2I status updates"
     # checkov:skip=CKV_AWS_117: "Function does not require VPC access as it only interacts with AWS services via APIs"
     # checkov:skip=CKV_AWS_115: "Function does not require reserved concurrency as it scales based on demand"

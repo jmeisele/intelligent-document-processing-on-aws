@@ -57,3 +57,36 @@ phases:
       - echo "All Pattern-2 Docker images successfully built and pushed to ECR"
       - echo "ECR Repository - $ECR_URI"
       - echo "Image Version - $IMAGE_VERSION"
+      - echo "Waiting for vulnerability scans to complete..."
+      - |
+        # Wait for and check vulnerability scan results for all images
+        IMAGES=("ocr-function" "classification-function" "extraction-function" "assessment-function" "processresults-function" "hitl-wait-function" "hitl-status-update-function" "hitl-process-function" "summarization-function")
+        for IMAGE in "${IMAGES[@]}"; do
+          echo "Checking scan results for $IMAGE-$IMAGE_VERSION..."
+          # Wait for scan to complete (max 10 minutes)
+          for i in {1..60}; do
+            SCAN_STATUS=$(aws ecr describe-image-scan-findings --repository-name $(basename $ECR_URI) --image-id imageTag=$IMAGE-$IMAGE_VERSION --region $AWS_REGION --query 'imageScanStatus.status' --output text 2>/dev/null || echo "IN_PROGRESS")
+            if [ "$SCAN_STATUS" = "COMPLETE" ]; then
+              echo "Scan completed for $IMAGE-$IMAGE_VERSION"
+              # Get vulnerability counts
+              CRITICAL=$(aws ecr describe-image-scan-findings --repository-name $(basename $ECR_URI) --image-id imageTag=$IMAGE-$IMAGE_VERSION --region $AWS_REGION --query 'imageScanFindings.findingCounts.CRITICAL' --output text 2>/dev/null || echo "0")
+              HIGH=$(aws ecr describe-image-scan-findings --repository-name $(basename $ECR_URI) --image-id imageTag=$IMAGE-$IMAGE_VERSION --region $AWS_REGION --query 'imageScanFindings.findingCounts.HIGH' --output text 2>/dev/null || echo "0")
+              echo "Vulnerabilities found in $IMAGE-$IMAGE_VERSION: CRITICAL=$CRITICAL, HIGH=$HIGH"
+              # Fail build if critical vulnerabilities found
+              if [ "$CRITICAL" != "0" ] && [ "$CRITICAL" != "None" ]; then
+                echo "ERROR: Critical vulnerabilities found in $IMAGE-$IMAGE_VERSION. Build failed."
+                exit 1
+              fi
+              break
+            elif [ "$SCAN_STATUS" = "FAILED" ]; then
+              echo "WARNING: Vulnerability scan failed for $IMAGE-$IMAGE_VERSION"
+              break
+            fi
+            echo "Scan in progress for $IMAGE-$IMAGE_VERSION... (attempt $i/60)"
+            sleep 10
+          done
+          if [ "$SCAN_STATUS" != "COMPLETE" ]; then
+            echo "WARNING: Scan did not complete within timeout for $IMAGE-$IMAGE_VERSION"
+          fi
+        done
+      - echo "Vulnerability scanning completed for all images"

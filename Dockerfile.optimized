@@ -1,6 +1,10 @@
 # Optimized Dockerfile for Lambda functions with minimal dependencies
 # This builds each function with ONLY the dependencies it needs
 
+# checkov:skip=CKV_DOCKER_3: "The Dockerfile uses the official AWS Lambda Python base image (public.ecr.aws/lambda/python:3.12-arm64), which already configures the appropriate non-root user for Lambda execution"
+# checkov:skip=CKV_DOCKER_2: "The Dockerfile.optimized is specifically designed for AWS Lambda container images, which don't use Docker HEALTHCHECK instructions."
+
+
 FROM public.ecr.aws/lambda/python:3.12-arm64 AS builder
 
 # Copy uv from official distroless image

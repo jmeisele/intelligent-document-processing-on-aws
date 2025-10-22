@@ -3713,6 +3713,8 @@ Resources:
             reason: "DLQ not required for Cfn Custom Resource function"
           - id: W76
             reason: "Suppressing W76: SPCM for IAM policy document is higher than 25"
+          - id: W11
+            reason: "Role requires * resource access for CloudWatch Metrics and Logs"
     # checkov:skip=CKV_AWS_116: "DLQ not required for analytics processor as it's invoked asynchronously by request handler with error handling and job status tracking in DynamoDB"
     # checkov:skip=CKV_AWS_117: "Function does not require VPC access as it only interacts with AWS services via APIs"
     # checkov:skip=CKV_AWS_115: "Function does not require reserved concurrency as it scales based on demand"
@@ -6234,6 +6236,8 @@ Resources:
             reason: "Function does not require reserved concurrency as it scales based on demand"
           - id: W12
             reason: "Lambda requires CloudWatch logs permissions"
+          - id: W11
+            reason: "Role requires * resource access for CloudWatch Metrics and Logs"
     # checkov:skip=CKV_AWS_116: "DLQ not required for SQS triggered function"
     # checkov:skip=CKV_AWS_117: "Function does not require VPC access as it only interacts with AWS services via APIs"
     # checkov:skip=CKV_AWS_115: "Function does not require reserved concurrency as it scales based on demand"
@@ -6435,6 +6439,8 @@ Resources:
             reason: "Function does not require reserved concurrency as it scales based on demand"
           - id: W12
             reason: "Lambda requires CloudWatch logs permissions"
+          - id: W11
+            reason: "Role requires * resource access for CloudWatch Metrics and Logs"
     # checkov:skip=CKV_AWS_116: "DLQ not required for AppSync resolver function"
     # checkov:skip=CKV_AWS_117: "Function does not require VPC access as it only interacts with AWS services via APIs"
     # checkov:skip=CKV_AWS_115: "Function does not require reserved concurrency as it scales based on demand"
