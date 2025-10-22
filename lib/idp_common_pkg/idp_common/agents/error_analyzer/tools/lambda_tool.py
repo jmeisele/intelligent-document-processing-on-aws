@@ -55,7 +55,7 @@ def extract_lambda_request_ids(
     failed_functions = []
     all_request_ids = []
 
-    for event in execution_events:
+    for i, event in enumerate(execution_events):
         event_type = event.get("type", "")
 
         # Extract function name from various event types
@@ -101,10 +101,13 @@ def extract_lambda_request_ids(
                         function_name = arn_parts[6]
 
                 # Extract request ID from multiple fields
-                for field in ["output", "cause", "error", "input"]:
-                    field_data = event_detail.get(field, "")
-                    if field_data:
-                        request_id = _extract_request_id_from_json(field_data)
+                for field_name, field_value in event_detail.items():
+                    if field_value:
+                        request_id = _extract_request_id_from_json(str(field_value))
+                        if not request_id:
+                            request_id = _extract_request_id_from_string(
+                                str(field_value)
+                            )
                         if request_id:
                             break
 
@@ -118,12 +121,29 @@ def extract_lambda_request_ids(
                     function_request_map[function_name] = request_id
                     all_request_ids.append(request_id)
 
-    return {
+        # Also check top-level event fields for request IDs
+        if not request_id:
+            for field_name, field_value in event.items():
+                if (
+                    field_name not in ["type", "timestamp", "id", "previousEventId"]
+                    and field_value
+                ):
+                    request_id = _extract_request_id_from_string(str(field_value))
+                    if request_id and function_name:
+                        function_request_map[function_name] = request_id
+                        all_request_ids.append(request_id)
+                        break
+
+    result = {
         "function_request_map": function_request_map,
         "failed_functions": list(set(failed_functions)),
         "all_request_ids": list(set(all_request_ids)),
         "primary_failed_function": failed_functions[0] if failed_functions else None,
     }
+
+    if not all_request_ids:
+        logger.info("No request ids extracted from step functions events")
+    return result
 
 
 def _extract_request_id_from_json(json_string: str) -> Optional[str]:
@@ -142,11 +162,43 @@ def _extract_request_id_from_json(json_string: str) -> Optional[str]:
     try:
         data = json.loads(json_string)
         # Check common request ID field names
-        for field in ["requestId", "request_id", "RequestId", "awsRequestId"]:
+        for field in [
+            "requestId",
+            "request_id",
+            "RequestId",
+            "awsRequestId",
+            "lambdaRequestId",
+        ]:
             if field in data and data[field]:
                 return str(data[field])
     except (json.JSONDecodeError, TypeError):
         pass
+
+    return None
+
+
+def _extract_request_id_from_string(text: str) -> Optional[str]:
+    """
+    Extract Lambda request ID from string using UUID pattern matching.
+
+    Args:
+        text: String that may contain a UUID request ID
+
+    Returns:
+        Request ID string if found, None otherwise
+    """
+    import re
+
+    if not text:
+        return None
+
+    # Pattern for UUID
+    uuid_pattern = r"([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})"
+
+    matches = re.findall(uuid_pattern, text, re.IGNORECASE)
+
+    if matches:
+        return matches[0]
 
     return None
 
