@@ -61,16 +61,16 @@ integration_tests:
  # Add rules to only run on develop branch
   rules:
     - if: $CI_COMMIT_BRANCH == "develop"
-      when: always # always # When idp-accelerator CICD is reconfigured
+      when: on_success
     - if: $CI_COMMIT_BRANCH =~ /^feature\/.*/
-      when: always
+      when: on_success
     - if: $CI_COMMIT_BRANCH =~ /^fix\/.*/
-      when: always
+      when: on_success
     - if: $CI_COMMIT_BRANCH =~ /^hotfix\/.*/
       when: manual
     - if: $CI_COMMIT_BRANCH =~ /^release\/.*/
       when: manual
-    - when: manual  # This will make it available on all other branches
+    - when: manual
 
   before_script:
     - python --version
@@ -98,7 +98,7 @@ integration_tests:
 deployment_validation:
   stage: deployment_validation
   rules:
-    - when: always
+    - when: on_success
 
   before_script:
     - apt-get update -y
