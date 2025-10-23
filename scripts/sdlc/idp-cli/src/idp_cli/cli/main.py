@@ -8,6 +8,7 @@ from idp_cli.util.codepipeline_util import CodePipelineUtil
 import typer
 from idp_cli.service.uninstall_service import UninstallService
 from idp_cli.service.smoketest_service import SmokeTestService
+from idp_cli.service.smoketest_idp_cli_service import SmokeTestIdpCliService
 from dotenv import load_dotenv
 
 from loguru import logger
@@ -42,8 +43,12 @@ def install(
         service.publish()
     
     if deploy:
-        service.install(admin_email=admin_email)
-        typer.echo("Install Complete!")
+        all_patterns_succeeded = service.install(admin_email=admin_email)
+        if all_patterns_succeeded:
+            typer.echo("Install Complete!")
+        else:
+            typer.echo("Install failed!", err=True)
+            sys.exit(1)
 
 
 @app.command()
@@ -60,9 +65,13 @@ def uninstall(
 
         service = UninstallService(stack_name_prefix=stack_name_prefix, account_id=account_id, cfn_prefix=cfn_prefix)
 
-        service.uninstall()
-
-        typer.echo("Uninstall Complete!")
+        all_patterns_succeeded = service.uninstall()
+        
+        if all_patterns_succeeded:
+            typer.echo("Uninstall Complete!")
+        else:
+            typer.echo("Uninstall failed!", err=True)
+            sys.exit(1)
     except Exception as e:
         logger.exception(f"Error during uninstall process: {str(e)}")
         typer.echo(f"Uninstall failed: {str(e)}", err=True)
@@ -97,6 +106,38 @@ def smoketest(
     except Exception as e:
         logger.exception(f"Error during smoke test: {str(e)}")
         typer.echo(f"Smoke test failed: {str(e)}", err=True)
+        sys.exit(1)
+
+@app.command()
+def idp_cli_smoketest(
+    cfn_prefix: str = typer.Option(..., "--cfn-prefix", help="CloudFormation prefix for stack naming"),
+    admin_email: str = typer.Option(..., "--admin-email", help="Admin email for deployment"),
+    account_id: str = typer.Option(..., "--account-id", help="AWS account ID"),
+    cwd: str = typer.Option("../../../", "--cwd", help="Working directory path")
+):
+    """
+    End-to-end smoketest: install CLI, deploy stack, run inference, verify results
+    """
+    try:
+        typer.echo(f"Running IDP CLI smoketest with prefix: {cfn_prefix}")
+        
+        service = SmokeTestIdpCliService(
+            cfn_prefix=cfn_prefix,
+            admin_email=admin_email,
+            account_id=account_id,
+            cwd=cwd
+        )
+        
+        result = service.do_smoketest()
+        
+        if result:
+            typer.echo("IDP CLI smoketest passed successfully!")
+        else:
+            typer.echo("IDP CLI smoketest failed!", err=True)
+            sys.exit(1)
+    except Exception as e:
+        logger.exception(f"Error during IDP CLI smoketest: {str(e)}")
+        typer.echo(f"IDP CLI smoketest failed: {str(e)}", err=True)
         sys.exit(1)
 
 @app.command()

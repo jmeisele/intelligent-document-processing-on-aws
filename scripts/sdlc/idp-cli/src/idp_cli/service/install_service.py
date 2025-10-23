@@ -365,7 +365,7 @@ class InstallService():
         """
         patterns = {
             "pattern1": "Pattern1 - Packet or Media processing with Bedrock Data Automation (BDA)",
-            "pattern2": "Pattern2 - OCR → Bedrock Classification (page-level or holistic) → Bedrock Extraction"
+            "pattern2": "Pattern2 - Packet processing with Textract and Bedrock"
         }
         
         def deploy_pattern(suffix, pattern_name):
@@ -389,13 +389,13 @@ class InstallService():
                     logger.error(f"Pattern {suffix} deployment failed: {e}")
                     results[suffix] = False
         
-        success = all(results.values())
-        if success:
+        all_patterns_succeeded = all(results.values())
+        if all_patterns_succeeded:
             logger.info("Both patterns installed successfully!")
         else:
             logger.error(f"Some patterns failed: {results}")
         
-        return success
+        return all_patterns_succeeded
     
     def deploy_pattern_stack(self, admin_email: str, idp_pattern: str, stack_name: str):
         """

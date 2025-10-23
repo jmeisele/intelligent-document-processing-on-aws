@@ -43,6 +43,13 @@ smoketest:
 	--stack-name-prefix=$(IDP_CFN_PREFIX) \
 	--file-path="../../../samples/lending_package.pdf"
 
+idp_cli_smoketest:
+	poetry run idpcli idp_cli_smoketest \
+	--cfn-prefix=$(IDP_CFN_PREFIX) \
+	--admin-email=$(IDP_ADMIN_EMAIL) \
+	--account-id=$(IDP_ACCOUNT_ID) \
+	--cwd=$(IDP_CWD)
+
 wait:
 	$(eval VERSION_ID := $(shell cat $(IDP_CWD)/.upload_version_id 2>/dev/null || echo ""))
 	@if [ -z "$(VERSION_ID)" ]; then echo "Error: No version ID found"; exit 1; fi
