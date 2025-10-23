@@ -929,11 +929,16 @@ Resources:
         AppSyncApiArn: !GetAtt GraphQLApi.Arn
         ConfigurationTable: !Ref ConfigurationTable
         ConfigurationDefaultS3Uri: !If
-          - HasPattern2CustomConfigPath
-          - !Sub "s3://${ConfigurationBucket}/${Pattern2CustomConfigPath}/config.yaml"
-          - !Sub 
+          - HasCustomConfigPath
+          - !Ref CustomConfigPath
+          - !Sub
             - "s3://${ConfigurationBucket}/config_library/pattern-2/${ConfigPath}/config.yaml"
-            - ConfigPath: !FindInMap [Pattern2ConfigurationMap, !Ref Pattern2Configuration, ConfigPath]
+            - ConfigPath:
+                !FindInMap [
+                  Pattern2ConfigurationMap,
+                  !Ref Pattern2Configuration,
+                  ConfigPath,
+                ]
         ConfigLibraryHash: "<CONFIG_LIBRARY_HASH_TOKEN>"
         EnableHITL: !Ref EnableHITL
         SageMakerA2IReviewPortalURL: !If
