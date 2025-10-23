@@ -11,6 +11,14 @@ SPDX-License-Identifier: MIT-0
   - Added support for Claude Haiku 4.5
   - Available for configuration across all document processing steps
 
+- **X-Ray Integration for Error Analyzer Agent**
+  - Integrated AWS X-Ray tracing tools to enhance diagnostic capabilities of the error analyzer agent
+  - X-Ray context enables better distinction between infrastructure issues and application logic failures
+  - Added trace ID persistence in DynamoDB alongside document status for complete traceability
+  - Enhanced CloudWatch error log filtering for more targeted error analysis
+  - Simplified CloudWatch results structure for improved readability and analysis
+  - Updated error analyzer recommendations to leverage X-Ray insights for more accurate root cause identification
+
 ### Changed
 
 - **Migrated UI Build System from Create React App to Vite**
