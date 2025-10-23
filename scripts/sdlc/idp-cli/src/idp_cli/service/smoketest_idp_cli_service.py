@@ -29,8 +29,9 @@ class SmokeTestIdpCliService:
             
             # Install IDP CLI
             logger.info("Installing IDP CLI...")
+            idp_cli_path = os.path.join(self.cwd, "idp_cli")
             subprocess.run([
-                "pip", "install", "-e", f"{self.cwd}/idp_cli"
+                "pip", "install", "-e", idp_cli_path
             ], check=True, cwd=self.cwd)
             
             # Deploy stack using idp-cli deploy
@@ -48,10 +49,11 @@ class SmokeTestIdpCliService:
             
             # Run inference using IDP CLI with custom batch ID
             logger.info(f"Running inference with batch ID: {batch_id}...")
+            samples_path = os.path.join(self.cwd, "samples/")
             subprocess.run([
                 "idp-cli", "run-inference",
                 "--stack-name", self.stack_name,
-                "--dir", f"{self.cwd}/samples/",
+                "--dir", samples_path,
                 "--file-pattern", "lending_package.pdf",
                 "--batch-id", batch_id,
                 "--monitor"
