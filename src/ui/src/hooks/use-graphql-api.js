@@ -1,6 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { ConsoleLogger } from 'aws-amplify/utils';
 
@@ -24,10 +24,13 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
   const [documents, setDocuments] = useState([]);
   const { setErrorMessage } = useAppContext();
 
-  const setDocumentsDeduped = (documentValues) => {
+  const subscriptionsRef = useRef({ onCreate: null, onUpdate: null });
+
+  const setDocumentsDeduped = useCallback((documentValues) => {
+    logger.debug('setDocumentsDeduped called with:', documentValues);
     setDocuments((currentDocuments) => {
       const documentValuesdocumentIds = documentValues.map((c) => c.ObjectKey);
-      return [
+      const updatedDocuments = [
         ...currentDocuments.filter((c) => !documentValuesdocumentIds.includes(c.ObjectKey)),
         ...documentValues.map((document) => ({
           ...document,
@@ -35,10 +38,12 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
           ListSK: document.ListSK || currentDocuments.find((c) => c.ObjectKey === document.ObjectKey)?.ListSK,
         })),
       ];
+      logger.debug('Documents state updated, new count:', updatedDocuments.length);
+      return updatedDocuments;
     });
-  };
+  }, []);
 
-  const getDocumentDetailsFromIds = async (objectKeys) => {
+  const getDocumentDetailsFromIds = useCallback(async (objectKeys) => {
     // prettier-ignore
     logger.debug('getDocumentDetailsFromIds', objectKeys);
     const getDocumentPromises = objectKeys.map((objectKey) =>
@@ -55,46 +60,80 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
       .map((r) => r.value?.data?.getDocument);
 
     return documentValues;
-  };
+  }, [setErrorMessage]);
 
   useEffect(() => {
+    if (subscriptionsRef.current.onCreate) {
+      logger.debug('onCreateDocument subscription already exists, skipping');
+      return;
+    }
+
     logger.debug('onCreateDocument subscription');
     const subscription = client.graphql({ query: onCreateDocument }).subscribe({
-      next: async ({ provider, value }) => {
-        logger.debug('document list subscription update', { provider, value });
-        const objectKey = value?.data?.onCreateDocument.ObjectKey || '';
+      next: async (subscriptionData) => {
+        logger.debug('document list subscription update', subscriptionData);
+        const data = subscriptionData?.data;
+        const objectKey = data?.onCreateDocument?.ObjectKey || '';
         if (objectKey) {
-          const documentValues = await getDocumentDetailsFromIds([objectKey]);
-          setDocumentsDeduped(documentValues);
+          try {
+            const documentValues = await getDocumentDetailsFromIds([objectKey]);
+            if (documentValues && documentValues.length > 0) {
+              setDocumentsDeduped(documentValues);
+            }
+          } catch (error) {
+            logger.error('Error processing onCreateDocument subscription:', error);
+          }
         }
       },
       error: (error) => {
-        logger.error(error);
+        logger.error('onCreateDocument subscription error:', error);
         setErrorMessage('document list network subscription failed - please reload the page');
       },
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    subscriptionsRef.current.onCreate = subscription;
+
+    return () => {
+      logger.debug('onCreateDocument subscription cleanup');
+      if (subscriptionsRef.current.onCreate) {
+        subscriptionsRef.current.onCreate.unsubscribe();
+        subscriptionsRef.current.onCreate = null;
+      }
+    };
+  }, [getDocumentDetailsFromIds, setDocumentsDeduped, setErrorMessage]);
 
   useEffect(() => {
-    logger.debug('onUpdateDocument subscription');
+    if (subscriptionsRef.current.onUpdate) {
+      logger.debug('onUpdateDocument subscription already exists, skipping');
+      return;
+    }
+
+    logger.debug('onUpdateDocument subscription setup');
     const subscription = client.graphql({ query: onUpdateDocument }).subscribe({
-      next: async ({ provider, value }) => {
-        logger.debug('document update', { provider, value });
-        const documentUpdateEvent = value?.data?.onUpdateDocument;
+      next: async (subscriptionData) => {
+        logger.debug('document update subscription received', subscriptionData);
+        const data = subscriptionData?.data;
+        const documentUpdateEvent = data?.onUpdateDocument;
         if (documentUpdateEvent?.ObjectKey) {
           setDocumentsDeduped([documentUpdateEvent]);
         }
       },
       error: (error) => {
-        logger.error(error);
+        logger.error('onUpdateDocument subscription error:', error);
         setErrorMessage('document update network request failed - please reload the page');
       },
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    subscriptionsRef.current.onUpdate = subscription;
+
+    return () => {
+      logger.debug('onUpdateDocument subscription cleanup');
+      if (subscriptionsRef.current.onUpdate) {
+        subscriptionsRef.current.onUpdate.unsubscribe();
+        subscriptionsRef.current.onUpdate = null;
+      }
+    };
+  }, [setDocumentsDeduped, setErrorMessage, getDocumentDetailsFromIds]);
 
   const listDocumentIdsByDateShards = async ({ date, shards }) => {
     const listDocumentsDateShardPromises = shards.map((i) => {
