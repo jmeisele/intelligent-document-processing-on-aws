@@ -88,26 +88,8 @@ def search_cloudwatch_logs(
         events = []
         for event in response.get("events", []):
             message = event["message"]
-
-            # Filter out non-error logs when searching for error patterns
-            if filter_pattern in [
-                "[ERROR]",
-                "[WARN]",
-                "ERROR:",
-                "WARN:",
-                "Exception",
-                "Failed",
-            ]:
-                # Skip INFO logs
-                if message.strip().startswith("[INFO]"):
-                    continue
-                # Skip Lambda system logs
-                if any(
-                    message.strip().startswith(prefix)
-                    for prefix in ["INIT_START", "START", "END", "REPORT"]
-                ):
-                    continue
-
+            if _should_exclude_log_event(message, filter_pattern):
+                continue
             events.append(
                 {
                     "timestamp": datetime.fromtimestamp(
@@ -117,7 +99,6 @@ def search_cloudwatch_logs(
                     "log_stream": event.get("logStreamName", ""),
                 }
             )
-
             # Stop when we have enough actual error events
             if len(events) >= max_events:
                 break
@@ -936,3 +917,55 @@ def cloudwatch_stack_logs(
     except Exception as e:
         logger.error(f"Stack log search failed for '{stack_name}': {e}")
         return create_error_response(str(e), stack_name=stack_name, events_found=0)
+
+
+def _should_exclude_log_event(message: str, filter_pattern: str = "") -> bool:
+    """
+    Consolidated log filtering - combines all exclusion logic.
+    Filters out noise from LLM context while preserving relevant error information.
+
+    Args:
+        message: Log message to evaluate
+        filter_pattern: CloudWatch filter pattern being used
+
+    Returns:
+        True if message should be excluded from LLM context
+    """
+    # Skip INFO logs when searching for error patterns
+    if filter_pattern in [
+        "[ERROR]",
+        "[WARN]",
+        "ERROR:",
+        "WARN:",
+        "Exception",
+        "Failed",
+    ]:
+        if message.strip().startswith("[INFO]"):
+            return True
+        # Skip Lambda system logs
+        if any(
+            message.strip().startswith(prefix)
+            for prefix in ["INIT_START", "START", "END", "REPORT"]
+        ):
+            return True
+
+    # Exclude content patterns that add no value for error analysis
+    EXCLUDE_CONTENT = [
+        "Config:",  # Configuration dumps
+        '"sample_json"',  # Config JSON structures
+        "Processing event:",  # Generic event processing logs
+        "Initialized",  # Initialization messages
+        "Starting",  # Startup messages
+        "Debug:",  # Debug information
+        "Trace:",  # Trace logs
+    ]
+
+    # Skip if contains excluded content
+    if any(exclude in message for exclude in EXCLUDE_CONTENT):
+        return True
+
+    # Skip very long messages (likely config dumps or verbose logs)
+    if len(message) > 1000:
+        return True
+
+    return False
