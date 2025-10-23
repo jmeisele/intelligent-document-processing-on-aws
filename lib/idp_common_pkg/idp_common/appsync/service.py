@@ -55,13 +55,19 @@ class DocumentAppSyncService:
         Returns:
             Dictionary compatible with CreateDocumentInput GraphQL type
         """
-        return {
+        input_data = {
             "ObjectKey": document.input_key,
             "ObjectStatus": document.status.value,
             "InitialEventTime": document.initial_event_time,
             "QueuedTime": document.queued_time,
             "ExpiresAfter": expires_after,
         }
+
+        # Add trace_id if available
+        if document.trace_id:
+            input_data["TraceId"] = document.trace_id
+
+        return input_data
 
     def _document_to_update_input(self, document: Document) -> Dict[str, Any]:
         """
@@ -222,6 +228,7 @@ class DocumentAppSyncService:
             workflow_execution_arn=appsync_data.get("WorkflowExecutionArn"),
             evaluation_report_uri=appsync_data.get("EvaluationReportUri"),
             summary_report_uri=appsync_data.get("SummaryReportUri"),
+            trace_id=appsync_data.get("TraceId"),
         )
 
         # Handle HITL fields - create HITL metadata if HITL fields are present

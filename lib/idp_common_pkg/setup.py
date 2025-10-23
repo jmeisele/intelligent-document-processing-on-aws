@@ -61,6 +61,7 @@ extras_require = {
     # Document service factory dependencies (includes both appsync and dynamodb support)
     "docs_service": [
         "requests==2.32.4",
+        "aws-xray-sdk>=2.12.0",
     ],
     # Testing dependencies
     "test": [

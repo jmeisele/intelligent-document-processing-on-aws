@@ -94,7 +94,7 @@ def get_context_limits() -> Dict[str, int]:
         "max_events_per_log_group": 5,
         "max_log_groups": 20,
         "max_stepfunction_timeline_events": 3,
-        "max_stepfunction_error_length": 200,
+        "max_stepfunction_error_length": 400,
         "time_range_hours_default": 24,
     }
 
@@ -143,11 +143,9 @@ def create_error_response(error: str, **kwargs) -> Dict[str, Any]:
     return response
 
 
-def create_success_response(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Creates standardized success response with consistent format."""
-    response = {"success": True}
-    response.update(data)
-    return response
+def create_response(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Creates standardized response with consistent format."""
+    return data
 
 
 def safe_int_conversion(value: Any, default: int = 0) -> int:
