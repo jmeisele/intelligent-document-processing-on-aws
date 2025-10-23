@@ -56,11 +56,6 @@ developer_tests:
 integration_tests:
   stage: integration_tests
   timeout: 2h
-  retry:
-    max: 2
-    when:
-      - script_failure
-      - unknown_failure
   # variables:
   #   # In order to run tests in another account, add a AWS_CREDS_TARGET_ROLE variable to the Gitlab pipeline variables.
   #   AWS_CREDS_TARGET_ROLE: ${AWS_CREDS_TARGET_ROLE}
