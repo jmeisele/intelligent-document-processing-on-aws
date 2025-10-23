@@ -17,7 +17,7 @@ class SmokeTestService():
                  verify_string: str):
         
         self.stack_name_prefix = stack_name_prefix
-        self.stack_names = [f"{stack_name_prefix}-pattern1", f"{stack_name_prefix}-pattern2"]
+        self.stack_names = [f"{stack_name_prefix}-p1", f"{stack_name_prefix}-p2"]
         self.file_path = file_path
         self.verify_string = verify_string
 

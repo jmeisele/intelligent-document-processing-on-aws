@@ -11,8 +11,8 @@ IDP_STACK_NAME?=$(IDP_CFN_PREFIX)
 IDP_PIPELINE_NAME?=idp-sdlc-deploy-pipeline
 
 # Pattern-specific configurations
-IDP_PATTERN1_STACK_NAME?=$(IDP_CFN_PREFIX)-pattern1
-IDP_PATTERN2_STACK_NAME?=$(IDP_CFN_PREFIX)-pattern2
+IDP_PATTERN1_STACK_NAME?=$(IDP_CFN_PREFIX)-p1
+IDP_PATTERN2_STACK_NAME?=$(IDP_CFN_PREFIX)-p2
 IDP_PATTERN1_NAME?=Pattern1 - Packet or Media processing with Bedrock Data Automation (BDA)
 IDP_PATTERN2_NAME?=Pattern2 - OCR → Bedrock Classification (page-level or holistic) → Bedrock Extraction
 

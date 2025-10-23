@@ -364,8 +364,8 @@ class InstallService():
             admin_email: Email address for the admin user
         """
         patterns = {
-            "pattern1": "Pattern1 - Packet or Media processing with Bedrock Data Automation (BDA)",
-            "pattern2": "Pattern2 - Packet processing with Textract and Bedrock"
+            "p1": "Pattern1 - Packet or Media processing with Bedrock Data Automation (BDA)",
+            "p2": "Pattern2 - Packet processing with Textract and Bedrock"
         }
         
         def deploy_pattern(suffix, pattern_name):
