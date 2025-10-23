@@ -9,6 +9,7 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from idp_cli.batch_processor import BatchProcessor
 
 
