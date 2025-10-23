@@ -122,6 +122,7 @@ Resources:
                   - ec2:DeleteTags
                   - ec2:DescribeTags
                   - ec2:DescribeAvailabilityZones
+                  - ecr:*
                 Resource: '*'
 
   PassRolePolicy:
