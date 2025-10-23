@@ -59,6 +59,10 @@ Resources:
                   - iam:DeletePolicy
                   - iam:GetPolicy
                   - iam:ListPolicies
+                  - iam:ListPolicyVersions
+                  - iam:CreatePolicyVersion
+                  - iam:DeletePolicyVersion
+                  - iam:SetDefaultPolicyVersion
                   - iam:AttachRolePolicy
                   - iam:DetachRolePolicy
                   - iam:PutRolePolicy
