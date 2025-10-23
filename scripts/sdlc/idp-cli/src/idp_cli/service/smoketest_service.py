@@ -70,7 +70,7 @@ class SmokeTestService():
         logger.debug("Processing completed!")
         
         # Verify result
-        self._verify_result(folder_key, output_bucket_name)
+        self._verify_result(folder_key, output_bucket_name, stack_name)
         logger.debug(f"Smoke test completed successfully for {stack_name}!")
         
         return True
@@ -124,12 +124,15 @@ class SmokeTestService():
         logger.error(f"Processing timed out after {max_attempts * wait_seconds} seconds")
         raise TimeoutError(f"Processing timed out after {max_attempts * wait_seconds} seconds")
 
-    def _verify_result(self, folder_key, output_bucket_name):
+    def _verify_result(self, folder_key, output_bucket_name, stack_name):
         logger.debug("Waiting in case the file needs time to write...")
         time.sleep(20)
         logger.debug("Verifying processing result")
         
-        object_path = f"{folder_key}/pages/0/result.json"
+        # Pattern 1 uses page 0, others use page 1
+        page_num = 0 if stack_name.endswith("-p1") else 1
+        
+        object_path = f"{folder_key}/pages/{page_num}/result.json"
         logger.debug(f"Looking for result file at: s3://{output_bucket_name}/{object_path}")
         
         try:
@@ -139,13 +142,15 @@ class SmokeTestService():
                 logger.error(f"Result file not found at: s3://{output_bucket_name}/{object_path}")
                 raise ValueError(f"Result file not found")
             
-            if "pages" not in result_json:
-                logger.error("Missing 'pages' property in result JSON")
-                raise ValueError("Missing 'pages' property in result JSON")
+            # Extract text content based on pattern
+            if stack_name.endswith("-p1"):
+                text_content = result_json["pages"][0]["representation"]["markdown"]
+            else:
+                text_content = result_json["text"]
             
-            if self.verify_string not in result_json["pages"][0]["representation"]["markdown"]:
+            if self.verify_string not in text_content:
                 logger.error(f"Text content does not contain expected string: '{self.verify_string}'")
-                logger.debug(f"Actual text starts with: '{result_json['pages'][0]['representation']['markdown'][:100]}...'")
+                logger.debug(f"Actual text starts with: '{text_content[:100]}...'")
                 raise ValueError("Text content does not contain expected verification string")
             
             logger.debug("Smoke test verification passed!")

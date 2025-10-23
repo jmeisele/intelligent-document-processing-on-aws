@@ -168,6 +168,7 @@ Resources:
                 - export IDP_CFN_PREFIX=$(make cfn-prefix) || { echo "CFN prefix generation failed"; exit 1; }
                 - make install -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX || { echo "Install failed - cleaning up"; make uninstall -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX || echo "Cleanup failed"; exit 1; }
                 - make smoketest -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX || { echo "Smoketest failed - leaving deployment for debugging"; exit 1; }
+                - make idp_cli_smoketest -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX || { echo "IDP CLI smoketest failed - leaving deployment for debugging"; exit 1; }
                 - echo "All tests passed successfully, running cleanup..."
                 - make uninstall -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX
 

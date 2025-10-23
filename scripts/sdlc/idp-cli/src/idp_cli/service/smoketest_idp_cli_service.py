@@ -33,13 +33,14 @@ class SmokeTestIdpCliService:
                 "pip", "install", "-e", f"{self.cwd}/idp_cli"
             ], check=True, cwd=self.cwd)
             
-            # Deploy stack using idp-cli deploy with pattern-2
-            logger.info(f"Deploying stack {self.stack_name} with pattern-2...")
+            # Deploy stack using idp-cli deploy
+            logger.info(f"Deploying stack {self.stack_name}...")
             subprocess.run([
                 "idp-cli", "deploy",
                 "--stack-name", self.stack_name,
+                "--pattern", "pattern-2",
                 "--admin-email", self.admin_email,
-                "--patterns", "pattern-2"
+                "--wait"
             ], check=True, cwd=self.cwd)
             
             # Use custom batch ID to avoid parsing
@@ -50,7 +51,8 @@ class SmokeTestIdpCliService:
             subprocess.run([
                 "idp-cli", "run-inference",
                 "--stack-name", self.stack_name,
-                "--file-path", f"{self.cwd}/samples/lending_package.pdf",
+                "--dir", f"{self.cwd}/samples/",
+                "--file-pattern", "lending_package.pdf",
                 "--batch-id", batch_id,
                 "--monitor"
             ], check=True, cwd=self.cwd)
@@ -66,24 +68,18 @@ class SmokeTestIdpCliService:
                 ], check=True, cwd=self.cwd)
                 
                 # Verify results exist and contain expected content
-                result_files = os.listdir(temp_dir)
-                if not result_files:
-                    raise Exception("No results downloaded")
-                
-                # Check for expected content in results (similar to smoketest_service)
                 logger.info("Verifying result content...")
-                found_content = False
-                for file_name in result_files:
-                    file_path = os.path.join(temp_dir, file_name)
-                    if os.path.isfile(file_path):
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                            if "ANYTOWN, USA 12345" in content:
-                                found_content = True
-                                break
                 
-                if not found_content:
-                    logger.warning("Expected content 'ANYTOWN, USA 12345' not found in results")
+                # Look for result.json file in page 1 (Pattern 2 structure)
+                result_path = os.path.join(temp_dir, batch_id, "lending_package.pdf", "pages", "1", "result.json")
+                if not os.path.exists(result_path):
+                    raise Exception("Expected result.json file not found in results")
+                
+                with open(result_path, 'r', encoding='utf-8') as f:
+                    import json
+                    result_data = json.load(f)
+                    if "ANYTOWN, USA 12345" not in result_data.get("text", ""):
+                        raise Exception("Expected content 'ANYTOWN, USA 12345' not found in result.json")
                     
             logger.info("✅ IDP CLI smoketest completed successfully!")
             
