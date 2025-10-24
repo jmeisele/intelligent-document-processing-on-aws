@@ -240,7 +240,6 @@ FlowDiagram.propTypes = {
     name: PropTypes.string,
   }),
   getStepIcon: PropTypes.func.isRequired,
-<<<<<<< HEAD
   mergedConfig: PropTypes.shape({
     summarization: PropTypes.shape({
       enabled: PropTypes.bool,
@@ -252,8 +251,6 @@ FlowDiagram.propTypes = {
       enabled: PropTypes.bool,
     }),
   }),
-=======
->>>>>>> develop
 };
 
 export default FlowDiagram;
