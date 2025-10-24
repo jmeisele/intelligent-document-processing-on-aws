@@ -46,6 +46,10 @@ const JsonDisplay = ({ data = null }) => {
   );
 };
 
+JsonDisplay.propTypes = {
+  data: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
+};
+
 // Helper function to check if a step is disabled based on configuration
 const isStepDisabled = (stepName, config) => {
   if (!config) return false;

@@ -63,6 +63,4 @@ ReprocessDocumentModal.propTypes = {
   ),
 };
 
-
-
 export default ReprocessDocumentModal;
