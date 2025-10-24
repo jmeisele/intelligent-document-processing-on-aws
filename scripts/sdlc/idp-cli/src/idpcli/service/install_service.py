@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import time
+import concurrent.futures
 from typing import Optional
 
 import boto3
@@ -136,14 +137,17 @@ class InstallService():
             return False
         
 
-    def deploy_service_role(self):
+    def deploy_service_role(self, stack_prefix):
         """
         Deploy the CloudFormation service role stack.
+        
+        Args:
+            stack_prefix: Stack-specific prefix for unique naming
         
         Returns:
             str: The ARN of the service role, or None if deployment failed
         """
-        service_role_stack_name = f"{self.cfn_prefix}-cloudformation-service-role"
+        service_role_stack_name = f"{stack_prefix}-cfrole"
         service_role_template = 'iam-roles/cloudformation-management/IDP-Cloudformation-Service-Role.yaml'
         
         try:
@@ -237,10 +241,14 @@ class InstallService():
             logger.error(f"Error getting service role ARN from stack {stack_name}: {e}")
             return None
 
-    def create_permission_boundary_policy(self):
-        """Create an 'allow everything' permission boundary policy"""
+    def create_permission_boundary_policy(self, stack_prefix):
+        """Create an 'allow everything' permission boundary policy
         
-        policy_name = f"{self.cfn_prefix}-IDPPermissionBoundary"
+        Args:
+            stack_prefix: Stack-specific prefix for unique policy naming
+        """
+        
+        policy_name = f"{stack_prefix}-IDPPermissionBoundary"
         iam = boto3.client('iam')
         
         try:
@@ -348,34 +356,74 @@ class InstallService():
             logger.error(f"Error validating permission boundary: {e}")
             return False
 
-    def install(self, admin_email: str, idp_pattern: str):
+    def install(self, admin_email: str):
         """
-        Install the IDP stack using CloudFormation with service role and permission boundary.
+        Install both IDP patterns in parallel using CloudFormation with service role and permission boundary.
+        
+        Args:
+            admin_email: Email address for the admin user
+        """
+        from idpcli.config import DEPLOY_PATTERNS
+        patterns = DEPLOY_PATTERNS
+        
+        def deploy_pattern(suffix, pattern_name):
+            stack_name = f"{self.cfn_prefix}-{suffix}"
+            logger.info(f"Starting parallel deployment of {stack_name}")
+            return self.deploy_pattern_stack(admin_email, pattern_name, stack_name)
+        
+        # Deploy patterns in parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {
+                executor.submit(deploy_pattern, suffix, pattern_name): suffix 
+                for suffix, pattern_name in patterns.items()
+            }
+            
+            results = {}
+            for future in concurrent.futures.as_completed(futures):
+                suffix = futures[future]
+                try:
+                    results[suffix] = future.result()
+                except Exception as e:
+                    logger.error(f"Pattern {suffix} deployment failed: {e}")
+                    results[suffix] = False
+        
+        all_patterns_succeeded = all(results.values())
+        if all_patterns_succeeded:
+            logger.info("All configured patterns installed successfully!")
+        else:
+            logger.error(f"Some patterns failed: {results}")
+        
+        return all_patterns_succeeded
+    
+    def deploy_pattern_stack(self, admin_email: str, idp_pattern: str, stack_name: str):
+        """
+        Install a single IDP pattern using CloudFormation with service role and permission boundary.
         
         Args:
             admin_email: Email address for the admin user
             idp_pattern: IDP pattern to deploy
+            stack_name: Name of the CloudFormation stack
         """
         template_file = '.aws-sam/idp-main.yaml'
         s3_prefix = f"{self.cfn_prefix}/0.2.2"  # TODO: Make version configurable
 
         try:
             # Step 1: Create permission boundary policy
-            logger.info("Step 1: Creating permission boundary policy...")
-            permission_boundary_arn = self.create_permission_boundary_policy()
+            logger.info(f"Step 1: Creating permission boundary policy for {stack_name}...")
+            permission_boundary_arn = self.create_permission_boundary_policy(stack_name)
             if not permission_boundary_arn:
                 logger.error("Failed to create permission boundary policy. Aborting deployment.")
                 return False
 
             # Step 2: Deploy CloudFormation service role
-            logger.info("Step 2: Deploying CloudFormation service role...")
-            service_role_arn = self.deploy_service_role()
+            logger.info(f"Step 2: Deploying CloudFormation service role for {stack_name}...")
+            service_role_arn = self.deploy_service_role(stack_name)
             if not service_role_arn:
                 logger.error("Failed to deploy service role. Aborting IDP deployment.")
                 return False
 
             # Step 3: Deploy IDP stack using the service role and permission boundary
-            logger.info("Step 3: Deploying IDP stack using service role and permission boundary...")
+            logger.info(f"Step 3: Deploying IDP stack {stack_name} using service role and permission boundary...")
             
             # Verify template file exists
             template_path = os.path.join(self.abs_cwd, template_file)
@@ -397,7 +445,7 @@ class InstallService():
                 f"IDPPattern={idp_pattern}",
                 f"AdminEmail={admin_email}",
                 f"PermissionsBoundaryArn={permission_boundary_arn}",
-                '--stack-name', self.stack_name
+                '--stack-name', stack_name
             ]
 
             logger.debug(f"Running CloudFormation deploy command: {' '.join(cmd)}")
@@ -421,11 +469,11 @@ class InstallService():
             if process.stderr:
                 logger.debug(f"CloudFormation deploy stderr: {process.stderr}")
 
-            logger.info(f"Successfully deployed stack {self.stack_name} in {self.region}")
+            logger.info(f"Successfully deployed stack {stack_name} in {self.region}")
             
             # Step 4: Validate permission boundary on all roles
-            logger.info("Step 4: Validating permission boundary on all IAM roles...")
-            if not self.validate_permission_boundary(self.stack_name, permission_boundary_arn):
+            logger.info(f"Step 4: Validating permission boundary on all IAM roles for {stack_name}...")
+            if not self.validate_permission_boundary(stack_name, permission_boundary_arn):
                 logger.error("Permission boundary validation failed!")
                 logger.error("Deployment failed due to security policy violations.")
                 return False
