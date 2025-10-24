@@ -334,16 +334,6 @@ pricing:
         price: '8.0E-8'
       - name: cacheWriteInputTokens
         price: '1.0E-6'
-  - name: bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
-    units:
-      - name: inputTokens
-        price: '3.0E-6'
-      - name: outputTokens
-        price: '1.5E-5'
-      - name: cacheReadInputTokens
-        price: '3.0E-7'
-      - name: cacheWriteInputTokens
-        price: '3.75E-6'
   - name: bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0
     units:
       - name: inputTokens
@@ -354,6 +344,16 @@ pricing:
         price: '1.1E-07'
       - name: cacheWriteInputTokens
         price: '1.4E-06'
+  - name: bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
+    units:
+      - name: inputTokens
+        price: '3.0E-6'
+      - name: outputTokens
+        price: '1.5E-5'
+      - name: cacheReadInputTokens
+        price: '3.0E-7'
+      - name: cacheWriteInputTokens
+        price: '3.75E-6'
   - name: bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0
     units:
       - name: inputTokens
@@ -494,23 +494,23 @@ pricing:
   - name: bedrock/eu.anthropic.claude-sonnet-4-5-20250929-v1:0
     units:
       - name: inputTokens
-        price: "3.0E-6"
+        price: '3.3E-6'
       - name: outputTokens
-        price: "1.5E-5"
+        price: '1.65E-5'
       - name: cacheReadInputTokens
-        price: "3.0E-7"
+        price: '3.3E-7'
       - name: cacheWriteInputTokens
-        price: "3.75E-6"
+        price: '4.125E-6'
   - name: bedrock/eu.anthropic.claude-sonnet-4-5-20250929-v1:0:1m
     units:
       - name: inputTokens
-        price: "3.0E-6"
+        price: '6.6E-6'
       - name: outputTokens
-        price: "1.5E-5"
+        price: '2.475E-5'
       - name: cacheReadInputTokens
-        price: "3.0E-7"
+        price: '6.6E-7'
       - name: cacheWriteInputTokens
-        price: "3.75E-6"
+        price: '8.25E-6'
   # AWS Lambda pricing (US East - N. Virginia)
   - name: lambda/requests
     units:
