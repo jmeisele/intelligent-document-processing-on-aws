@@ -113,14 +113,16 @@ idp-cli deploy [OPTIONS]
 
 **Required for New Stacks:**
 - `--stack-name`: CloudFormation stack name
-- `--pattern`: IDP pattern (`pattern-1`, `pattern-2`, or `pattern-3`)
+- `--pattern`: IDP pattern architecture to deploy (`pattern-1`, `pattern-2`, or `pattern-3`)
 - `--admin-email`: Admin user email
 
 **Optional Parameters:**
+- `--template-url`: URL to CloudFormation template in S3 (optional, auto-selected based on region)
 - `--custom-config`: Path to local config file or S3 URI
 - `--max-concurrent`: Maximum concurrent workflows (default: 100)
-- `--log-level`: Logging level (`DEBUG`, `INFO`, `WARN`, `ERROR`)
+- `--log-level`: Logging level (`DEBUG`, `INFO`, `WARN`, `ERROR`) (default: INFO)
 - `--enable-hitl`: Enable Human-in-the-Loop (`true` or `false`)
+- `--pattern-config`: Pattern-specific configuration preset (optional, distinct from --pattern)
 - `--parameters`: Additional parameters as `key=value,key2=value2`
 - `--wait`: Wait for stack operation to complete
 - `--region`: AWS region (optional, auto-detected)
@@ -146,6 +148,15 @@ idp-cli deploy \
     --stack-name my-idp \
     --max-concurrent 200 \
     --log-level DEBUG \
+    --wait
+
+# Deploy with custom template URL (for regions not auto-supported)
+idp-cli deploy \
+    --stack-name my-idp \
+    --pattern pattern-2 \
+    --admin-email user@example.com \
+    --template-url https://s3.eu-west-1.amazonaws.com/my-bucket/idp-main.yaml \
+    --region eu-west-1 \
     --wait
 ```
 
