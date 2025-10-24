@@ -7,7 +7,6 @@ phases:
       - echo "Verifying Docker..."
       - docker --version
       - echo "Setting up Docker buildx for cross-platform builds..."
-      - docker run --privileged --rm tonistiigi/binfmt --install all
       - docker buildx create --use --name multiarch-builder --driver docker-container || docker buildx use multiarch-builder
       - docker buildx inspect --bootstrap
   build:

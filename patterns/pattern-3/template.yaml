@@ -11,6 +11,12 @@ Parameters:
   StackName:
     Type: String
 
+  EnableXRayTracing:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Enable X-Ray tracing
+
   InputBucket:
     Type: String
 
@@ -1436,6 +1442,8 @@ Resources:
     Properties:
       PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref AWS::NoValue]
       Name: !Sub "${AWS::StackName}-DocumentProcessingWorkflow"
+      Tracing:
+        Enabled: !Ref EnableXRayTracing
       DefinitionUri: statemachine/workflow.asl.json
       DefinitionSubstitutions:
         OCRFunctionArn: !GetAtt OCRFunction.Arn

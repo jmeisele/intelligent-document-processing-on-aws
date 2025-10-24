@@ -45,23 +45,23 @@ class TestErrorAnalyzerTools:
     def test_dynamodb_tools_find_tracking_table(self):
         """Test find_tracking_table function can be imported."""
         spec = importlib.util.find_spec(
-            "idp_common.agents.error_analyzer.tools.dynamodb_tools"
+            "idp_common.agents.error_analyzer.tools.dynamodb_tool"
         )
-        assert spec is not None, "Failed to find dynamodb_tools module"
+        assert spec is not None, "Failed to find dynamodb_tool module"
 
     def test_dynamodb_tools_scan_table(self):
         """Test scan_dynamodb_table function can be imported."""
         spec = importlib.util.find_spec(
-            "idp_common.agents.error_analyzer.tools.dynamodb_tools"
+            "idp_common.agents.error_analyzer.tools.dynamodb_tool"
         )
-        assert spec is not None, "Failed to find dynamodb_tools module"
+        assert spec is not None, "Failed to find dynamodb_tool module"
 
     def test_cloudwatch_tools_search_stack_logs(self):
         """Test search_stack_logs function can be imported."""
         spec = importlib.util.find_spec(
-            "idp_common.agents.error_analyzer.tools.cloudwatch_tools"
+            "idp_common.agents.error_analyzer.tools.cloudwatch_tool"
         )
-        assert spec is not None, "Failed to find cloudwatch_tools module"
+        assert spec is not None, "Failed to find cloudwatch_tool module"
 
     def test_general_analysis_tool(self):
         """Test general system analysis tool can be imported."""
@@ -73,6 +73,6 @@ class TestErrorAnalyzerTools:
     def test_stepfunction_tools(self):
         """Test Step Function analysis tool can be imported."""
         spec = importlib.util.find_spec(
-            "idp_common.agents.error_analyzer.tools.stepfunction_tools"
+            "idp_common.agents.error_analyzer.tools.stepfunction_tool"
         )
-        assert spec is not None, "Failed to find stepfunction_tools module"
+        assert spec is not None, "Failed to find stepfunction_tool module"

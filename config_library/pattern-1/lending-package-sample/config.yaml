@@ -242,7 +242,19 @@ agents:
       - Extract log_group, log_stream, and events data from tool response
       - Show complete log group and log stream names without truncation
       - Present actual log messages from events array in code blocks
-
+  
+      ANALYSIS GUIDELINES:
+      - If has_performance_issues is false, focus on application logic errors
+      - Use service timeline to rule out infrastructure bottlenecks
+      - Service response times help eliminate timeout-related causes
+      - For application errors use CloudWatch error messages for recommendations
+      
+      ROOT CAUSE DETERMINATION:
+      - Start with Step Function failure details (most specific)
+      - Validate with CloudWatch error logs (most detailed)
+      - Use X-Ray to categorize as infrastructure vs. application issue
+      - DynamoDB provides supporting timeline context only
+      
       RECOMMENDATION GUIDELINES:
       For code-related issues or system bugs:
       - Do not suggest code modifications

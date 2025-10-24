@@ -13,29 +13,33 @@ Provides comprehensive error analysis capabilities including:
 - Lambda function context extraction
 """
 
-from .cloudwatch_tools import search_document_logs, search_stack_logs
-from .document_analysis_tool import analyze_document_failure
-from .dynamodb_tools import (
-    get_document_by_key,
-    get_document_status,
-    get_tracking_table_name,
-    query_tracking_table,
+from .cloudwatch_tool import cloudwatch_document_logs, cloudwatch_stack_logs
+from .document_analysis_tool import analyze_document_error
+from .dynamodb_tool import (
+    dynamodb_document_record,
+    dynamodb_document_status,
+    dynamodb_table_name,
+    dynamodb_tracking_query,
 )
 from .error_analysis_tool import analyze_errors
-from .general_analysis_tool import analyze_recent_system_errors
-from .lambda_tools import get_document_context
-from .stepfunction_tools import analyze_stepfunction_execution
+from .general_analysis_tool import analyze_general_errors
+from .lambda_tool import lambda_document_context
+from .stepfunction_tool import stepfunction_execution_details
+from .xray_tool import xray_document_analysis, xray_service_map, xray_stack_traces
 
 __all__ = [
     "analyze_errors",
-    "analyze_document_failure",
-    "analyze_recent_system_errors",
-    "search_document_logs",
-    "search_stack_logs",
-    "get_document_context",
-    "get_document_by_key",
-    "get_document_status",
-    "get_tracking_table_name",
-    "query_tracking_table",
-    "analyze_stepfunction_execution",
+    "analyze_document_error",
+    "analyze_general_errors",
+    "cloudwatch_document_logs",
+    "cloudwatch_stack_logs",
+    "lambda_document_context",
+    "dynamodb_document_record",
+    "dynamodb_document_status",
+    "dynamodb_table_name",
+    "dynamodb_tracking_query",
+    "stepfunction_execution_details",
+    "xray_document_analysis",
+    "xray_service_map",
+    "xray_stack_traces",
 ]
