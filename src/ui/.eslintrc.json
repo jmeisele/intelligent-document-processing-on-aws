@@ -17,7 +17,7 @@
   "rules": {
     "no-console": "off",
     "no-alert": "off",
-    "max-len": ["error", { "code": 120, "ignoreUrls": true, "ignoreTemplateLiterals": true }],
+    "max-len": ["error", { "code": 120, "ignoreUrls": true, "ignoreTemplateLiterals": true, "ignoreComments": true }],
     "linebreak-style": ["error", "unix"],
     "react/jsx-filename-extension": [
       "warn",

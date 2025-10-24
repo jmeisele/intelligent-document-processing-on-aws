@@ -590,7 +590,7 @@ const FormView = ({
   // Define renderField first as a function declaration
   function renderField(key, property, path = '') {
     const currentPath = path ? `${path}.${key}` : key;
-    let value = getValueAtPath(formValues, currentPath);
+    const value = getValueAtPath(formValues, currentPath);
 
     // Add debugging for granular assessment
     if (currentPath.includes('granular')) {
