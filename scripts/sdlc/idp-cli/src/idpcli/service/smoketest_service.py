@@ -1,9 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 
-from idp_cli.util.cfn_util import CfnUtil
-from idp_cli.util.path_util import PathUtil
-from idp_cli.util.s3_util import S3Util
+from idpcli.util.cfn_util import CfnUtil
+from idpcli.util.path_util import PathUtil
+from idpcli.util.s3_util import S3Util
 import time
 import json
 import os
@@ -16,7 +16,7 @@ class SmokeTestService():
                  file_path: str, 
                  verify_string: str):
         
-        from idp_cli.config import DEPLOY_PATTERNS
+        from idpcli.config import DEPLOY_PATTERNS
         
         self.stack_name_prefix = stack_name_prefix
         self.stack_names = [f"{stack_name_prefix}-{suffix}" for suffix in DEPLOY_PATTERNS.keys()]

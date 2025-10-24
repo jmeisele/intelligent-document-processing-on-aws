@@ -3,12 +3,12 @@
 
 import os
 import sys
-from idp_cli.service.install_service import InstallService
-from idp_cli.util.codepipeline_util import CodePipelineUtil
+from idpcli.service.install_service import InstallService
+from idpcli.util.codepipeline_util import CodePipelineUtil
 import typer
-from idp_cli.service.uninstall_service import UninstallService
-from idp_cli.service.smoketest_service import SmokeTestService
-from idp_cli.service.smoketest_idp_cli_service import SmokeTestIdpCliService
+from idpcli.service.uninstall_service import UninstallService
+from idpcli.service.smoketest_service import SmokeTestService
+from idpcli.service.smoketest_idp_cli_service import SmokeTestIdpCliService
 from dotenv import load_dotenv
 
 from loguru import logger

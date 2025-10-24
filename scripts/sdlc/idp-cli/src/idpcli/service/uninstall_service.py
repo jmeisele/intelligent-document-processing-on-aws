@@ -6,15 +6,15 @@ import boto3
 import concurrent.futures
 from typing import Any, Dict, Optional
 from botocore.exceptions import ClientError
-from idp_cli.util.cfn_util import CfnUtil
-from idp_cli.util.s3_util import S3Util
+from idpcli.util.cfn_util import CfnUtil
+from idpcli.util.s3_util import S3Util
 from loguru import logger
 
 class UninstallService():
     def __init__(self, stack_name_prefix: str,
                  account_id: str,
                  cfn_prefix: Optional[str] = "idp-dev"):
-        from idp_cli.config import DEPLOY_PATTERNS
+        from idpcli.config import DEPLOY_PATTERNS
         
         self.stack_name_prefix = stack_name_prefix
         self.account_id = account_id

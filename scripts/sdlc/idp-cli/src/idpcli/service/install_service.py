@@ -363,7 +363,7 @@ class InstallService():
         Args:
             admin_email: Email address for the admin user
         """
-        from idp_cli.config import DEPLOY_PATTERNS
+        from idpcli.config import DEPLOY_PATTERNS
         patterns = DEPLOY_PATTERNS
         
         def deploy_pattern(suffix, pattern_name):
