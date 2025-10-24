@@ -94,6 +94,10 @@ Parameters:
   ConfigLibraryHash:
     Type: String
     Description: "Hash token from config library to force updates when config library changes"
+
+  EvaluationFunctionArn:
+    Type: String
+    Description: "ARN of the Evaluation Lambda function"
     
   EnableHITL:
     Type: String
@@ -362,6 +366,11 @@ Resources:
             type: object
             sectionLabel: Evaluation Inference
             properties:
+              enabled:
+                type: boolean
+                description: Enable or disable evaluation processing
+                default: true
+                order: 0
               llm_method:
                 type: object
                 properties:
@@ -648,6 +657,7 @@ Resources:
         HITLWaitFunctionArn: !GetAtt HITLWaitFunction.Arn
         HITLStatusUpdateFunctionArn: !GetAtt HITLStatusUpdateFunction.Arn
         SummarizationLambdaArn: !GetAtt SummarizationFunction.Arn
+        EvaluationLambdaArn: !Ref EvaluationFunctionArn
         EnableHITL: !Ref EnableHITL
         OutputBucket: !Ref OutputBucket
         WorkingBucket: !Ref WorkingBucket
@@ -670,6 +680,8 @@ Resources:
             FunctionName: !Ref HITLWaitFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref HITLStatusUpdateFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref EvaluationFunctionArn
         - CloudWatchLogsFullAccess
 
   StateMachineLogGroup:

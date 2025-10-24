@@ -56,6 +56,11 @@ const isStepDisabled = (stepName, config) => {
     return config.assessment?.enabled === false;
   }
 
+  // Check if this is an evaluation step
+  if (stepNameLower.includes('evaluation') || stepNameLower.includes('evaluate')) {
+    return config.evaluation?.enabled === false;
+  }
+
   return false;
 };
 
@@ -270,6 +275,9 @@ const StepFunctionFlowViewer = ({ executionArn, visible, onDismiss, mergedConfig
       return <FaEye size={iconProps.size} className={iconProps.className} />;
     }
     if (stepName.toLowerCase().includes('summarization')) {
+      return <FaChartBar size={iconProps.size} className={iconProps.className} />;
+    }
+    if (stepName.toLowerCase().includes('evaluation')) {
       return <FaChartBar size={iconProps.size} className={iconProps.className} />;
     }
     if (stepName.toLowerCase().includes('workflow')) {
@@ -496,6 +504,9 @@ StepFunctionFlowViewer.propTypes = {
       enabled: PropTypes.bool,
     }),
     assessment: PropTypes.shape({
+      enabled: PropTypes.bool,
+    }),
+    evaluation: PropTypes.shape({
       enabled: PropTypes.bool,
     }),
   }),

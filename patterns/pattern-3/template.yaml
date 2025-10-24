@@ -92,6 +92,10 @@ Parameters:
     Type: String
     Description: "Hash token from config library to force updates when config library changes"
 
+  EvaluationFunctionArn:
+    Type: String
+    Description: "ARN of the Evaluation Lambda function"
+
   PermissionsBoundaryArn:
     Type: String
     Default: ""
@@ -700,6 +704,11 @@ Resources:
             type: object
             sectionLabel: Evaluation Inference
             properties:
+              enabled:
+                type: boolean
+                description: Enable or disable evaluation processing
+                default: true
+                order: 0
               llm_method:
                 type: object
                 properties:
@@ -1452,6 +1461,7 @@ Resources:
         AssessmentFunctionArn: !GetAtt AssessmentFunction.Arn
         ProcessResultsLambdaArn: !GetAtt ProcessResultsFunction.Arn
         SummarizationLambdaArn: !GetAtt SummarizationFunction.Arn
+        EvaluationLambdaArn: !Ref EvaluationFunctionArn
         OutputBucket: !Ref OutputBucket
       Logging:
         Level: ALL
@@ -1471,6 +1481,8 @@ Resources:
             FunctionName: !Ref ProcessResultsFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref SummarizationFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref EvaluationFunctionArn
         - CloudWatchLogsFullAccess
 
   StateMachineLogGroup:

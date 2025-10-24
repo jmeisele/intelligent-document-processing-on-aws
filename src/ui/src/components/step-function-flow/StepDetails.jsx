@@ -62,6 +62,11 @@ const isStepDisabled = (stepName, config) => {
     return config.assessment?.enabled === false;
   }
 
+  // Check if this is an evaluation step
+  if (stepNameLower.includes('evaluation') || stepNameLower.includes('evaluate')) {
+    return config.evaluation?.enabled === false;
+  }
+
   return false;
 };
 
@@ -295,6 +300,9 @@ StepDetails.propTypes = {
       enabled: PropTypes.bool,
     }),
     assessment: PropTypes.shape({
+      enabled: PropTypes.bool,
+    }),
+    evaluation: PropTypes.shape({
       enabled: PropTypes.bool,
     }),
   }),
