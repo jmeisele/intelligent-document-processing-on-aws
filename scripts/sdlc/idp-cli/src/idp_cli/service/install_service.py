@@ -363,7 +363,7 @@ class InstallService():
         Args:
             admin_email: Email address for the admin user
         """
-        from idp_cli.cli.main import DEPLOY_PATTERNS
+        from idp_cli.config import DEPLOY_PATTERNS
         patterns = DEPLOY_PATTERNS
         
         def deploy_pattern(suffix, pattern_name):
@@ -389,7 +389,7 @@ class InstallService():
         
         all_patterns_succeeded = all(results.values())
         if all_patterns_succeeded:
-            logger.info("Both patterns installed successfully!")
+            logger.info("All configured patterns installed successfully!")
         else:
             logger.error(f"Some patterns failed: {results}")
         

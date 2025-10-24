@@ -14,12 +14,14 @@ class UninstallService():
     def __init__(self, stack_name_prefix: str,
                  account_id: str,
                  cfn_prefix: Optional[str] = "idp-dev"):
+        from idp_cli.config import DEPLOY_PATTERNS
+        
         self.stack_name_prefix = stack_name_prefix
         self.account_id = account_id
         self.cfn_prefix = cfn_prefix 
         self.region = os.environ.get('AWS_REGION', 'us-east-1')
         self.install_bucket_name = f"{self.cfn_prefix}-{self.account_id}-{self.region}"
-        self.stack_names = [f"{stack_name_prefix}-p1", f"{stack_name_prefix}-p2"]
+        self.stack_names = [f"{stack_name_prefix}-{suffix}" for suffix in DEPLOY_PATTERNS.keys()]
         logger.debug(f"stack_names: {self.stack_names}\naccount_id: {account_id}\ncfn_prefix: {cfn_prefix}\nregion:{self.region}")
 
     def uninstall(self):
