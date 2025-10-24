@@ -31,8 +31,8 @@ class SmokeTestIdpCliService:
             logger.info("Installing IDP CLI...")
             idp_cli_path = os.path.join(self.cwd, "idp_cli")
             subprocess.run([
-                "pip", "install", "-e", idp_cli_path
-            ], check=True, cwd=self.cwd)
+                "pip", "install", "-e", "."
+            ], check=True, cwd=idp_cli_path)
             
             # Deploy stack using idp-cli deploy
             logger.info(f"Deploying stack {self.stack_name}...")
