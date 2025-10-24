@@ -171,6 +171,7 @@ Resources:
               finally:
                 - echo "Running cleanup regardless of build result..."
                 - make uninstall -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX || echo "Cleanup failed but continuing"
+                - make -n cli-smoketest >/dev/null 2>&1 && make cli-smoketest -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX || echo "CLI smoketest target not found, skipping"
 
   DeploymentPipeline:
     Type: 'AWS::CodePipeline::Pipeline'

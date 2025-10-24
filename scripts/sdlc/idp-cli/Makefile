@@ -39,14 +39,16 @@ uninstall:
 	cd $(IDP_CWD) && python3 scripts/cleanup-logs.py || echo "Log cleanup failed but continuing"
 
 smoketest:
+	poetry run idpcli smoketest \
+	--stack-name-prefix=$(IDP_CFN_PREFIX) \
+	--file-path="../../../samples/lending_package.pdf"
+
+cli-smoketest:
 	poetry run idpcli idp-cli-smoketest \
 	--cfn-prefix=$(IDP_CFN_PREFIX) \
 	--admin-email=$(IDP_ADMIN_EMAIL) \
 	--account-id=$(IDP_ACCOUNT_ID) \
 	--cwd=$(IDP_CWD)
-	poetry run idpcli smoketest \
-	--stack-name-prefix=$(IDP_CFN_PREFIX) \
-	--file-path="../../../samples/lending_package.pdf"
 
 
 wait:
