@@ -52,7 +52,7 @@ smoketest:
 wait:
 	$(eval VERSION_ID := $(shell cat $(IDP_CWD)/.upload_version_id 2>/dev/null || echo ""))
 	@if [ -z "$(VERSION_ID)" ]; then echo "Error: No version ID found"; exit 1; fi
-	$(eval EXECUTION_ID := $(shell poetry run python -c "from idp_cli.util.codepipeline_util import CodePipelineUtil; print(CodePipelineUtil.get_execution_id_by_version('$(IDP_PIPELINE_NAME)', '$(VERSION_ID)'))" || echo "FAILED"))
+	$(eval EXECUTION_ID := $(shell poetry run python -c "from idpcli.util.codepipeline_util import CodePipelineUtil; print(CodePipelineUtil.get_execution_id_by_version('$(IDP_PIPELINE_NAME)', '$(VERSION_ID)'))" || echo "FAILED"))
 	@if [ "$(EXECUTION_ID)" = "FAILED" ]; then echo "Error: Failed to find pipeline execution for version $(VERSION_ID)"; exit 1; fi
 	poetry run idpcli monitor-pipeline \
 	--pipeline-name=$(IDP_PIPELINE_NAME) \
