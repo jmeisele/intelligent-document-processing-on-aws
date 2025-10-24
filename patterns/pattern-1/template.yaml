@@ -680,8 +680,10 @@ Resources:
             FunctionName: !Ref HITLWaitFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref HITLStatusUpdateFunction
-        - LambdaInvokePolicy:
-            FunctionName: !Ref EvaluationFunctionArn
+        - Statement:
+            - Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource: !Ref EvaluationFunctionArn
         - CloudWatchLogsFullAccess
 
   StateMachineLogGroup:

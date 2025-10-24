@@ -1481,8 +1481,10 @@ Resources:
             FunctionName: !Ref ProcessResultsFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref SummarizationFunction
-        - LambdaInvokePolicy:
-            FunctionName: !Ref EvaluationFunctionArn
+        - Statement:
+            - Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource: !Ref EvaluationFunctionArn
         - CloudWatchLogsFullAccess
 
   StateMachineLogGroup:
