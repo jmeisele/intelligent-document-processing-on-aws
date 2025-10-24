@@ -157,6 +157,7 @@ def handler(event, context):
     """
     actual_document = None
     start_time = time.time()
+    working_bucket = os.environ.get('WORKING_BUCKET')
     
     try:
         logger.info(f"Starting evaluation process")
@@ -171,7 +172,7 @@ def handler(event, context):
         if not evaluation_enabled:
             logger.info("Evaluation is disabled in configuration, skipping evaluation")
             # Return document unchanged
-            return {'document': actual_document.serialize_document()}
+            return {'document': actual_document.serialize_document(working_bucket, 'evaluation')}
         
         # Set document status to EVALUATING before processing
         actual_document.status = Status.EVALUATING
@@ -187,7 +188,7 @@ def handler(event, context):
         if not expected_document:
             actual_document = update_document_evaluation_status(actual_document, EvaluationStatus.NO_BASELINE)
             logger.info("Evaluation skipped - no baseline data available")
-            return {'document': actual_document.serialize_document()}
+            return {'document': actual_document.serialize_document(working_bucket, 'evaluation')}
         
         # Create evaluation service
         evaluation_service = evaluation.EvaluationService(config=config)
@@ -205,7 +206,7 @@ def handler(event, context):
             error_msg = f"Evaluation encountered errors: {evaluated_document.errors}"
             logger.error(error_msg)
             evaluated_document = update_document_evaluation_status(evaluated_document, EvaluationStatus.FAILED)
-            return {'document': evaluated_document.serialize_document()}
+            return {'document': evaluated_document.serialize_document(working_bucket, 'evaluation')}
        
         # Save evaluation results to reporting bucket for analytics using the SaveReportingData Lambda
         try:
@@ -236,7 +237,7 @@ def handler(event, context):
         logger.info(f"Evaluation process completed successfully in {time.time() - start_time:.2f} seconds")
         
         # Return document in state machine format
-        return {'document': evaluated_document.serialize_document()}
+        return {'document': evaluated_document.serialize_document(working_bucket, 'evaluation')}
     
     except Exception as e:
         error_msg = f"Error in lambda_handler: {str(e)}"
@@ -246,7 +247,7 @@ def handler(event, context):
         if actual_document:
             try:
                 actual_document = update_document_evaluation_status(actual_document, EvaluationStatus.FAILED)
-                return {'document': actual_document.serialize_document()}
+                return {'document': actual_document.serialize_document(working_bucket, 'evaluation')}
             except Exception as update_error:
                 logger.error(f"Failed to update evaluation status: {str(update_error)}")
         
