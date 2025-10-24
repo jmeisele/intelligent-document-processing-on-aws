@@ -43,29 +43,32 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
     });
   }, []);
 
-  const getDocumentDetailsFromIds = useCallback(async (objectKeys) => {
-    // prettier-ignore
-    logger.debug('getDocumentDetailsFromIds', objectKeys);
-    const getDocumentPromises = objectKeys.map((objectKey) =>
-      client.graphql({ query: getDocument, variables: { objectKey } }),
-    );
-    const getDocumentResolutions = await Promise.allSettled(getDocumentPromises);
-    const getDocumentRejected = getDocumentResolutions.filter((r) => r.status === 'rejected');
-    if (getDocumentRejected.length) {
-      setErrorMessage('failed to get document details - please try again later');
-      logger.error('get document promises rejected', getDocumentRejected);
-    }
-    const documentValues = getDocumentResolutions
-      .filter((r) => r.status === 'fulfilled')
-      .map((r) => r.value?.data?.getDocument);
+  const getDocumentDetailsFromIds = useCallback(
+    async (objectKeys) => {
+      // prettier-ignore
+      logger.debug('getDocumentDetailsFromIds', objectKeys);
+      const getDocumentPromises = objectKeys.map((objectKey) =>
+        client.graphql({ query: getDocument, variables: { objectKey } }),
+      );
+      const getDocumentResolutions = await Promise.allSettled(getDocumentPromises);
+      const getDocumentRejected = getDocumentResolutions.filter((r) => r.status === 'rejected');
+      if (getDocumentRejected.length) {
+        setErrorMessage('failed to get document details - please try again later');
+        logger.error('get document promises rejected', getDocumentRejected);
+      }
+      const documentValues = getDocumentResolutions
+        .filter((r) => r.status === 'fulfilled')
+        .map((r) => r.value?.data?.getDocument);
 
-    return documentValues;
-  }, [setErrorMessage]);
+      return documentValues;
+    },
+    [setErrorMessage],
+  );
 
   useEffect(() => {
     if (subscriptionsRef.current.onCreate) {
       logger.debug('onCreateDocument subscription already exists, skipping');
-      return;
+      return undefined;
     }
 
     logger.debug('onCreateDocument subscription');
@@ -105,7 +108,7 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
   useEffect(() => {
     if (subscriptionsRef.current.onUpdate) {
       logger.debug('onUpdateDocument subscription already exists, skipping');
-      return;
+      return undefined;
     }
 
     logger.debug('onUpdateDocument subscription setup');

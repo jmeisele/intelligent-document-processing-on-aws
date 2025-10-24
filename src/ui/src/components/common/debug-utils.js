@@ -29,7 +29,7 @@ export const debugSectionStructure = (section, sectionId = 'Unknown') => {
           );
 
           if (hasConfidenceFields) {
-            console.log(`Found confidence data in Output.${key}:`, value);  // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Data from trusted internal source only
+            console.log(`Found confidence data in Output.${key}:`, value); // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Data from trusted internal source only
           }
         }
       });
