@@ -397,69 +397,69 @@ pricing:
   - name: bedrock/eu.amazon.nova-lite-v1:0
     units:
       - name: inputTokens
-        price: "7.8E-8"
+        price: '7.8E-8'
       - name: outputTokens
-        price: "3.1E-7"
+        price: '3.1E-7'
       - name: cacheReadInputTokens
-        price: "1.9E-8"
+        price: '1.9E-8'
       - name: cacheWriteInputTokens
-        price: "7.8E-8"
+        price: '7.8E-8'
   - name: bedrock/eu.amazon.nova-pro-v1:0
     units:
       - name: inputTokens
-        price: "1.0E-6"
+        price: '1.0E-6'
       - name: outputTokens
-        price: "4.2E-6"
+        price: '4.2E-6'
       - name: cacheReadInputTokens
-        price: "2.6E-7"
+        price: '2.6E-7'
       - name: cacheWriteInputTokens
-        price: "1.0E-6"
+        price: '1.0E-6'
   - name: bedrock/eu.anthropic.claude-3-haiku-20240307-v1:0
     units:
       - name: inputTokens
-        price: "2.5E-7"
+        price: '2.5E-7'
       - name: outputTokens
-        price: "1.25E-6"
+        price: '1.25E-6'
   - name: bedrock/eu.anthropic.claude-haiku-4-5-20251001-v1:0
     units:
       - name: inputTokens
-        price: "1.1E-6"
+        price: '1.1E-6'
       - name: outputTokens
-        price: "5.5E-6"
+        price: '5.5E-6'
       - name: cacheReadInputTokens
-        price: "1.1E-7"
+        price: '1.1E-7'
       - name: cacheWriteInputTokens
-        price: "1.4E-6"
+        price: '1.4E-6'
   - name: bedrock/eu.anthropic.claude-3-5-sonnet-20241022-v2:0
     units:
       - name: inputTokens
-        price: "3.0E-6"
+        price: '3.0E-6'
       - name: outputTokens
-        price: "1.5E-5"
+        price: '1.5E-5'
       - name: cacheReadInputTokens
-        price: "3.0E-7"
+        price: '3.0E-7'
       - name: cacheWriteInputTokens
-        price: "3.75E-6"
+        price: '3.75E-6'
   - name: bedrock/eu.anthropic.claude-3-7-sonnet-20250219-v1:0
     units:
       - name: inputTokens
-        price: "3.0E-6"
+        price: '3.0E-6'
       - name: outputTokens
-        price: "1.5E-5"
+        price: '1.5E-5'
       - name: cacheReadInputTokens
-        price: "3.0E-7"
+        price: '3.0E-7'
       - name: cacheWriteInputTokens
-        price: "3.75E-6"
+        price: '3.75E-6'
   - name: bedrock/eu.anthropic.claude-sonnet-4-20250514-v1:0
     units:
       - name: inputTokens
-        price: "3.0E-6"
+        price: '3.0E-6'
       - name: outputTokens
-        price: "1.5E-5"
+        price: '1.5E-5'
       - name: cacheReadInputTokens
-        price: "3.0E-7"
+        price: '3.0E-7'
       - name: cacheWriteInputTokens
-        price: "3.75E-6"
+        price: '3.75E-6'
   - name: bedrock/eu.anthropic.claude-sonnet-4-5-20250929-v1:0
     units:
       - name: inputTokens
