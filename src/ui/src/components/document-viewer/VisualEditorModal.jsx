@@ -1091,16 +1091,7 @@ const VisualEditorModal = ({ visible, onDismiss, jsonData, onChange, isReadOnly,
             flex: '0 0 50%',
           }}
         >
-          <Container
-            header={<Header variant="h3">Document Pages ({pageIds.length})</Header>}
-            style={{
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-              flex: 1,
-            }}
-          >
+          <Container header={<Header variant="h3">Document Pages ({pageIds.length})</Header>}>
             {(() => {
               if (loadingImages) {
                 return (
@@ -1139,7 +1130,6 @@ const VisualEditorModal = ({ visible, onDismiss, jsonData, onChange, isReadOnly,
                           }
                         }}
                         disabled={pageIds.indexOf(currentPage) === 0}
-                        style={{ pointerEvents: 'auto' }}
                       />
                       <Button
                         iconName="angle-right"
@@ -1152,7 +1142,6 @@ const VisualEditorModal = ({ visible, onDismiss, jsonData, onChange, isReadOnly,
                           }
                         }}
                         disabled={pageIds.indexOf(currentPage) === pageIds.length - 1}
-                        style={{ pointerEvents: 'auto' }}
                       />
                     </Box>
 
@@ -1338,16 +1327,7 @@ const VisualEditorModal = ({ visible, onDismiss, jsonData, onChange, isReadOnly,
             overflow: 'hidden',
           }}
         >
-          <Container
-            header={<Header variant="h3">Document Data</Header>}
-            style={{
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-              flex: 1,
-            }}
-          >
+          <Container header={<Header variant="h3">Document Data</Header>}>
             <div
               style={{
                 flex: 1,

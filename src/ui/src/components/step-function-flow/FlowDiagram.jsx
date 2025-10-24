@@ -4,6 +4,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Box, Badge } from '@cloudscape-design/components';
+import useConfiguration from '../../hooks/use-configuration';
 import './FlowDiagram.css';
 
 // Helper function to check if a step is disabled based on configuration
@@ -26,6 +27,9 @@ const isStepDisabled = (stepName, config) => {
 };
 
 const FlowDiagram = ({ steps = [], onStepClick, selectedStep = null, getStepIcon }) => {
+  // Use the configuration hook to get mergedConfig
+  const { mergedConfig } = useConfiguration();
+
   if (!steps || steps.length === 0) {
     return (
       <Box textAlign="center" padding="xl">
@@ -231,14 +235,6 @@ FlowDiagram.propTypes = {
     name: PropTypes.string,
   }),
   getStepIcon: PropTypes.func.isRequired,
-  mergedConfig: PropTypes.shape({
-    summarization: PropTypes.shape({
-      enabled: PropTypes.bool,
-    }),
-    assessment: PropTypes.shape({
-      enabled: PropTypes.bool,
-    }),
-  }),
 };
 
 export default FlowDiagram;
