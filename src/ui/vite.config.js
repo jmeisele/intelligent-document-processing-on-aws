@@ -7,7 +7,7 @@ import svgr from 'vite-plugin-svgr';
 import { resolve } from 'path';
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react({
       // Use automatic JSX runtime (React 17+)
@@ -36,7 +36,7 @@ export default defineConfig({
   // Build configuration
   build: {
     outDir: 'build',
-    sourcemap: false,
+    sourcemap: mode === 'development' ? 'inline' : false,
     // Increase chunk size warning limit
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
@@ -91,8 +91,16 @@ export default defineConfig({
       loader: {
         '.js': 'jsx',
       },
+      // Suppress source map warnings for dependencies
+      sourcemap: false,
     },
   },
+
+  // Suppress source map warnings in development
+  ...(mode === 'development' && {
+    logLevel: 'info',
+    clearScreen: false,
+  }),
 
   // CSS configuration
   css: {
@@ -100,4 +108,4 @@ export default defineConfig({
       localsConvention: 'camelCase',
     },
   },
-});
+}));
