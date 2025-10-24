@@ -744,10 +744,7 @@ Resources:
             Action: bedrock:InvokeDataAutomationAsync
             Resource: 
               - !Ref BDAProjectArn
-              - !Sub "arn:${AWS::Partition}:bedrock:us-east-1:${AWS::AccountId}:data-automation-profile/us.data-automation-v1"
-              - !Sub "arn:${AWS::Partition}:bedrock:us-east-2:${AWS::AccountId}:data-automation-profile/us.data-automation-v1"
-              - !Sub "arn:${AWS::Partition}:bedrock:us-west-1:${AWS::AccountId}:data-automation-profile/us.data-automation-v1"
-              - !Sub "arn:${AWS::Partition}:bedrock:us-west-2:${AWS::AccountId}:data-automation-profile/us.data-automation-v1"
+              - !Sub "arn:${AWS::Partition}:bedrock:*:${AWS::AccountId}:data-automation-profile/*.data-automation-v1"
   
   InvokeBDAFunctionLogGroup:
     Type: AWS::Logs::LogGroup
