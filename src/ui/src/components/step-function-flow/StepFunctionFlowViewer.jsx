@@ -59,7 +59,7 @@ const isStepDisabled = (stepName, config) => {
   return false;
 };
 
-const StepFunctionFlowViewer = ({ executionArn, visible, onDismiss, mergedConfig = null }) => {
+const StepFunctionFlowViewer = ({ executionArn, visible, onDismiss, mergedConfig }) => {
   const [selectedStep, setSelectedStep] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -418,6 +418,7 @@ const StepFunctionFlowViewer = ({ executionArn, visible, onDismiss, mergedConfig
             onStepClick={setSelectedStep}
             selectedStep={selectedStep}
             getStepIcon={getStepIcon}
+            mergedConfig={mergedConfig}
           />
         </Container>
 
@@ -498,6 +499,10 @@ StepFunctionFlowViewer.propTypes = {
       enabled: PropTypes.bool,
     }),
   }),
+};
+
+StepFunctionFlowViewer.defaultProps = {
+  mergedConfig: null,
 };
 
 export default StepFunctionFlowViewer;
