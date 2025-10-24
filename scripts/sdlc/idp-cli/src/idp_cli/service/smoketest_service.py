@@ -16,8 +16,10 @@ class SmokeTestService():
                  file_path: str, 
                  verify_string: str):
         
+        from idp_cli.cli.main import DEPLOY_PATTERNS
+        
         self.stack_name_prefix = stack_name_prefix
-        self.stack_names = [f"{stack_name_prefix}-p1", f"{stack_name_prefix}-p2"]
+        self.stack_names = [f"{stack_name_prefix}-{suffix}" for suffix in DEPLOY_PATTERNS.keys()]
         self.file_path = file_path
         self.verify_string = verify_string
 

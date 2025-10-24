@@ -36,6 +36,7 @@ class SmokeTestIdpCliService:
             
             # Deploy stack using idp-cli deploy
             logger.info(f"Deploying stack {self.stack_name}...")
+            # Use pattern-2 specifically for CLI smoketest
             subprocess.run([
                 "idp-cli", "deploy",
                 "--stack-name", self.stack_name,
@@ -49,7 +50,7 @@ class SmokeTestIdpCliService:
             
             # Run inference using IDP CLI with custom batch ID
             logger.info(f"Running inference with batch ID: {batch_id}...")
-            samples_path = os.path.join(self.cwd, "samples/")
+            samples_path = "samples/"
             subprocess.run([
                 "idp-cli", "run-inference",
                 "--stack-name", self.stack_name,
@@ -84,17 +85,20 @@ class SmokeTestIdpCliService:
                         raise Exception("Expected content 'ANYTOWN, USA 12345' not found in result.json")
                     
             logger.info("✅ IDP CLI smoketest completed successfully!")
-            
-            # Always cleanup test deployment
-            logger.info(f"Cleaning up deployment {self.stack_name}...")
-            subprocess.run([
-                "idp-cli", "delete",
-                "--stack-name", self.stack_name,
-                "--force"
-            ], check=True, cwd=self.cwd)
-            
             return True
                 
         except Exception as e:
             logger.exception(f"Error during IDP CLI smoketest: {str(e)}")
             return False
+        finally:
+            # Always cleanup test deployment regardless of success/failure
+            try:
+                logger.info(f"Cleaning up deployment {self.stack_name}...")
+                subprocess.run([
+                    "idp-cli", "delete",
+                    "--stack-name", self.stack_name,
+                    "--force"
+                ], check=True, cwd=self.cwd)
+                logger.info("✅ Cleanup completed successfully!")
+            except Exception as cleanup_error:
+                logger.error(f"Failed to cleanup deployment {self.stack_name}: {cleanup_error}")

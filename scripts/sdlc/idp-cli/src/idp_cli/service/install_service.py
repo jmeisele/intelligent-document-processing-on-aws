@@ -363,10 +363,8 @@ class InstallService():
         Args:
             admin_email: Email address for the admin user
         """
-        patterns = {
-            "p1": "Pattern1 - Packet or Media processing with Bedrock Data Automation (BDA)",
-            "p2": "Pattern2 - Packet processing with Textract and Bedrock"
-        }
+        from idp_cli.cli.main import DEPLOY_PATTERNS
+        patterns = DEPLOY_PATTERNS
         
         def deploy_pattern(suffix, pattern_name):
             stack_name = f"{self.cfn_prefix}-{suffix}"
