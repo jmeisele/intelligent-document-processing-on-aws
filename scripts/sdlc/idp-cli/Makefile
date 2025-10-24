@@ -10,6 +10,12 @@ IDP_CFN_PREFIX?=idp-dev
 IDP_STACK_NAME?=$(IDP_CFN_PREFIX)
 IDP_PIPELINE_NAME?=idp-sdlc-deploy-pipeline
 
+# Pattern-specific configurations
+IDP_PATTERN1_STACK_NAME?=$(IDP_CFN_PREFIX)-p1
+IDP_PATTERN2_STACK_NAME?=$(IDP_CFN_PREFIX)-p2
+IDP_PATTERN1_NAME?=Pattern1 - Packet or Media processing with Bedrock Data Automation (BDA)
+IDP_PATTERN2_NAME?=Pattern2 - OCR → Bedrock Classification (page-level or holistic) → Bedrock Extraction
+
 test:
 	poetry run pytest -s --log-cli-level=DEBUG
 
@@ -27,20 +33,28 @@ install:
 uninstall:
 	export S3UTIL_ALLOW_BUCKET_DESTRUCT=true && \
 	poetry run idpcli uninstall \
-	--stack-name=$(IDP_STACK_NAME) \
+	--stack-name-prefix=$(IDP_CFN_PREFIX) \
 	--account-id=$(IDP_ACCOUNT_ID) \
 	--cfn-prefix=$(IDP_CFN_PREFIX)
-	# Clean up CloudWatch Logs resource policy after uninstall
-	cd $(IDP_CWD) && python3 scripts/cleanup-logs.py || echo "Log cleanup failed but continuing" \
+	cd $(IDP_CWD) && python3 scripts/cleanup-logs.py || echo "Log cleanup failed but continuing"
 
 smoketest:
 	poetry run idpcli smoketest \
-	--stack-name=$(IDP_STACK_NAME)
+	--stack-name-prefix=$(IDP_CFN_PREFIX) \
+	--file-path="../../../samples/lending_package.pdf"
+
+cli-smoketest:
+	poetry run idpcli idp-cli-smoketest \
+	--cfn-prefix=$(IDP_CFN_PREFIX) \
+	--admin-email=$(IDP_ADMIN_EMAIL) \
+	--account-id=$(IDP_ACCOUNT_ID) \
+	--cwd=$(IDP_CWD)
+
 
 wait:
 	$(eval VERSION_ID := $(shell cat $(IDP_CWD)/.upload_version_id 2>/dev/null || echo ""))
 	@if [ -z "$(VERSION_ID)" ]; then echo "Error: No version ID found"; exit 1; fi
-	$(eval EXECUTION_ID := $(shell poetry run python -c "from idp_cli.util.codepipeline_util import CodePipelineUtil; print(CodePipelineUtil.get_execution_id_by_version('$(IDP_PIPELINE_NAME)', '$(VERSION_ID)'))" || echo "FAILED"))
+	$(eval EXECUTION_ID := $(shell poetry run python -c "from idpcli.util.codepipeline_util import CodePipelineUtil; print(CodePipelineUtil.get_execution_id_by_version('$(IDP_PIPELINE_NAME)', '$(VERSION_ID)'))" || echo "FAILED"))
 	@if [ "$(EXECUTION_ID)" = "FAILED" ]; then echo "Error: Failed to find pipeline execution for version $(VERSION_ID)"; exit 1; fi
 	poetry run idpcli monitor-pipeline \
 	--pipeline-name=$(IDP_PIPELINE_NAME) \

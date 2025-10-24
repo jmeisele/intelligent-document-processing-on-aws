@@ -28,9 +28,8 @@ def setup_and_teardown():
     cwd="../../../"
     install_service = InstallService(account_id=os.getenv("IDP_ACCOUNT_ID"), cfn_prefix=cfn_prefix, cwd=cwd, debug=True)
 
-    idp_pattern = "Pattern2 - Packet processing with Textract and Bedrock"
     # TODO: This is not working, fix at a future date...
-    install_service.install(admin_email=os.getenv("IDP_ADMIN_EMAIL"), idp_pattern=idp_pattern)
+    install_service.install(admin_email=os.getenv("IDP_ADMIN_EMAIL"))
 
     install_service.publish()
 

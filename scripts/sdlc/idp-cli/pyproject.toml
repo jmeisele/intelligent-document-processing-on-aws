@@ -19,10 +19,10 @@ dependencies = [
 ]
 
 [tool.poetry]
-packages = [{include = "idp_cli", from = "src"}]
+packages = [{include = "idpcli", from = "src"}]
 
 [tool.poetry.scripts]
-idpcli = "idp_cli.cli.main:app"
+idpcli = "idpcli.cli.main:app"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"

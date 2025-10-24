@@ -274,6 +274,15 @@ To use Bedrock OCR:
    - `us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m`
    - `us.anthropic.claude-opus-4-20250514-v1:0`
    - `us.anthropic.claude-opus-4-1-20250805-v1:0`
+   - `eu.amazon.nova-lite-v1:0`
+   - `eu.amazon.nova-pro-v1:0`
+   - `eu.anthropic.claude-3-haiku-20240307-v1:0`
+   - `eu.anthropic.claude-haiku-4-5-20251001-v1:0`
+   - `eu.anthropic.claude-3-5-sonnet-20241022-v2:0`
+   - `eu.anthropic.claude-3-7-sonnet-20250219-v1:0`
+   - `eu.anthropic.claude-sonnet-4-20250514-v1:0`
+   - `eu.anthropic.claude-sonnet-4-5-20250929-v1:0`
+   - `eu.anthropic.claude-sonnet-4-5-20250929-v1:0:1m`
 3. **Configure prompts**: Customize system and task prompts for your specific use case
 4. **Deploy**: The configuration can be updated through the Web UI without stack redeployment
 

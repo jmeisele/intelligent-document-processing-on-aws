@@ -4,6 +4,10 @@
 # Any publicly available image
 image: public.ecr.aws/docker/library/python:3.13-bookworm
 
+# Global timeout for all jobs
+default:
+  timeout: 2h
+
 # Change pip's cache directory to be inside the project directory since we can
 # only cache local items.
 # variables:
@@ -51,6 +55,7 @@ developer_tests:
 
 integration_tests:
   stage: integration_tests
+  timeout: 2h
   # variables:
   #   # In order to run tests in another account, add a AWS_CREDS_TARGET_ROLE variable to the Gitlab pipeline variables.
   #   AWS_CREDS_TARGET_ROLE: ${AWS_CREDS_TARGET_ROLE}

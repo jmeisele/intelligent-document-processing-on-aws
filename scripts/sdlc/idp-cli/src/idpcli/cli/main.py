@@ -3,11 +3,12 @@
 
 import os
 import sys
-from idp_cli.service.install_service import InstallService
-from idp_cli.util.codepipeline_util import CodePipelineUtil
+from idpcli.service.install_service import InstallService
+from idpcli.util.codepipeline_util import CodePipelineUtil
 import typer
-from idp_cli.service.uninstall_service import UninstallService
-from idp_cli.service.smoketest_service import SmokeTestService
+from idpcli.service.uninstall_service import UninstallService
+from idpcli.service.smoketest_service import SmokeTestService
+from idpcli.service.smoketest_idp_cli_service import SmokeTestIdpCliService
 from dotenv import load_dotenv
 
 from loguru import logger
@@ -28,7 +29,6 @@ def install(
     account_id: str = typer.Option(..., "--account-id", help="AWS Account ID"),
     cfn_prefix: str = typer.Option("idp-dev", "--cfn-prefix", help="An identifier to prefix the stack"),
     admin_email: str = typer.Option(..., "--admin-email", help="The admin email"),
-    idp_pattern: str = typer.Option("Pattern1 - Packet or Media processing with Bedrock Data Automation (BDA)", "--idp-pattern", help="The IDP Pattern to install"),
     cwd: str = typer.Option("./", "--cwd", help="Current working directory"),
     debug: bool = typer.Option(False, "--debug", help="Enable debug mode"),
     publish: bool = typer.Option(True, "--publish", help="Control publishing"),
@@ -43,13 +43,17 @@ def install(
         service.publish()
     
     if deploy:
-        service.install(admin_email=admin_email, idp_pattern=idp_pattern)
-        typer.echo("Install Complete!")
+        all_patterns_succeeded = service.install(admin_email=admin_email)
+        if all_patterns_succeeded:
+            typer.echo("Install Complete!")
+        else:
+            typer.echo("Install failed!", err=True)
+            sys.exit(1)
 
 
 @app.command()
 def uninstall(
-    stack_name: str = typer.Option(..., "--stack-name", help="Name of the stack to uninstall"),
+    stack_name_prefix: str = typer.Option(..., "--stack-name-prefix", help="Prefix of the stacks to uninstall"),
     account_id: str = typer.Option(..., "--account-id", help="AWS Account ID"),
     cfn_prefix: str = typer.Option("idp-dev", "--cfn-prefix", help="An identifier to prefix the stack")
 ):
@@ -57,13 +61,17 @@ def uninstall(
     Uninstall IDP Accelerator
     """
     try:
-        typer.echo(f"Uninstalling stack: {stack_name}")
+        typer.echo(f"Uninstalling stacks with prefix: {stack_name_prefix}")
 
-        service = UninstallService(stack_name=stack_name, account_id=account_id, cfn_prefix=cfn_prefix)
+        service = UninstallService(stack_name_prefix=stack_name_prefix, account_id=account_id, cfn_prefix=cfn_prefix)
 
-        service.uninstall()
-
-        typer.echo("Uninstall Complete!")
+        all_patterns_succeeded = service.uninstall()
+        
+        if all_patterns_succeeded:
+            typer.echo("Uninstall Complete!")
+        else:
+            typer.echo("Uninstall failed!", err=True)
+            sys.exit(1)
     except Exception as e:
         logger.exception(f"Error during uninstall process: {str(e)}")
         typer.echo(f"Uninstall failed: {str(e)}", err=True)
@@ -72,18 +80,18 @@ def uninstall(
 
 @app.command()
 def smoketest(
-    stack_name: str = typer.Option("idp-Stack", "--stack-name", help="Name of the deployed stack to test"),
+    stack_name_prefix: str = typer.Option("idp-Stack", "--stack-name-prefix", help="Prefix of the deployed stacks to test"),
     file_path: str = typer.Option("../../../samples/lending_package.pdf", "--file-path", help="Path to the test file"),
     verify_string: str = typer.Option("ANYTOWN, USA 12345", "--verify-string", help="String to verify in the processed output")
 ):
     """
-    Run a smoke test on the deployed IDP Accelerator
+    Run a smoke test on both deployed IDP patterns
     """
     try:
-        typer.echo(f"Running smoke test on stack: {stack_name}")
+        typer.echo(f"Running smoke test on stacks with prefix: {stack_name_prefix}")
         
         service = SmokeTestService(
-            stack_name=stack_name,
+            stack_name_prefix=stack_name_prefix,
             file_path=file_path,
             verify_string=verify_string
         )
@@ -91,13 +99,45 @@ def smoketest(
         result = service.do_smoketest()
         
         if result:
-            typer.echo("Smoke test passed successfully!")
+            typer.echo("All smoke tests passed successfully!")
         else:
             typer.echo("Smoke test failed!", err=True)
             sys.exit(1)
     except Exception as e:
         logger.exception(f"Error during smoke test: {str(e)}")
         typer.echo(f"Smoke test failed: {str(e)}", err=True)
+        sys.exit(1)
+
+@app.command()
+def idp_cli_smoketest(
+    cfn_prefix: str = typer.Option(..., "--cfn-prefix", help="CloudFormation prefix for stack naming"),
+    admin_email: str = typer.Option(..., "--admin-email", help="Admin email for deployment"),
+    account_id: str = typer.Option(..., "--account-id", help="AWS account ID"),
+    cwd: str = typer.Option("../../../", "--cwd", help="Working directory path")
+):
+    """
+    End-to-end smoketest: install CLI, deploy stack, run inference, verify results
+    """
+    try:
+        typer.echo(f"Running IDP CLI smoketest with prefix: {cfn_prefix}")
+        
+        service = SmokeTestIdpCliService(
+            cfn_prefix=cfn_prefix,
+            admin_email=admin_email,
+            account_id=account_id,
+            cwd=cwd
+        )
+        
+        result = service.do_smoketest()
+        
+        if result:
+            typer.echo("IDP CLI smoketest passed successfully!")
+        else:
+            typer.echo("IDP CLI smoketest failed!", err=True)
+            sys.exit(1)
+    except Exception as e:
+        logger.exception(f"Error during IDP CLI smoketest: {str(e)}")
+        typer.echo(f"IDP CLI smoketest failed: {str(e)}", err=True)
         sys.exit(1)
 
 @app.command()
