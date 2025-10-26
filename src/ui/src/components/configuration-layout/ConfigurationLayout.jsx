@@ -286,12 +286,16 @@ const ConfigurationLayout = () => {
                             // Only check constraints if it's a valid number
                             if (isValidNumber && itemProp.minimum !== undefined && numValue < itemProp.minimum) {
                               errors.push({
-                                message: `Field '${itemKey}' in item ${index} of '${key}' must be at least ${itemProp.minimum}`,
+                                message:
+                                  `Field '${itemKey}' in item ${index} of '${key}' must be ` +
+                                  `at least ${itemProp.minimum}`,
                               });
                             }
                             if (isValidNumber && itemProp.maximum !== undefined && numValue > itemProp.maximum) {
                               errors.push({
-                                message: `Field '${itemKey}' in item ${index} of '${key}' must be at most ${itemProp.maximum}`,
+                                message:
+                                  `Field '${itemKey}' in item ${index} of '${key}' must be ` +
+                                  `at most ${itemProp.maximum}`,
                               });
                             }
                           }
@@ -504,7 +508,8 @@ const ConfigurationLayout = () => {
       const compareWithDefault = (current, defaultObj, path = '') => {
         // Add debugging for granular assessment
         if (path.includes('granular')) {
-          console.log(`DEBUG: compareWithDefault called with path '${path}':`, {  // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
+          console.log(`DEBUG: compareWithDefault called with path '${path}':`, {
+            // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
             current,
             currentType: typeof current,
             defaultObj,
@@ -593,7 +598,8 @@ const ConfigurationLayout = () => {
 
             // Add debugging for granular assessment
             if (newPath.includes('granular')) {
-              console.log(`DEBUG: Comparing object key '${key}' at path '${newPath}':`, {  // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
+              console.log(`DEBUG: Comparing object key '${key}' at path '${newPath}':`, {
+                // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
                 currentValue: current[key],
                 defaultValue: defaultObj[key],
                 keyInCurrent: key in current,
@@ -611,7 +617,8 @@ const ConfigurationLayout = () => {
 
               // Add debugging for granular assessment
               if (newPath.includes('granular')) {
-                console.log(`DEBUG: Recursive call result for '${newPath}':`, {  // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
+                console.log(`DEBUG: Recursive call result for '${newPath}':`, {
+                  // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
                   nestedResults,
                   nestedResultsKeys: Object.keys(nestedResults),
                   nestedResultsLength: Object.keys(nestedResults).length,
@@ -627,7 +634,8 @@ const ConfigurationLayout = () => {
 
         // Handle primitive values
         if (current !== defaultObj) {
-          console.log(`DEBUG: Primitive difference detected at path '${path}':`, {  // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
+          console.log(`DEBUG: Primitive difference detected at path '${path}':`, {
+            // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
             current,
             currentType: typeof current,
             defaultObj,
@@ -699,7 +707,7 @@ const ConfigurationLayout = () => {
                 for (let i = 0; i < parts.length - 1; i += 1) {
                   // Use += 1 instead of ++
                   current[parts[i]] = {};
-                  current = current[parts[i]];  // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop - Index from controlled array iteration
+                  current = current[parts[i]]; // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop - Index from controlled array iteration
                 }
 
                 // Set the value at the final path - IMPORTANT: preserve boolean false values!

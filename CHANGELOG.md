@@ -19,6 +19,14 @@ SPDX-License-Identifier: MIT-0
   - Simplified CloudWatch results structure for improved readability and analysis
   - Updated error analyzer recommendations to leverage X-Ray insights for more accurate root cause identification
 
+- **EU Region Support with Automatic Model Mapping**
+  - Added support for deploying the solution in EU regions (eu-central-1, eu-west-1, etc.)
+  - Automatic model endpoint mapping between US and EU regions for seamless deployment
+  - Comprehensive model mapping table covering Amazon Nova and Anthropic Claude models
+  - Intelligent fallback mappings when direct EU equivalents are unavailable
+  - Quick Launch button for eu-central-1 region in README and deployment documentation
+  - Complete technical documentation in `docs/eu-region-model-support.md` with best practices and troubleshooting
+
 ### Changed
 
 - **Migrated Evaluation from EventBridge Trigger to Step Functions Workflow**

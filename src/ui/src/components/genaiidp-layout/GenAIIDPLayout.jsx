@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { Routes, Route } from 'react-router-dom';
 import { AppLayout, Flashbar } from '@cloudscape-design/components';
 
@@ -127,6 +128,10 @@ const GenAIIDPLayout = ({ children }) => {
       />
     </DocumentsContext.Provider>
   );
+};
+
+GenAIIDPLayout.propTypes = {
+  children: PropTypes.node,
 };
 
 export default GenAIIDPLayout;

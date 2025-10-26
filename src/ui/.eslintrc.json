@@ -17,7 +17,7 @@
   "rules": {
     "no-console": "off",
     "no-alert": "off",
-    "max-len": ["error", { "code": 120, "ignoreUrls": true, "ignoreTemplateLiterals": true }],
+    "max-len": ["error", { "code": 120, "ignoreUrls": true, "ignoreTemplateLiterals": true, "ignoreComments": true }],
     "linebreak-style": ["error", "unix"],
     "react/jsx-filename-extension": [
       "warn",
@@ -56,6 +56,8 @@
       {
         "ignore": ["\\.css$"]
       }
-    ]
+    ],
+    "react/require-default-props": "off",
+    "react/default-props-match-prop-types": "off"
   }
 }
