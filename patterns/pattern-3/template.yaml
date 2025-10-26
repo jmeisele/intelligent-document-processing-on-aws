@@ -11,6 +11,12 @@ Parameters:
   StackName:
     Type: String
 
+  EnableXRayTracing:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Enable X-Ray tracing
+
   InputBucket:
     Type: String
 
@@ -85,6 +91,10 @@ Parameters:
   ConfigLibraryHash:
     Type: String
     Description: "Hash token from config library to force updates when config library changes"
+
+  EvaluationFunctionArn:
+    Type: String
+    Description: "ARN of the Evaluation Lambda function"
 
   PermissionsBoundaryArn:
     Type: String
@@ -199,6 +209,7 @@ Resources:
                   - "us.amazon.nova-pro-v1:0"
                   - "us.amazon.nova-premier-v1:0"
                   - "us.anthropic.claude-3-haiku-20240307-v1:0"
+                  - "us.anthropic.claude-haiku-4-5-20251001-v1:0"
                   - "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
                   - "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
                   - "us.anthropic.claude-sonnet-4-20250514-v1:0"
@@ -207,6 +218,15 @@ Resources:
                   - "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m"
                   - "us.anthropic.claude-opus-4-20250514-v1:0"
                   - "us.anthropic.claude-opus-4-1-20250805-v1:0"
+                  - "eu.amazon.nova-lite-v1:0"
+                  - "eu.amazon.nova-pro-v1:0"
+                  - "eu.anthropic.claude-3-haiku-20240307-v1:0"
+                  - "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+                  - "eu.anthropic.claude-3-5-sonnet-20241022-v2:0"
+                  - "eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
+                  - "eu.anthropic.claude-sonnet-4-20250514-v1:0"
+                  - "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+                  - "eu.anthropic.claude-sonnet-4-5-20250929-v1:0:1m"
                 order: 2
                 dependsOn: {
                   field: "backend",
@@ -497,6 +517,7 @@ Resources:
                   - "us.amazon.nova-pro-v1:0"
                   - "us.amazon.nova-premier-v1:0"
                   - "us.anthropic.claude-3-haiku-20240307-v1:0"
+                  - "us.anthropic.claude-haiku-4-5-20251001-v1:0"
                   - "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
                   - "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
                   - "us.anthropic.claude-sonnet-4-20250514-v1:0"
@@ -505,6 +526,15 @@ Resources:
                   - "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m"
                   - "us.anthropic.claude-opus-4-20250514-v1:0"
                   - "us.anthropic.claude-opus-4-1-20250805-v1:0"
+                  - "eu.amazon.nova-lite-v1:0"
+                  - "eu.amazon.nova-pro-v1:0"
+                  - "eu.anthropic.claude-3-haiku-20240307-v1:0"
+                  - "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+                  - "eu.anthropic.claude-3-5-sonnet-20241022-v2:0"
+                  - "eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
+                  - "eu.anthropic.claude-sonnet-4-20250514-v1:0"
+                  - "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+                  - "eu.anthropic.claude-sonnet-4-5-20250929-v1:0:1m"
                 order: 1
               temperature:
                 type: number
@@ -618,7 +648,7 @@ Resources:
               model:
                 type: string
                 description: Bedrock model ID
-                enum: ["us.amazon.nova-lite-v1:0", "us.amazon.nova-pro-v1:0", "us.amazon.nova-premier-v1:0", "us.anthropic.claude-3-haiku-20240307-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0:1m", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m", "us.anthropic.claude-opus-4-20250514-v1:0", "us.anthropic.claude-opus-4-1-20250805-v1:0"]
+                enum: ["us.amazon.nova-lite-v1:0", "us.amazon.nova-pro-v1:0", "us.amazon.nova-premier-v1:0", "us.anthropic.claude-3-haiku-20240307-v1:0", "us.anthropic.claude-haiku-4-5-20251001-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0:1m", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m", "us.anthropic.claude-opus-4-20250514-v1:0", "us.anthropic.claude-opus-4-1-20250805-v1:0", "eu.amazon.nova-lite-v1:0", "eu.amazon.nova-pro-v1:0", "eu.anthropic.claude-3-haiku-20240307-v1:0", "eu.anthropic.claude-haiku-4-5-20251001-v1:0", "eu.anthropic.claude-3-5-sonnet-20241022-v2:0", "eu.anthropic.claude-3-7-sonnet-20250219-v1:0", "eu.anthropic.claude-sonnet-4-20250514-v1:0",  "eu.anthropic.claude-sonnet-4-5-20250929-v1:0", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0:1m"]
                 order: 3
               temperature:
                 type: number
@@ -659,7 +689,7 @@ Resources:
               model:
                 type: string
                 description: Bedrock model ID
-                enum: ["us.amazon.nova-lite-v1:0", "us.amazon.nova-pro-v1:0", "us.amazon.nova-premier-v1:0", "us.anthropic.claude-3-haiku-20240307-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0:1m", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m", "us.anthropic.claude-opus-4-20250514-v1:0", "us.anthropic.claude-opus-4-1-20250805-v1:0"]
+                enum: ["us.amazon.nova-lite-v1:0", "us.amazon.nova-pro-v1:0", "us.amazon.nova-premier-v1:0", "us.anthropic.claude-3-haiku-20240307-v1:0", "us.anthropic.claude-haiku-4-5-20251001-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0:1m", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m", "us.anthropic.claude-opus-4-20250514-v1:0", "us.anthropic.claude-opus-4-1-20250805-v1:0", "eu.amazon.nova-lite-v1:0", "eu.amazon.nova-pro-v1:0", "eu.anthropic.claude-3-haiku-20240307-v1:0", "eu.anthropic.claude-haiku-4-5-20251001-v1:0", "eu.anthropic.claude-3-5-sonnet-20241022-v2:0", "eu.anthropic.claude-3-7-sonnet-20250219-v1:0", "eu.anthropic.claude-sonnet-4-20250514-v1:0",  "eu.anthropic.claude-sonnet-4-5-20250929-v1:0", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0:1m"]
                 order: 1
               temperature:
                 type: number
@@ -692,13 +722,18 @@ Resources:
             type: object
             sectionLabel: Evaluation Inference
             properties:
+              enabled:
+                type: boolean
+                description: Enable or disable evaluation processing
+                default: true
+                order: 0
               llm_method:
                 type: object
                 properties:
                   model:
                     type: string
                     description: Bedrock model ID
-                    enum: ["us.amazon.nova-lite-v1:0", "us.amazon.nova-pro-v1:0", "us.amazon.nova-premier-v1:0", "us.anthropic.claude-3-haiku-20240307-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0:1m", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m", "us.anthropic.claude-opus-4-20250514-v1:0", "us.anthropic.claude-opus-4-1-20250805-v1:0"]
+                    enum: ["us.amazon.nova-lite-v1:0", "us.amazon.nova-pro-v1:0", "us.amazon.nova-premier-v1:0", "us.anthropic.claude-3-haiku-20240307-v1:0", "us.anthropic.claude-haiku-4-5-20251001-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0:1m", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m", "us.anthropic.claude-opus-4-20250514-v1:0", "us.anthropic.claude-opus-4-1-20250805-v1:0", "eu.amazon.nova-lite-v1:0", "eu.amazon.nova-pro-v1:0", "eu.anthropic.claude-3-haiku-20240307-v1:0", "eu.anthropic.claude-haiku-4-5-20251001-v1:0", "eu.anthropic.claude-3-5-sonnet-20241022-v2:0", "eu.anthropic.claude-3-7-sonnet-20250219-v1:0", "eu.anthropic.claude-sonnet-4-20250514-v1:0",  "eu.anthropic.claude-sonnet-4-5-20250929-v1:0", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0:1m"]
                     order: 1
                   temperature:
                     type: number
@@ -743,7 +778,7 @@ Resources:
                   model_id:
                     type: string
                     description: Bedrock model ID for discovery without ground truth
-                    enum: ["us.amazon.nova-lite-v1:0", "us.amazon.nova-pro-v1:0", "us.amazon.nova-premier-v1:0", "us.anthropic.claude-3-haiku-20240307-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0:1m", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m", "us.anthropic.claude-opus-4-20250514-v1:0", "us.anthropic.claude-opus-4-1-20250805-v1:0"]
+                    enum: ["us.amazon.nova-lite-v1:0", "us.amazon.nova-pro-v1:0", "us.amazon.nova-premier-v1:0", "us.anthropic.claude-3-haiku-20240307-v1:0", "us.anthropic.claude-haiku-4-5-20251001-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0:1m", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m", "us.anthropic.claude-opus-4-20250514-v1:0", "us.anthropic.claude-opus-4-1-20250805-v1:0", "eu.amazon.nova-lite-v1:0", "eu.amazon.nova-pro-v1:0", "eu.anthropic.claude-3-haiku-20240307-v1:0", "eu.anthropic.claude-haiku-4-5-20251001-v1:0", "eu.anthropic.claude-3-5-sonnet-20241022-v2:0", "eu.anthropic.claude-3-7-sonnet-20250219-v1:0", "eu.anthropic.claude-sonnet-4-20250514-v1:0",  "eu.anthropic.claude-sonnet-4-5-20250929-v1:0", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0:1m"]
                     default: "us.amazon.nova-pro-v1:0"
                     order: 0
                   temperature:
@@ -788,7 +823,7 @@ Resources:
                   model_id:
                     type: string
                     description: Bedrock model ID for discovery with ground truth
-                    enum: ["us.amazon.nova-lite-v1:0", "us.amazon.nova-pro-v1:0", "us.amazon.nova-premier-v1:0", "us.anthropic.claude-3-haiku-20240307-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0:1m", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m", "us.anthropic.claude-opus-4-20250514-v1:0", "us.anthropic.claude-opus-4-1-20250805-v1:0"]
+                    enum: ["us.amazon.nova-lite-v1:0", "us.amazon.nova-pro-v1:0", "us.amazon.nova-premier-v1:0", "us.anthropic.claude-3-haiku-20240307-v1:0", "us.anthropic.claude-haiku-4-5-20251001-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0:1m", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m", "us.anthropic.claude-opus-4-20250514-v1:0", "us.anthropic.claude-opus-4-1-20250805-v1:0", "eu.amazon.nova-lite-v1:0", "eu.amazon.nova-pro-v1:0", "eu.anthropic.claude-3-haiku-20240307-v1:0", "eu.anthropic.claude-haiku-4-5-20251001-v1:0", "eu.anthropic.claude-3-5-sonnet-20241022-v2:0", "eu.anthropic.claude-3-7-sonnet-20250219-v1:0", "eu.anthropic.claude-sonnet-4-20250514-v1:0",  "eu.anthropic.claude-sonnet-4-5-20250929-v1:0", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0:1m"]
                     default: "us.amazon.nova-pro-v1:0"
                     order: 0
                   temperature:
@@ -850,7 +885,7 @@ Resources:
                   model_id:
                     type: string
                     description: Model ID for the error analysis agent
-                    enum: ["anthropic.claude-3-sonnet-20240229-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0"]
+                    enum: ["anthropic.claude-3-sonnet-20240229-v1:0", "us.anthropic.claude-3-5-sonnet-20241022-v2:0", "us.anthropic.claude-3-7-sonnet-20250219-v1:0", "us.anthropic.claude-sonnet-4-20250514-v1:0", "eu.anthropic.claude-3-5-sonnet-20241022-v2:0", "eu.anthropic.claude-3-7-sonnet-20250219-v1:0", "eu.anthropic.claude-sonnet-4-20250514-v1:0"]
                     default: "us.anthropic.claude-sonnet-4-20250514-v1:0"
                     order: 0
                   system_prompt:
@@ -905,6 +940,15 @@ Resources:
                       price:
                         type: number
                         description: Estimated cost/unit
+            default:
+              - name: "lambda/requests"
+                units:
+                  - name: "invocations"
+                    price: 2.0E-7
+              - name: "lambda/duration"
+                units:
+                  - name: "gb_seconds"
+                    price: 1.66667E-5
     UpdateReplacePolicy: Delete
     DeletionPolicy: Delete
 
@@ -1434,6 +1478,8 @@ Resources:
     Properties:
       PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref AWS::NoValue]
       Name: !Sub "${AWS::StackName}-DocumentProcessingWorkflow"
+      Tracing:
+        Enabled: !Ref EnableXRayTracing
       DefinitionUri: statemachine/workflow.asl.json
       DefinitionSubstitutions:
         OCRFunctionArn: !GetAtt OCRFunction.Arn
@@ -1442,6 +1488,7 @@ Resources:
         AssessmentFunctionArn: !GetAtt AssessmentFunction.Arn
         ProcessResultsLambdaArn: !GetAtt ProcessResultsFunction.Arn
         SummarizationLambdaArn: !GetAtt SummarizationFunction.Arn
+        EvaluationLambdaArn: !Ref EvaluationFunctionArn
         OutputBucket: !Ref OutputBucket
       Logging:
         Level: ALL
@@ -1461,6 +1508,10 @@ Resources:
             FunctionName: !Ref ProcessResultsFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref SummarizationFunction
+        - Statement:
+            - Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource: !Ref EvaluationFunctionArn
         - CloudWatchLogsFullAccess
 
   StateMachineLogGroup:

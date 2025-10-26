@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React, { useEffect, useState } from 'react';
-import { useParams, useHistory } from 'react-router-dom';
-import { Logger } from 'aws-amplify';
+import { useParams, useNavigate } from 'react-router-dom';
+import { ConsoleLogger } from 'aws-amplify/utils';
 
 import useDocumentsContext from '../../contexts/documents';
 import useSettingsContext from '../../contexts/settings';
@@ -12,15 +12,15 @@ import DeleteDocumentModal from '../common/DeleteDocumentModal';
 import ReprocessDocumentModal from '../common/ReprocessDocumentModal';
 import { DOCUMENTS_PATH } from '../../routes/constants';
 
-import '@awsui/global-styles/index.css';
+import '@cloudscape-design/global-styles/index.css';
 
 import DocumentPanel from '../document-panel';
 
-const logger = new Logger('documentDetails');
+const logger = new ConsoleLogger('documentDetails');
 
 const DocumentDetails = () => {
   const params = useParams();
-  const history = useHistory();
+  const navigate = useNavigate();
   let { objectKey } = params;
   // Ensure we properly decode the objectKey from the URL parameter
   // It may be already decoded or still encoded depending on browser behavior with refreshes
@@ -89,7 +89,7 @@ const DocumentDetails = () => {
     logger.debug('Delete result', result);
 
     // Navigate back to document list
-    history.push(DOCUMENTS_PATH);
+    navigate(DOCUMENTS_PATH);
   };
 
   // Function to show delete modal

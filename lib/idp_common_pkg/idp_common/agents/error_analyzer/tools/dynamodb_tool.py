@@ -13,13 +13,13 @@ from typing import Any, Dict
 import boto3
 from strands import tool
 
-from ..config import create_error_response, create_success_response, decimal_to_float
+from ..config import create_error_response, create_response, decimal_to_float
 
 logger = logging.getLogger(__name__)
 
 
 @tool
-def get_document_status(object_key: str) -> Dict[str, Any]:
+def dynamodb_document_status(object_key: str) -> Dict[str, Any]:
     """
     Retrieve document processing status from DynamoDB tracking table.
     Performs a direct lookup to get the current status and metadata for a specific document.
@@ -31,11 +31,11 @@ def get_document_status(object_key: str) -> Dict[str, Any]:
         Dict containing document status information or error details
     """
     try:
-        result = get_document_by_key(object_key)
+        result = dynamodb_document_record(object_key)
 
         if result.get("document_found"):
             document = result.get("document", {})
-            return create_success_response(
+            return create_response(
                 {
                     "document_found": True,
                     "object_key": object_key,
@@ -56,7 +56,7 @@ def get_document_status(object_key: str) -> Dict[str, Any]:
 
 
 @tool
-def get_tracking_table_name() -> Dict[str, Any]:
+def dynamodb_table_name() -> Dict[str, Any]:
     """
     Retrieve the DynamoDB tracking table name from environment configuration.
     Checks for the TRACKING_TABLE_NAME environment variable and validates its availability.
@@ -66,7 +66,7 @@ def get_tracking_table_name() -> Dict[str, Any]:
     """
     table_name = os.environ.get("TRACKING_TABLE_NAME")
     if table_name:
-        return create_success_response(
+        return create_response(
             {
                 "tracking_table_found": True,
                 "table_name": table_name,
@@ -78,7 +78,7 @@ def get_tracking_table_name() -> Dict[str, Any]:
 
 
 @tool
-def query_tracking_table(
+def dynamodb_tracking_query(
     date: str = "", hours_back: int = 24, limit: int = 100
 ) -> Dict[str, Any]:
     """
@@ -143,7 +143,7 @@ def query_tracking_table(
 
         items = [decimal_to_float(item) for item in all_items[:limit]]
 
-        return create_success_response(
+        return create_response(
             {
                 "table_name": table_name,
                 "items_found": len(items),
@@ -159,7 +159,7 @@ def query_tracking_table(
 
 
 @tool
-def get_document_by_key(object_key: str) -> Dict[str, Any]:
+def dynamodb_document_record(object_key: str) -> Dict[str, Any]:
     """
     Retrieve a specific document record from DynamoDB tracking table by its object key.
     Performs a direct item lookup using the document's S3 object key as the primary identifier.
@@ -188,7 +188,7 @@ def get_document_by_key(object_key: str) -> Dict[str, Any]:
 
         if "Item" in response:
             item = decimal_to_float(response["Item"])
-            return create_success_response(
+            return create_response(
                 {
                     "document_found": True,
                     "document": item,

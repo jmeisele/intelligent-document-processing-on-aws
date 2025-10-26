@@ -1362,15 +1362,9 @@ Set the following parameters during stack deployment:
 ```yaml
 EvaluationBaselineBucketName:
   Description: Existing bucket with baseline data, or leave empty to create new bucket
-  
-EvaluationAutoEnabled:
-  Default: true
-  Description: Automatically evaluate each document (if baseline exists)
-  
-EvaluationModelId:
-  Default: "anthropic.claude-3-sonnet-20240229-v1:0"
-  Description: Model to use for evaluation reports
 ```
+
+**Note:** Evaluation is now controlled via configuration file (`evaluation.enabled: true/false`) rather than stack parameters. See the [evaluation.md](./evaluation.md) documentation for details.
 
 ### Evaluation Methods Configuration
 
@@ -1471,6 +1465,7 @@ Configure from these supported models:
 - `us.amazon.nova-pro-v1:0`
 - `us.amazon.nova-premier-v1:0`
 - `us.anthropic.claude-3-haiku-20240307-v1:0`
+- `us.anthropic.claude-haiku-4-5-20251001-v1:0`
 - `us.anthropic.claude-3-5-sonnet-20241022-v2:0`
 - `us.anthropic.claude-3-7-sonnet-20250219-v1:0`
 - `us.anthropic.claude-sonnet-4-20250514-v1:0`
@@ -1479,6 +1474,15 @@ Configure from these supported models:
 - `us.anthropic.claude-sonnet-4-5-20250929-v1:0:1m`  
 - `us.anthropic.claude-opus-4-20250514-v1:0`
 - `us.anthropic.claude-opus-4-1-20250805-v1:0`
+- `eu.amazon.nova-lite-v1:0`
+- `eu.amazon.nova-pro-v1:0`
+- `eu.anthropic.claude-3-haiku-20240307-v1:0`
+- `eu.anthropic.claude-haiku-4-5-20251001-v1:0`
+- `eu.anthropic.claude-3-5-sonnet-20241022-v2:0`
+- `eu.anthropic.claude-3-7-sonnet-20250219-v1:0`
+- `eu.anthropic.claude-sonnet-4-20250514-v1:0`
+- `eu.anthropic.claude-sonnet-4-5-20250929-v1:0`
+- `eu.anthropic.claude-sonnet-4-5-20250929-v1:0:1m`
 
 #### When to Configure Bedrock OCR
 

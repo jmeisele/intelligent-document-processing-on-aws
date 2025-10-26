@@ -17,7 +17,7 @@ import {
   Header,
   Container,
   Modal,
-} from '@awsui/components-react';
+} from '@cloudscape-design/components';
 
 // Add custom styles for compact form layout
 const customStyles = `
@@ -171,7 +171,7 @@ const getConstraintText = (property) => {
 };
 
 // Resizable Columns Component
-const ResizableColumns = ({ columns, children, columnSpacing = '8px' }) => {
+const ResizableColumns = ({ columns, children = null, columnSpacing = '8px' }) => {
   const [columnWidths, setColumnWidths] = useState([]);
   const containerRef = useRef(null);
   const resizingRef = useRef(null);
@@ -326,12 +326,14 @@ ResizableColumns.propTypes = {
   columnSpacing: PropTypes.string,
 };
 
-ResizableColumns.defaultProps = {
-  children: null,
-  columnSpacing: '8px',
-};
-
-const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDefault, onChange }) => {
+const FormView = ({
+  schema = { properties: {} },
+  formValues = {},
+  defaultConfig = null,
+  isCustomized = null,
+  onResetToDefault = null,
+  onChange,
+}) => {
   // Track expanded state for all list items across the form - default to collapsed
   const [expandedItems, setExpandedItems] = useState({});
 
@@ -341,6 +343,54 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
   const [nameError, setNameError] = useState('');
   // For handling dropdown selection in modal
   const [showNameAsDropdown, setShowNameAsDropdown] = useState(false);
+
+  // Handle default value initialization at component level to avoid hooks violations
+  useEffect(() => {
+    const initializeDefaults = (obj, currentPath = '', schemaProps = schema.properties) => {
+      if (!schemaProps) return;
+
+      Object.entries(schemaProps).forEach(([key, property]) => {
+        const fullPath = currentPath ? `${currentPath}.${key}` : key;
+        const currentValue = getValueAtPath(formValues, fullPath);
+
+        // Handle attributeType field default
+        if (key === 'attributeType' && (currentValue === undefined || currentValue === null || currentValue === '')) {
+          updateValue(fullPath, 'simple');
+        }
+
+        // Handle boolean fields with default values - ONLY when value is truly undefined/null, NOT false
+        if (
+          property.type === 'boolean' &&
+          property.default !== undefined &&
+          (currentValue === undefined || currentValue === null)
+        ) {
+          updateValue(fullPath, property.default);
+        }
+
+        // Recursively handle nested objects
+        if (property.type === 'object' && property.properties) {
+          const nestedObj = getValueAtPath(formValues, fullPath);
+          if (nestedObj && typeof nestedObj === 'object') {
+            initializeDefaults(nestedObj, fullPath, property.properties);
+          }
+        }
+
+        // Handle arrays/lists with object items
+        if ((property.type === 'array' || property.type === 'list') && property.items && property.items.properties) {
+          const arrayValue = getValueAtPath(formValues, fullPath);
+          if (Array.isArray(arrayValue)) {
+            arrayValue.forEach((item, index) => {
+              if (item && typeof item === 'object') {
+                initializeDefaults(item, `${fullPath}[${index}]`, property.items.properties);
+              }
+            });
+          }
+        }
+      });
+    };
+
+    initializeDefaults();
+  }, [formValues, schema.properties]);
 
   // Component-level function to add a new item with a name
   const addNewItem = (path, name) => {
@@ -476,7 +526,7 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
           // Parent doesn't exist, so we can't delete anything
           return;
         }
-        current = current[segments[i]];
+        current = current[segments[i]]; // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop - Index from controlled array iteration
       }
 
       const [lastSegment] = segments.slice(-1);
@@ -506,7 +556,7 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
             current[segment] = {};
           }
         }
-        current = current[segment];
+        current = current[segment]; // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop - Index from controlled array iteration
       });
 
       const [lastSegment] = segments.slice(-1);
@@ -529,7 +579,7 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
           current[segment] = {};
         }
       }
-      current = current[segment];
+      current = current[segment]; // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop - Index from controlled array iteration
     });
 
     const [lastSegment] = segments.slice(-1);
@@ -540,11 +590,12 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
   // Define renderField first as a function declaration
   function renderField(key, property, path = '') {
     const currentPath = path ? `${path}.${key}` : key;
-    let value = getValueAtPath(formValues, currentPath);
+    const value = getValueAtPath(formValues, currentPath);
 
     // Add debugging for granular assessment
     if (currentPath.includes('granular')) {
       console.log(`DEBUG: Rendering granular field '${key}' at path '${currentPath}':`, {
+        // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
         property,
         value,
         formValues: getValueAtPath(formValues, 'assessment'),
@@ -553,21 +604,7 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
 
     // For objects with properties, ensure the object exists in formValues
     if (property.type === 'object' && property.properties && value === undefined) {
-      // Initialize the object
-      const newObj = {};
-
-      // Initialize any properties with default values
-      Object.entries(property.properties).forEach(([propKey, propSchema]) => {
-        if (propSchema.default !== undefined) {
-          newObj[propKey] = propSchema.default;
-        }
-      });
-
-      // Only update if we have defaults to set
-      if (Object.keys(newObj).length > 0) {
-        updateValue(currentPath, newObj);
-        value = newObj;
-      }
+      return null;
     }
 
     // Check dependencies FIRST, before any rendering - applies to all field types
@@ -612,6 +649,7 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
 
       // Enhanced debug logging for dependency checking
       console.log(`DEBUG renderField dependency check for ${key}:`, {
+        // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
         key,
         currentPath,
         dependencyField,
@@ -660,6 +698,7 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
       // If dependency value doesn't match any required values, hide this field
       if (normalizedDependencyValue === undefined || !normalizedDependencyValues.includes(normalizedDependencyValue)) {
         console.log(`Hiding field ${key} due to dependency mismatch:`, {
+          // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Data from trusted internal source only
           normalizedDependencyValue,
           normalizedDependencyValues,
           includes: normalizedDependencyValues.includes(normalizedDependencyValue),
@@ -759,7 +798,6 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
                   toggleExpand();
                 }}
                 ariaLabel={isExpanded ? 'Collapse section' : 'Expand section'}
-                style={{ margin: '0', padding: '0', display: 'inline-flex' }}
                 className="awsui-button-icon"
               />
               <Box fontWeight="bold" fontSize="body-m" marginLeft="xxs" display="inline-block">
@@ -811,7 +849,7 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
     const values = getValueAtPath(formValues, path) || [];
 
     // Add debug info
-    console.log(`Rendering list field: ${key}, type: ${property.type}, path: ${path}`, property, values);
+    console.log(`Rendering list field: ${key}, type: ${property.type}, path: ${path}`, property, values); // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
 
     // Get list item display settings from schema metadata
     const columnCount = property.columns ? parseInt(property.columns, 10) : 2;
@@ -870,7 +908,6 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
                 toggleListExpand();
               }}
               ariaLabel={isListExpanded ? 'Collapse list' : 'Expand list'}
-              style={{ margin: '0', padding: '0', display: 'inline-flex' }}
               className="awsui-button-icon"
             />
             <Box fontWeight="bold" fontSize="body-m" marginLeft="xxs" display="inline-block">
@@ -934,7 +971,6 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
                           updateValue(path, newValues);
                         }}
                         ariaLabel="Remove item"
-                        style={{ padding: '0', margin: '0 4px 0 0', display: 'inline-flex' }}
                         className="awsui-button-icon"
                       />
 
@@ -1029,6 +1065,7 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
 
                         // Add debugging to see field distribution
                         console.log(`Field distribution for ${key}:`, {
+                          // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
                           totalProperties: propEntries.length,
                           requestedColumns: columnCount,
                           visibleRegularFields: regularProps.length,
@@ -1075,6 +1112,7 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
 
                         // Validation and debugging for field distribution
                         console.log(`Distribution result for ${key}:`, {
+                          // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
                           actualColumnCount,
                           maxRows,
                           columnLengths: fieldColumns.map((col) => col.length),
@@ -1255,31 +1293,28 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
     // Special handling for fields with default values
     let displayValue = value;
 
-    // Handle attributeType field default
+    // Handle attributeType field default - just for display, actual update handled by useEffect
     if (key === 'attributeType' && (value === undefined || value === null || value === '')) {
       displayValue = 'simple';
-      updateValue(path, 'simple');
     }
 
-    // Handle boolean fields with default values - ONLY when value is truly undefined/null, NOT false
+    // Handle boolean fields with default values - just for display, actual update handled by useEffect
     if (property.type === 'boolean' && property.default !== undefined && (value === undefined || value === null)) {
       displayValue = property.default;
-      // Update the form values immediately to ensure dependency checking works
-      updateValue(path, property.default);
     }
 
     // Dependencies are now checked in the main renderField function
 
     // If this is an object type, it should be rendered as an object field, not an input field
     if (property.type === 'object') {
-      console.log(`Redirecting object type ${key} to renderObjectField`);
+      console.log(`Redirecting object type ${key} to renderObjectField`); // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
       return renderObjectField(key, property, path.substring(0, path.lastIndexOf('.')) || '');
     }
 
     let input;
 
     // Add debug info
-    console.log(`Rendering input field: ${key}, type: ${property.type}, path: ${path}`, { property, value });
+    console.log(`Rendering input field: ${key}, type: ${property.type}, path: ${path}`, { property, value }); // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
 
     // Check if we're trying to render an array as an input field (which would be incorrect)
     if (Array.isArray(value) && (property.type === 'array' || property.type === 'list')) {
@@ -1304,7 +1339,7 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
         // Use the provided onResetToDefault function if available
         onResetToDefault(path)
           .then(() => {
-            console.log(`Restored default value for ${path} using onResetToDefault`);
+            console.log(`Restored default value for ${path} using onResetToDefault`); // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Data from trusted internal source only
           })
           .catch((error) => {
             console.error(`Error restoring default value: ${error.message}`);
@@ -1314,7 +1349,7 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
               const defaultValue = getValueAtPath(defaultConfig, path);
               if (defaultValue !== undefined) {
                 updateValue(path, defaultValue);
-                console.log(`Manually restored default value for ${path}: ${defaultValue}`);
+                console.log(`Manually restored default value for ${path}: ${defaultValue}`); // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Data from trusted internal source only
               }
             }
           });
@@ -1323,7 +1358,7 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
         const defaultValue = getValueAtPath(defaultConfig, path);
         if (defaultValue !== undefined) {
           updateValue(path, defaultValue);
-          console.log(`Manually restored default value for ${path}: ${defaultValue}`);
+          console.log(`Manually restored default value for ${path}: ${defaultValue}`); // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Data from trusted internal source only
         }
       }
     };
@@ -1450,14 +1485,14 @@ const FormView = ({ schema, formValues, defaultConfig, isCustomized, onResetToDe
   const renderTopLevelProperty = ({ key, property }) => {
     // Debug info for sections
     console.log(
-      `Rendering top level property: ${key}, type: ${property.type}, sectionLabel: ${property.sectionLabel}`,
+      `Rendering top level property: ${key}, type: ${property.type}, sectionLabel: ${property.sectionLabel}`, // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
       property,
     );
 
     // If property should have a section container, wrap it
     if (shouldUseContainer(key, property)) {
       const sectionTitle = property.sectionLabel;
-      console.log(`Creating section container for ${key} with title: ${sectionTitle}`);
+      console.log(`Creating section container for ${key} with title: ${sectionTitle}`); // nosemgrep: javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring - Debug logging with controlled internal data
 
       return (
         <Container key={key} header={<Header variant="h3">{sectionTitle}</Header>}>
@@ -1561,14 +1596,6 @@ FormView.propTypes = {
   isCustomized: PropTypes.func,
   onResetToDefault: PropTypes.func,
   onChange: PropTypes.func.isRequired,
-};
-
-FormView.defaultProps = {
-  schema: { properties: {} },
-  formValues: {},
-  defaultConfig: null,
-  isCustomized: null,
-  onResetToDefault: null,
 };
 
 export default FormView;

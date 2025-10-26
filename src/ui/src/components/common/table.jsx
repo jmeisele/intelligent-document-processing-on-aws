@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
-import { Box, Button, Header, SpaceBetween } from '@awsui/components-react';
+import { Box, Button, Header, SpaceBetween } from '@cloudscape-design/components';
 
 import { InfoLink } from './info-link';
 

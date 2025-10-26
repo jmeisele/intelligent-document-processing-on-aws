@@ -24,6 +24,10 @@ Parameters:
     Type: String
     Description: 'Optional ARN of an existing IAM role for CodeBuild. If not provided, a new role will be created.'
     Default: ''
+    
+  KMSKeyArn:
+    Type: String
+    Description: 'ARN of customer-managed KMS key for encrypting CodePipeline artifacts'
 
 Conditions:
   CreateCodeBuildRole: !Equals [!Ref CodeBuildRoleArn, '']
@@ -61,6 +65,11 @@ Resources:
                     - 'codebuild:BatchGetBuilds'
                     - 'codebuild:StartBuild'
                   Resource: !GetAtt IdkInstallCodeBuild.Arn
+                - Effect: Allow
+                  Action:
+                    - 'kms:Decrypt'
+                    - 'kms:GenerateDataKey'
+                  Resource: !Ref KMSKeyArn
 
   CodeBuildRole:
     Type: 'AWS::IAM::Role'
@@ -159,8 +168,10 @@ Resources:
                 - export IDP_CFN_PREFIX=$(make cfn-prefix) || { echo "CFN prefix generation failed"; exit 1; }
                 - make install -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX
                 - make smoketest -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX
-                - echo "All tests passed successfully, running cleanup..."
+              finally:
+                - echo "Running cleanup regardless of build result..."
                 - make uninstall -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX || echo "Cleanup failed but continuing"
+                - make -n cli-smoketest >/dev/null 2>&1 && make cli-smoketest -e IDP_CFN_PREFIX=$IDP_CFN_PREFIX || echo "CLI smoketest target not found, skipping"
 
   DeploymentPipeline:
     Type: 'AWS::CodePipeline::Pipeline'
@@ -171,6 +182,9 @@ Resources:
       ArtifactStore:
         Type: S3
         Location: !Ref ArtifactBucket
+        EncryptionKey:
+          Id: !Ref KMSKeyArn
+          Type: KMS
       Stages:
         - Name: Source
           Actions:

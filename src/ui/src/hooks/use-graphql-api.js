@@ -1,22 +1,22 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { useEffect, useState } from 'react';
-import { API, Logger, graphqlOperation } from 'aws-amplify';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { generateClient } from 'aws-amplify/api';
+import { ConsoleLogger } from 'aws-amplify/utils';
 
 import useAppContext from '../contexts/app';
-
 import listDocumentsDateShard from '../graphql/queries/listDocumentsDateShard';
 import listDocumentsDateHour from '../graphql/queries/listDocumentsDateHour';
 import getDocument from '../graphql/queries/getDocument';
 import deleteDocument from '../graphql/queries/deleteDocument';
 import reprocessDocument from '../graphql/queries/reprocessDocument';
-
 import onCreateDocument from '../graphql/queries/onCreateDocument';
 import onUpdateDocument from '../graphql/queries/onUpdateDocument';
-
 import { DOCUMENT_LIST_SHARDS_PER_DAY } from '../components/document-list/documents-table-config';
 
-const logger = new Logger('useGraphQlApi');
+const client = generateClient();
+
+const logger = new ConsoleLogger('useGraphQlApi');
 
 const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2 } = {}) => {
   const [periodsToLoad, setPeriodsToLoad] = useState(initialPeriodsToLoad);
@@ -24,10 +24,13 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
   const [documents, setDocuments] = useState([]);
   const { setErrorMessage } = useAppContext();
 
-  const setDocumentsDeduped = (documentValues) => {
+  const subscriptionsRef = useRef({ onCreate: null, onUpdate: null });
+
+  const setDocumentsDeduped = useCallback((documentValues) => {
+    logger.debug('setDocumentsDeduped called with:', documentValues);
     setDocuments((currentDocuments) => {
       const documentValuesdocumentIds = documentValues.map((c) => c.ObjectKey);
-      return [
+      const updatedDocuments = [
         ...currentDocuments.filter((c) => !documentValuesdocumentIds.includes(c.ObjectKey)),
         ...documentValues.map((document) => ({
           ...document,
@@ -35,71 +38,110 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
           ListSK: document.ListSK || currentDocuments.find((c) => c.ObjectKey === document.ObjectKey)?.ListSK,
         })),
       ];
+      logger.debug('Documents state updated, new count:', updatedDocuments.length);
+      return updatedDocuments;
     });
-  };
+  }, []);
 
-  const getDocumentDetailsFromIds = async (objectKeys) => {
-    // prettier-ignore
-    logger.debug('getDocumentDetailsFromIds', objectKeys);
-    const getDocumentPromises = objectKeys.map((objectKey) =>
-      API.graphql({ query: getDocument, variables: { objectKey } }),
-    );
-    const getDocumentResolutions = await Promise.allSettled(getDocumentPromises);
-    const getDocumentRejected = getDocumentResolutions.filter((r) => r.status === 'rejected');
-    if (getDocumentRejected.length) {
-      setErrorMessage('failed to get document details - please try again later');
-      logger.error('get document promises rejected', getDocumentRejected);
-    }
-    const documentValues = getDocumentResolutions
-      .filter((r) => r.status === 'fulfilled')
-      .map((r) => r.value?.data?.getDocument);
+  const getDocumentDetailsFromIds = useCallback(
+    async (objectKeys) => {
+      // prettier-ignore
+      logger.debug('getDocumentDetailsFromIds', objectKeys);
+      const getDocumentPromises = objectKeys.map((objectKey) =>
+        client.graphql({ query: getDocument, variables: { objectKey } }),
+      );
+      const getDocumentResolutions = await Promise.allSettled(getDocumentPromises);
+      const getDocumentRejected = getDocumentResolutions.filter((r) => r.status === 'rejected');
+      if (getDocumentRejected.length) {
+        setErrorMessage('failed to get document details - please try again later');
+        logger.error('get document promises rejected', getDocumentRejected);
+      }
+      const documentValues = getDocumentResolutions
+        .filter((r) => r.status === 'fulfilled')
+        .map((r) => r.value?.data?.getDocument);
 
-    return documentValues;
-  };
+      return documentValues;
+    },
+    [setErrorMessage],
+  );
 
   useEffect(() => {
+    if (subscriptionsRef.current.onCreate) {
+      logger.debug('onCreateDocument subscription already exists, skipping');
+      return undefined;
+    }
+
     logger.debug('onCreateDocument subscription');
-    const subscription = API.graphql(graphqlOperation(onCreateDocument)).subscribe({
-      next: async ({ provider, value }) => {
-        logger.debug('document list subscription update', { provider, value });
-        const objectKey = value?.data?.onCreateDocument.ObjectKey || '';
+    const subscription = client.graphql({ query: onCreateDocument }).subscribe({
+      next: async (subscriptionData) => {
+        logger.debug('document list subscription update', subscriptionData);
+        const data = subscriptionData?.data;
+        const objectKey = data?.onCreateDocument?.ObjectKey || '';
         if (objectKey) {
-          const documentValues = await getDocumentDetailsFromIds([objectKey]);
-          setDocumentsDeduped(documentValues);
+          try {
+            const documentValues = await getDocumentDetailsFromIds([objectKey]);
+            if (documentValues && documentValues.length > 0) {
+              setDocumentsDeduped(documentValues);
+            }
+          } catch (error) {
+            logger.error('Error processing onCreateDocument subscription:', error);
+          }
         }
       },
       error: (error) => {
-        logger.error(error);
+        logger.error('onCreateDocument subscription error:', error);
         setErrorMessage('document list network subscription failed - please reload the page');
       },
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    subscriptionsRef.current.onCreate = subscription;
+
+    return () => {
+      logger.debug('onCreateDocument subscription cleanup');
+      if (subscriptionsRef.current.onCreate) {
+        subscriptionsRef.current.onCreate.unsubscribe();
+        subscriptionsRef.current.onCreate = null;
+      }
+    };
+  }, [getDocumentDetailsFromIds, setDocumentsDeduped, setErrorMessage]);
 
   useEffect(() => {
-    logger.debug('onUpdateDocument subscription');
-    const subscription = API.graphql(graphqlOperation(onUpdateDocument)).subscribe({
-      next: async ({ provider, value }) => {
-        logger.debug('document update', { provider, value });
-        const documentUpdateEvent = value?.data?.onUpdateDocument;
+    if (subscriptionsRef.current.onUpdate) {
+      logger.debug('onUpdateDocument subscription already exists, skipping');
+      return undefined;
+    }
+
+    logger.debug('onUpdateDocument subscription setup');
+    const subscription = client.graphql({ query: onUpdateDocument }).subscribe({
+      next: async (subscriptionData) => {
+        logger.debug('document update subscription received', subscriptionData);
+        const data = subscriptionData?.data;
+        const documentUpdateEvent = data?.onUpdateDocument;
         if (documentUpdateEvent?.ObjectKey) {
           setDocumentsDeduped([documentUpdateEvent]);
         }
       },
       error: (error) => {
-        logger.error(error);
+        logger.error('onUpdateDocument subscription error:', error);
         setErrorMessage('document update network request failed - please reload the page');
       },
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    subscriptionsRef.current.onUpdate = subscription;
+
+    return () => {
+      logger.debug('onUpdateDocument subscription cleanup');
+      if (subscriptionsRef.current.onUpdate) {
+        subscriptionsRef.current.onUpdate.unsubscribe();
+        subscriptionsRef.current.onUpdate = null;
+      }
+    };
+  }, [setDocumentsDeduped, setErrorMessage, getDocumentDetailsFromIds]);
 
   const listDocumentIdsByDateShards = async ({ date, shards }) => {
     const listDocumentsDateShardPromises = shards.map((i) => {
       logger.debug('sending list document date shard', date, i);
-      return API.graphql({ query: listDocumentsDateShard, variables: { date, shard: i } });
+      return client.graphql({ query: listDocumentsDateShard, variables: { date, shard: i } });
     });
     const listDocumentsDateShardResolutions = await Promise.allSettled(listDocumentsDateShardPromises);
 
@@ -119,7 +161,7 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
   const listDocumentIdsByDateHours = async ({ date, hours }) => {
     const listDocumentsDateHourPromises = hours.map((i) => {
       logger.debug('sending list document date hour', date, i);
-      return API.graphql({ query: listDocumentsDateHour, variables: { date, hour: i } });
+      return client.graphql({ query: listDocumentsDateHour, variables: { date, hour: i } });
     });
     const listDocumentsDateHourResolutions = await Promise.allSettled(listDocumentsDateHourPromises);
 
@@ -246,7 +288,7 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
   const deleteDocuments = async (objectKeys) => {
     try {
       logger.debug('Deleting documents', objectKeys);
-      const result = await API.graphql(graphqlOperation(deleteDocument, { objectKeys }));
+      const result = await client.graphql({ query: deleteDocument, variables: { objectKeys } });
       logger.debug('Delete documents result', result);
 
       // Refresh the document list after deletion
@@ -263,7 +305,7 @@ const useGraphQlApi = ({ initialPeriodsToLoad = DOCUMENT_LIST_SHARDS_PER_DAY * 2
   const reprocessDocuments = async (objectKeys) => {
     try {
       logger.debug('Reprocessing documents', objectKeys);
-      const result = await API.graphql(graphqlOperation(reprocessDocument, { objectKeys }));
+      const result = await client.graphql({ query: reprocessDocument, variables: { objectKeys } });
       logger.debug('Reprocess documents result', result);
       // Refresh the document list after reprocessing
       setIsDocumentsListLoading(true);

@@ -101,6 +101,7 @@ agents = [
 # This includes all dependencies needed for both backends
 docs_service = [
   "requests==2.32.4", # Required for appsync module (dynamodb only needs boto3 which is core)
+  "aws-xray-sdk>=2.12.0", # Required for X-Ray tracing
 ]
 
 # Testing dependencies

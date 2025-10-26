@@ -17,13 +17,16 @@ import {
   Textarea,
   Modal,
   Alert,
-} from '@awsui/components-react';
-import { API, graphqlOperation } from 'aws-amplify';
+} from '@cloudscape-design/components';
+import { generateClient } from 'aws-amplify/api';
+
 import FileViewer from '../document-viewer/JSONViewer';
 import { getSectionConfidenceAlertCount, getSectionConfidenceAlerts } from '../common/confidence-alerts-utils';
 import useConfiguration from '../../hooks/use-configuration';
 import useSettingsContext from '../../contexts/settings';
 import processChanges from '../../graphql/queries/processChanges';
+
+const client = generateClient();
 
 // Cell renderer components
 const IdCell = ({ item }) => <span>{item.Id}</span>;
@@ -604,12 +607,13 @@ const SectionsPanel = ({ sections, pages, documentItem, mergedConfig, onSaveChan
 
       // Call the GraphQL API with timeout
       const result = await Promise.race([
-        API.graphql(
-          graphqlOperation(processChanges, {
+        client.graphql({
+          query: processChanges,
+          variables: {
             objectKey,
             modifiedSections: allChanges,
-          }),
-        ),
+          },
+        }),
         new Promise((_, reject) => {
           setTimeout(() => reject(new Error('Request timed out after 30 seconds')), 30000);
         }),

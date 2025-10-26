@@ -5,6 +5,55 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+## [0.3.21]
+
+### Added
+
+- **Claude Sonnet 4.5 Haiku Model Support**
+  - Added support for Claude Haiku 4.5
+  - Available for configuration across all document processing steps
+
+- **X-Ray Integration for Error Analyzer Agent**
+  - Integrated AWS X-Ray tracing tools to enhance diagnostic capabilities of the error analyzer agent
+  - X-Ray context enables better distinction between infrastructure issues and application logic failures
+  - Added trace ID persistence in DynamoDB alongside document status for complete traceability
+  - Enhanced CloudWatch error log filtering for more targeted error analysis
+  - Simplified CloudWatch results structure for improved readability and analysis
+  - Updated error analyzer recommendations to leverage X-Ray insights for more accurate root cause identification
+
+- **EU Region Support with Automatic Model Mapping**
+  - Added support for deploying the solution in EU regions (eu-central-1, eu-west-1, etc.)
+  - Automatic model endpoint mapping between US and EU regions for seamless deployment
+  - Comprehensive model mapping table covering Amazon Nova and Anthropic Claude models
+  - Intelligent fallback mappings when direct EU equivalents are unavailable
+  - Quick Launch button for eu-central-1 region in README and deployment documentation
+  - IDP CLI now supports eu-central-1 deployment with automatic template URL selection
+  - Complete technical documentation in `docs/eu-region-model-support.md` with best practices and troubleshooting
+
+### Changed
+
+- **Migrated Evaluation from EventBridge Trigger to Step Functions Workflow**
+  - Moved evaluation processing from external EventBridge-triggered Lambda to integrated Step Functions workflow step
+  - **Race Condition Eliminated**: Evaluation now runs inside state machine before WorkflowTracker marks documents COMPLETE, preventing premature completion status when evaluation is still running
+  - **Config-Driven Control**: Evaluation now controlled by `evaluation.enabled` configuration setting instead of CloudFormation stack parameter, enabling runtime control without stack redeployment
+  - **Enhanced Status Tracking**: Added EVALUATING status to document processing pipeline for better visibility of evaluation progress
+  - **UI Improvements**: Added support for displaying EVALUATING status in processing flow viewer and "NOT ENABLED" badge when evaluation is disabled in configuration
+  - **Consistent Pattern**: Aligns evaluation with summarization and assessment patterns for unified feature control approach
+
+
+- **Migrated UI Build System from Create React App to Vite**
+  - Upgraded to Vite 7 for faster build times
+  - Updated to React 18, AWS Amplify v6, react-router-dom v6, and Cloudscape Design System
+  - Reduced dependencies and node_modules size
+  - Implemented strategic code splitting for improved performance
+  - Environment variables now use `VITE_` prefix instead of `REACT_APP_` for local development
+
+### Fixed
+
+- **IDP CLI Code Cleanup and Portability Improvements** - [#91](https://github.com/aws-solutions-library-samples/accelerated-intelligent-document-processing-on-aws/issues/91), [#92](https://github.com/aws-solutions-library-samples/accelerated-intelligent-document-processing-on-aws/issues/92)
+  - Removed dead code from previous refactors in batch_processor.py (51 lines)
+  - Replaced hardcoded absolute paths with dynamic path resolution in rerun_processor.py for cross-platform compatibility
+
 ## [0.3.20]
 
 ### Added

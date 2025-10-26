@@ -113,14 +113,16 @@ idp-cli deploy [OPTIONS]
 
 **Required for New Stacks:**
 - `--stack-name`: CloudFormation stack name
-- `--pattern`: IDP pattern (`pattern-1`, `pattern-2`, or `pattern-3`)
+- `--pattern`: IDP pattern architecture to deploy (`pattern-1`, `pattern-2`, or `pattern-3`)
 - `--admin-email`: Admin user email
 
 **Optional Parameters:**
+- `--template-url`: URL to CloudFormation template in S3 (optional, auto-selected based on region)
 - `--custom-config`: Path to local config file or S3 URI
 - `--max-concurrent`: Maximum concurrent workflows (default: 100)
-- `--log-level`: Logging level (`DEBUG`, `INFO`, `WARN`, `ERROR`)
+- `--log-level`: Logging level (`DEBUG`, `INFO`, `WARN`, `ERROR`) (default: INFO)
 - `--enable-hitl`: Enable Human-in-the-Loop (`true` or `false`)
+- `--pattern-config`: Pattern-specific configuration preset (optional, distinct from --pattern)
 - `--parameters`: Additional parameters as `key=value,key2=value2`
 - `--wait`: Wait for stack operation to complete
 - `--region`: AWS region (optional, auto-detected)
@@ -146,6 +148,15 @@ idp-cli deploy \
     --stack-name my-idp \
     --max-concurrent 200 \
     --log-level DEBUG \
+    --wait
+
+# Deploy with custom template URL (for regions not auto-supported)
+idp-cli deploy \
+    --stack-name my-idp \
+    --pattern pattern-2 \
+    --admin-email user@example.com \
+    --template-url https://s3.eu-west-1.amazonaws.com/my-bucket/idp-main.yaml \
+    --region eu-west-1 \
     --wait
 ```
 
@@ -698,20 +709,10 @@ idp-cli run-inference \
 
 Download the evaluation results to analyze accuracy:
 
-**⏱️ Important Timing Note:** Evaluation processing runs as a separate step after the main document processing completes. This takes an additional 2-3 minutes per document. If you download results immediately after the batch shows "Complete", the evaluation data may not be ready yet.
-
-**Best practice:**
-1. Wait 5-10 minutes after batch completion before downloading evaluation results
-2. Check that the downloaded files include the `evaluation/` directory
-3. If evaluation data is missing, wait a few more minutes and download again
+**✓ Synchronous Evaluation:** Evaluation runs as the final step in the workflow before completion. When a document shows status "COMPLETE", all processing including evaluation is finished - results are immediately available for download.
 
 ```bash
-# Wait for evaluation to complete (check status)
-idp-cli status \
-    --stack-name eval-testing \
-    --batch-id eval-run-001
-
-# Download evaluation results
+# Download evaluation results (no waiting needed)
 idp-cli download-results \
     --stack-name eval-testing \
     --batch-id eval-run-001 \

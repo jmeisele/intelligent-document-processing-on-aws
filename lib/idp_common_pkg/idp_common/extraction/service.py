@@ -31,9 +31,6 @@ from idp_common.utils import extract_json_from_text
 logger = logging.getLogger(__name__)
 
 
-logger = logging.getLogger(__name__)
-
-
 class ExtractionService:
     """Service for extracting fields from documents using LLMs."""
 
@@ -1324,11 +1321,29 @@ class ExtractionService:
             # Time the model invocation
             request_start_time = time.time()
 
-            if (
+            agentic_enabled = (
                 self.config.get("extraction", {})
                 .get("agentic", {})
                 .get("enabled", False)
-            ):
+            )
+
+            agentic_enabled = (
+                isinstance(agentic_enabled, str) and agentic_enabled.lower() == "true"
+            ) or (isinstance(agentic_enabled, bool) and agentic_enabled)
+
+            agentic_review_agent_enabled = self.config.get("extraction", {}).get(
+                "review_agent", False
+            )
+
+            agentic_review_agent_enabled = (
+                isinstance(agentic_review_agent_enabled, str)
+                and agentic_review_agent_enabled.lower() == "true"
+            ) or (
+                isinstance(agentic_review_agent_enabled, bool)
+                and agentic_review_agent_enabled
+            )
+
+            if agentic_enabled:
                 if not AGENTIC_AVAILABLE:
                     raise ImportError(
                         "Agentic extraction requires Python 3.10+ and strands-agents dependencies. "
@@ -1358,9 +1373,7 @@ class ExtractionService:
                     data_format=dynamic_model,
                     prompt=message_prompt,  # pyright: ignore[reportArgumentType]
                     custom_instruction=system_prompt,
-                    review_agent=self.config.get("extraction", {}).get(
-                        "review_agent", False
-                    ),
+                    review_agent=agentic_review_agent_enabled,
                     context="Extraction",
                 )
 

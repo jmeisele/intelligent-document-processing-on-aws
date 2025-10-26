@@ -101,7 +101,7 @@ class TestBatchProcessor:
     @patch("boto3.client")
     @patch("boto3.resource")
     def test_upload_local_file(self, mock_resource, mock_client, mock_stack_info_class):
-        """Test local file upload"""
+        """Test local file upload with path preservation"""
         mock_stack_info = MagicMock()
         mock_stack_info.validate_stack.return_value = True
         mock_stack_info.get_resources.return_value = {
@@ -118,16 +118,17 @@ class TestBatchProcessor:
         doc = {
             "document_id": "doc1",
             "path": "/tmp/test.pdf",
-            "filename": "test.pdf",  # Added filename field
+            "filename": "test.pdf",
             "type": "local",
         }
 
-        s3_key = processor._upload_local_file(doc, "batch-123")
+        # Use the replacement method _upload_local_file_with_path
+        s3_key = processor._upload_local_file_with_path(doc, "batch-123")
 
         # Verify upload was called
         mock_s3.upload_file.assert_called_once()
         assert "batch-123" in s3_key
-        assert "test.pdf" in s3_key  # Filename is now used
+        assert "test.pdf" in s3_key
 
     @patch("idp_cli.batch_processor.StackInfo")
     @patch("boto3.client")

@@ -13,8 +13,8 @@ import {
   Table,
   ExpandableSection,
   StatusIndicator,
-} from '@awsui/components-react';
-import { Logger } from 'aws-amplify';
+} from '@cloudscape-design/components';
+import { ConsoleLogger } from 'aws-amplify/utils';
 import './DocumentPanel.css';
 import DocumentViewers from '../document-viewers/DocumentViewers';
 import SectionsPanel from '../sections-panel';
@@ -28,7 +28,7 @@ import TroubleshootModal from './TroubleshootModal';
 // Uncomment the line below to enable debugging
 // import { debugDocumentStructure } from '../common/debug-utils';
 
-const logger = new Logger('DocumentPanel');
+const logger = new ConsoleLogger('DocumentPanel');
 
 // Component to display confidence alerts count only
 const ConfidenceAlertsSection = ({ sections, mergedConfig }) => {
@@ -335,7 +335,7 @@ const MeteringExpandableSection = ({ meteringData, documentItem }) => {
     <Box margin={{ top: 'l', bottom: 'm' }}>
       <ExpandableSection
         variant="container"
-        header={
+        headerText={
           <Header variant="h3" description={`Estimated cost per page: $${costPerPage.toFixed(4)}`}>
             Estimated Cost
           </Header>

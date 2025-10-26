@@ -12,6 +12,9 @@ from idp_common.docs_service import create_document_service
 from idp_common import s3
 from idp_common.utils import normalize_boolean_value, calculate_lambda_metering, merge_metering_data
 from assessment_validator import AssessmentValidator
+from aws_xray_sdk.core import xray_recorder, patch_all
+
+patch_all()
 
 # Custom exception for throttling scenarios
 class ThrottlingException(Exception):
@@ -88,6 +91,7 @@ def check_document_for_throttling_errors(document):
     
     return False, None
 
+@xray_recorder.capture('assessment_function')
 def handler(event, context):
     """
     Lambda handler for document assessment.
@@ -117,6 +121,10 @@ def handler(event, context):
     working_bucket = os.environ.get('WORKING_BUCKET')
     document = Document.load_document(document_data, working_bucket, logger)
     logger.info(f"Processing assessment for document {document.id}, section {section_id}")
+
+    # X-Ray annotations
+    xray_recorder.put_annotation('document_id', {document.id})
+    xray_recorder.put_annotation('processing_stage', 'assessment')
 
     # Find the section we're processing
     section = None
