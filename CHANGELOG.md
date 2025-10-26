@@ -5,6 +5,8 @@ SPDX-License-Identifier: MIT-0
 
 ## [Unreleased]
 
+## [0.3.21]
+
 ### Added
 
 - **Claude Sonnet 4.5 Haiku Model Support**
@@ -25,6 +27,7 @@ SPDX-License-Identifier: MIT-0
   - Comprehensive model mapping table covering Amazon Nova and Anthropic Claude models
   - Intelligent fallback mappings when direct EU equivalents are unavailable
   - Quick Launch button for eu-central-1 region in README and deployment documentation
+  - IDP CLI now supports eu-central-1 deployment with automatic template URL selection
   - Complete technical documentation in `docs/eu-region-model-support.md` with best practices and troubleshooting
 
 ### Changed
