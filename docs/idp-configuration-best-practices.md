@@ -1362,15 +1362,9 @@ Set the following parameters during stack deployment:
 ```yaml
 EvaluationBaselineBucketName:
   Description: Existing bucket with baseline data, or leave empty to create new bucket
-  
-EvaluationAutoEnabled:
-  Default: true
-  Description: Automatically evaluate each document (if baseline exists)
-  
-EvaluationModelId:
-  Default: "anthropic.claude-3-sonnet-20240229-v1:0"
-  Description: Model to use for evaluation reports
 ```
+
+**Note:** Evaluation is now controlled via configuration file (`evaluation.enabled: true/false`) rather than stack parameters. See the [evaluation.md](./evaluation.md) documentation for details.
 
 ### Evaluation Methods Configuration
 

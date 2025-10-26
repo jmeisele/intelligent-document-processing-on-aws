@@ -155,7 +155,6 @@ Key parameters that can be configured during CloudFormation deployment:
 
 ### Optional Features
 - `EvaluationBaselineBucketName`: Optional existing bucket for ground truth data
-- `EvaluationAutoEnabled`: Enable automatic accuracy evaluation (default: true)
 - `DocumentKnowledgeBase`: Enable document knowledge base functionality
 - `KnowledgeBaseModelId`: Bedrock model for knowledge base queries
 - `PostProcessingLambdaHookFunctionArn`: Optional Lambda ARN for custom post-processing (see [post-processing-lambda-hook.md](post-processing-lambda-hook.md) for detailed implementation guidance)

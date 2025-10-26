@@ -957,6 +957,7 @@ assessment:
     {EXTRACTION_RESULTS}
     </extraction-results>
 evaluation:
+  enabled: true
   llm_method:
     top_p: '0.1'
     max_tokens: '4096'

@@ -1307,6 +1307,7 @@ assessment:
     {EXTRACTION_RESULTS}
     </extraction-results>
 evaluation:
+  enabled: true
   llm_method:
     top_p: "0.1"
     max_tokens: "4096"
@@ -1776,4 +1777,3 @@ pricing:
     units:
       - name: gb_seconds
         price: "1.66667E-5" # $0.0000166667 per GB-second ($16.67 per 1M GB-seconds)
-

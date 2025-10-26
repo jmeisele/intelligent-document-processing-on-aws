@@ -709,20 +709,10 @@ idp-cli run-inference \
 
 Download the evaluation results to analyze accuracy:
 
-**⏱️ Important Timing Note:** Evaluation processing runs as a separate step after the main document processing completes. This takes an additional 2-3 minutes per document. If you download results immediately after the batch shows "Complete", the evaluation data may not be ready yet.
-
-**Best practice:**
-1. Wait 5-10 minutes after batch completion before downloading evaluation results
-2. Check that the downloaded files include the `evaluation/` directory
-3. If evaluation data is missing, wait a few more minutes and download again
+**✓ Synchronous Evaluation:** Evaluation runs as the final step in the workflow before completion. When a document shows status "COMPLETE", all processing including evaluation is finished - results are immediately available for download.
 
 ```bash
-# Wait for evaluation to complete (check status)
-idp-cli status \
-    --stack-name eval-testing \
-    --batch-id eval-run-001
-
-# Download evaluation results
+# Download evaluation results (no waiting needed)
 idp-cli download-results \
     --stack-name eval-testing \
     --batch-id eval-run-001 \

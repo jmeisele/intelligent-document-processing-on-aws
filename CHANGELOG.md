@@ -29,6 +29,15 @@ SPDX-License-Identifier: MIT-0
 
 ### Changed
 
+- **Migrated Evaluation from EventBridge Trigger to Step Functions Workflow**
+  - Moved evaluation processing from external EventBridge-triggered Lambda to integrated Step Functions workflow step
+  - **Race Condition Eliminated**: Evaluation now runs inside state machine before WorkflowTracker marks documents COMPLETE, preventing premature completion status when evaluation is still running
+  - **Config-Driven Control**: Evaluation now controlled by `evaluation.enabled` configuration setting instead of CloudFormation stack parameter, enabling runtime control without stack redeployment
+  - **Enhanced Status Tracking**: Added EVALUATING status to document processing pipeline for better visibility of evaluation progress
+  - **UI Improvements**: Added support for displaying EVALUATING status in processing flow viewer and "NOT ENABLED" badge when evaluation is disabled in configuration
+  - **Consistent Pattern**: Aligns evaluation with summarization and assessment patterns for unified feature control approach
+
+
 - **Migrated UI Build System from Create React App to Vite**
   - Upgraded to Vite 7 for faster build times
   - Updated to React 18, AWS Amplify v6, react-router-dom v6, and Cloudscape Design System

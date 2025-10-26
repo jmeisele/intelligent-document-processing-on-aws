@@ -16,9 +16,11 @@ The GenAIIDP solution includes a built-in evaluation framework to assess the acc
    - Use an existing bucket or let the solution create one
    - Can use outputs from another GenAIIDP stack to compare different patterns/prompts
 
-2. **Automatic Evaluation**
-   - When enabled, automatically evaluates each processed document
-   - Compares against baseline data if available
+2. **Integrated Evaluation Step**
+   - Evaluation runs as the final step in the Step Functions workflow (after summarization)
+   - Executes **before** the workflow marks documents as COMPLETE, eliminating race conditions
+   - When `evaluation.enabled: true` in configuration, evaluates against baseline data if available
+   - When `evaluation.enabled: false` in configuration, step executes but skips processing
    - Generates detailed markdown reports using AI analysis
 
 3. **Evaluation Reports**
@@ -79,20 +81,37 @@ The confidence integration is fully backward compatible:
 
 ## Configuration
 
-Set the following parameters during stack deployment:
+### Stack Deployment Parameters
+
+Set the following parameter during stack deployment:
 
 ```yaml
 EvaluationBaselineBucketName:
   Description: Existing bucket with baseline data, or leave empty to create new bucket
-  
-EvaluationAutoEnabled:
-  Default: true
-  Description: Automatically evaluate each document (if baseline exists)
-  
-EvaluationModelId:
-  Default: "anthropic.claude-3-sonnet-20240229-v1:0"
-  Description: Model to use for evaluation reports (e.g., "us.anthropic.claude-3-7-sonnet-20250219-v1:0")
 ```
+
+### Runtime Configuration
+
+Control evaluation behavior through the configuration file (no stack redeployment needed):
+
+```yaml
+evaluation:
+  enabled: true  # Set to false to disable evaluation processing
+  llm_method:
+    model: "us.anthropic.claude-3-haiku-20240307-v1:0"  # Model for evaluation reports
+    temperature: "0.0"
+    top_p: "0.1"
+    max_tokens: "4096"
+    # Additional model parameters...
+```
+
+**Benefits of Configuration-Based Control:**
+- Enable/disable evaluation without stack redeployment
+- Runtime control similar to summarization and assessment features
+- Zero LLM costs when disabled (step executes but skips processing)
+- Consistent feature control pattern across the solution
+
+### Attribute-Specific Evaluation Methods
 
 You can also configure evaluation methods for specific document classes and attributes through the solution's configuration. The framework supports three types of attributes with different evaluation approaches:
 

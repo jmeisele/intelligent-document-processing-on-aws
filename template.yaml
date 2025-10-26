@@ -204,16 +204,6 @@ Parameters:
       Frequency for the Glue Crawler to run and discover new document section tables and partitions.
       Manual requires manual execution, other options run automatically at the specified interval.
 
-  EvaluationAutoEnabled:
-    Type: String
-    Default: true
-    AllowedValues:
-      - true
-      - false
-    Description: >-
-      If true, an evaluation is automatically attempted for each processed document (if the EvaluationBaselineBucket contains baseline data for the document).
-      Set to true during test cycles to evaluate and compare accuracy for different patterns and prompts for each document.
-      If false, evaluation is not automatically attempted for each processed document. Set to false when deployed in production.
 
   # X-Ray Tracing
   EnableXRayTracing:
@@ -468,7 +458,6 @@ Conditions:
   ShouldCreateEvaluationBaselineBucket:
     !Equals [!Ref EvaluationBaselineBucketName, ""]
   ShouldCreateReportingBucket: !Equals [!Ref ReportingBucketName, ""]
-  IsEvaluationAutoEnabled: !Equals [!Ref EvaluationAutoEnabled, "true"]
   IsWafEnabled: !Not [!Equals [!Ref WAFAllowedIPv4Ranges, "0.0.0.0/0"]]
   ShouldCreateDocumentKnowledgeBase:
     !Equals [!Ref DocumentKnowledgeBase, "BEDROCK_KNOWLEDGE_BASE (Create)"]
@@ -520,7 +509,6 @@ Metadata:
           default: "Evaluation"
         Parameters:
           - EvaluationBaselineBucketName
-          - EvaluationAutoEnabled
       - Label:
           default: "Reporting"
         Parameters:
@@ -918,6 +906,7 @@ Resources:
           - IsHITLEnabled
           - !GetAtt WorkforceURLResource.PortalURL
           - ""
+        EvaluationFunctionArn: !GetAtt EvaluationFunction.Arn
 
   PATTERN2STACK:
     DependsOn:
@@ -970,6 +959,7 @@ Resources:
         ArtifactBucket: "<ARTIFACT_BUCKET_TOKEN>"
         ArtifactPrefix: "<ARTIFACT_PREFIX_TOKEN>"
         Pattern2SourceZipfile: "<PATTERN2_SOURCE_ZIPFILE_TOKEN>"
+        EvaluationFunctionArn: !GetAtt EvaluationFunction.Arn
 
   PATTERN3STACK:
     DependsOn:
@@ -1017,6 +1007,7 @@ Resources:
           - ""
         EnableXRayTracing: !Ref EnableXRayTracing
         PermissionsBoundaryArn: !Ref PermissionsBoundaryArn
+        EvaluationFunctionArn: !GetAtt EvaluationFunction.Arn
 
   ##########################################################################
   # Encryption key
@@ -3013,42 +3004,6 @@ Resources:
     Properties:
       KmsKeyId: !GetAtt CustomerManagedEncryptionKey.Arn
       RetentionInDays: !Ref LogRetentionDays
-
-  EvaluationFunctionRule:
-    Type: AWS::Events::Rule
-    Condition: IsEvaluationAutoEnabled
-    Properties:
-      EventPattern:
-        source:
-          - aws.states
-        detail-type:
-          - Step Functions Execution Status Change
-        detail:
-          stateMachineArn:
-            - !If
-              - IsPattern3
-              - !GetAtt PATTERN3STACK.Outputs.StateMachineArn
-              - !If
-                - IsPattern2
-                - !GetAtt PATTERN2STACK.Outputs.StateMachineArn
-                - !GetAtt PATTERN1STACK.Outputs.StateMachineArn
-          status:
-            - SUCCEEDED
-      State: ENABLED
-      Targets:
-        - Arn: !GetAtt EvaluationFunction.Arn
-          Id: InvokeEvaluationFunction
-          RetryPolicy:
-            MaximumRetryAttempts: 3
-
-  EvaluationFunctionPermission:
-    Type: AWS::Lambda::Permission
-    Condition: IsEvaluationAutoEnabled
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref EvaluationFunction
-      Principal: !Sub "events.${AWS::URLSuffix}"
-      SourceArn: !GetAtt EvaluationFunctionRule.Arn
 
   ##########################################################################
   # CloudWatch monitoring

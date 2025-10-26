@@ -27,6 +27,7 @@ class Status(Enum):
     POSTPROCESSING = "POSTPROCESSING"  # Document summarization
     HITL_IN_PROGRESS = "HITL_IN_PROGRESS"  # Human-in-the-loop review in progress
     SUMMARIZING = "SUMMARIZING"  # Document summarization
+    EVALUATING = "EVALUATING"  # Document evaluation
     COMPLETED = "COMPLETED"  # All processing completed
     FAILED = "FAILED"  # Processing failed
 
